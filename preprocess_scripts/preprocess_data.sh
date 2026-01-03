@@ -9,4 +9,4 @@
 #SBATCH --error=preprocess_data.err
 
 
-python process_data.py --base_path re10k --output_dir re10k_processed --mode test
+python preprocess_scripts/preprocess_data.py --base_path re10k --output_dir re10k_processed --mode test

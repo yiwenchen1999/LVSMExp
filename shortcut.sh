@@ -1,4 +1,21 @@
+# env setup
+cd /Users/yiwenchen/Desktop/ResearchProjects/scripts
+source venv/bin/activate
+
+
 python process_data.py --base_path re10k --output_dir re10k_processed --mode test
+
+python preprocess_scripts/preprocess_objaverse.py \
+    --input data_samples/sample_objaverse \
+    --output data_samples/objaverse_processed \
+    --split test
+
+python preprocess_scripts/create_evaluation_index.py \
+    --full-list data_samples/objaverse_processed/test/full_list.txt \
+    --output data/evaluation_index_objaverse.json \
+    --n-input 2 \
+    --n-target 3 \
+    --seed 42
 
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
