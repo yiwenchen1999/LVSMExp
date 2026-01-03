@@ -1,0 +1,1 @@
+python process_data.py --base_path re10k --output_dir re10k_processed --mode test

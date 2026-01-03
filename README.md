@@ -25,13 +25,12 @@
     <a href="https://haian-jin.github.io/projects/LVSM/"><strong>Project Page</strong></a> |
     <a href="https://arxiv.org/abs/2410.17242"><strong>Paper</strong></a> 
 </div>
-
-<br>
+##### <br>
 
 
 ## 0. Clarification
 
-This is the **official repository** for the paper _"LVSM: A Large View Synthesis Model with Minimal 3D Inductive Bias"_.
+##### This is the **official repository** for the paper _"LVSM: A Large View Synthesis Model with Minimal 3D Inductive Bias"_.
 
 The code here is a **re-implementation** and **differs** from the original version developed at Adobe. However, the provided checkpoints are from the original Adobe implementation and were trained inside Adobe.
 

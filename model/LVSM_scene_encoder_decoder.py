@@ -219,56 +219,120 @@ class Images2LatentScene(nn.Module):
     
     
     def forward(self, data_batch, has_target_image=True):
-
+        #& Step 1: Data preprocessing - Extract input and target data from data_batch, compute rays
+        # input.image: [b, v_input, 3, h, w] - Input RGB images (v_input=2 views)
+        # input.ray_o: [b, v_input, 3, h, w] - Ray origins
+        # input.ray_d: [b, v_input, 3, h, w] - Ray directions
+        # target.image: [b, v_target, 3, h, w] - Target RGB images (v_target=6 views)
+        # target.ray_o: [b, v_target, 3, h, w] - Target ray origins
+        # target.ray_d: [b, v_target, 3, h, w] - Target ray directions
         input, target = self.process_data(data_batch, has_target_image=has_target_image, target_has_input = self.config.training.target_has_input, compute_rays=True)
         checkpoint_every = self.config.training.grad_checkpoint_every
         n_latent_vectors = self.config.model.transformer.n_latent_vectors
-        # Process input images
+        
+        #& Step 2: Build input image pose conditioning - Concatenate RGB images with ray info
+        # According to config: image_tokenizer.in_channels=9 (3 RGB + 6 pose)
+        # Using default_plucker method: pose_cond = [ray_o×ray_d, ray_d] = [3, 3] = 6 channels
+        # posed_input_images: [b, v_input, 9, h, w] - RGB images normalized to [-1,1] and concatenated with pose conditioning
         posed_input_images = self.get_posed_input(
             images=input.image, ray_o=input.ray_o, ray_d=input.ray_d
         )
         b, v_input, c, h, w = posed_input_images.size()
 
+        #& Step 3: Image tokenization - Split images into patches and convert to tokens
+        # According to config: image_tokenizer.patch_size=8, transformer.d=768
+        # Reshape [b, v_input, 9, h, w] to [b*v_input, n_patches, 8*8*9] then linearly project to d=768
+        # n_patches = (h//8) * (w//8) = (256//8)^2 = 32*32 = 1024
+        # input_img_tokens: [b*v_input, 1024, 768] - Each patch converted to a 768-dim token
         input_img_tokens = self.image_tokenizer(posed_input_images)  # [b*v, n_patches, d]
 
         _, n_patches, d = input_img_tokens.size()  # [b*v, n_patches, d]
+        #*Reshape input tokens - Merge batch and view dimensions
+        # input_img_tokens: [b, v_input*n_patches, 768] - All input view patches flattened
         input_img_tokens = input_img_tokens.reshape(b, v_input * n_patches, d)  # [b, v*n_patches, d]
         
+        #& Step 4: Initialize latent vectors - Learnable scene representation
+        # According to config: n_latent_vectors=3072 (3x32x32, corresponding to 3x32x32 latent grid)
+        #* latent_vector_tokens: [b, 3072, 768] - Learnable scene latent tokens
+        #* this corresponds to the scene latents in rayZer
         latent_vector_tokens = self.n_light_field_latent.expand(b, -1, -1) # [b, n_latent_vectors, d]
      
+        #& Step 5: Build encoder input - Concatenate latent vectors and input image tokens
+        # encoder_input_tokens: [b, 3072 + v_input*1024, 768]
+        # Order: [latent_tokens(3072), input_img_tokens(v_input*1024)]
         encoder_input_tokens = torch.cat((latent_vector_tokens, input_img_tokens), dim=1) # [b, n_latent_vectors + v*n_patches, d]
 
+        #& Step 6: Transformer encoder - Process through 12 transformer blocks
+        # According to config: encoder_n_layer=12, d=768, d_head=64, use_qk_norm=True
+        # Each layer contains: LayerNorm -> QK_Norm_SelfAttention (12 heads, 64 dim/head) -> LayerNorm -> MLP (ratio=4, hidden=3072)
+        # Encoder learns to extract scene information from input image tokens into latent tokens
+        # intermediate_tokens: [b, 3072 + v_input*1024, 768] - Encoded tokens
+        #* intermediate_tokens is the concatenation of the latent tokens and the input image tokens
         intermediate_tokens = self.pass_layers(self.transformer_encoder, encoder_input_tokens, gradient_checkpoint=True, checkpoint_every=checkpoint_every)
 
+        #& Step 7: Split latent tokens and input tokens - Extract encoded scene representation
+        # latent_tokens: [b, 3072, 768] - Encoded scene latent representation
+        # input_img_tokens: [b, v_input*1024, 768] - Encoded input image tokens (not used later)
         latent_tokens, input_img_tokens = intermediate_tokens.split(
             [self.config.model.transformer.n_latent_vectors, v_input * n_patches], dim=1
         ) # [b, n_latent_vectors, d], [b, v*n_patches, d]
                 
         
+        #& Step 8: Build target pose conditioning - Only use pose info (no RGB image)
+        # According to config: target_pose_tokenizer.in_channels=6 (pose only, no RGB)
+        # target_pose_cond: [b, v_target, 6, h, w] - Target view pose conditioning
         target_pose_cond= self.get_posed_input(ray_o=target.ray_o, ray_d=target.ray_d)
         b, v_target, c, h, w = target_pose_cond.size()
+        
+        #& Step 9: Replicate latent tokens for each target view
+        # repeated_latent_tokens: [b*v_target, 3072, 768] - Each target view has the same scene latent
         repeated_latent_tokens = repeat(
                                 latent_tokens,
                                 'b nl d -> (b v_target) nl d', 
                                 v_target=v_target) 
 
+        #& Step 10: Target pose tokenization - Convert target pose conditioning to tokens
+        # According to config: target_pose_tokenizer.patch_size=8, in_channels=6
+        # Reshape [b, v_target, 6, h, w] to [b*v_target, n_patches, 8*8*6] then linearly project to d=768
+        # target_pose_tokens: [b*v_target, 1024, 768] - Target pose patch tokens
+        # todo: figure out the structure of the target_tokenizer
         target_pose_tokens = self.target_pose_tokenizer(target_pose_cond) # [b*v_target, n_patches, d]
         
+        #& Step 11: Build decoder input - Concatenate target pose tokens and latent tokens
+        # decoder_input_tokens: [b*v_target, 1024 + 3072, 768]
+        # Order: [target_pose_tokens(1024), repeated_latent_tokens(3072)]
         decoder_input_tokens = torch.cat((target_pose_tokens, repeated_latent_tokens), dim=1) # [b*v_target, n_latent_vectors + n_patches, d]
+        
+        #& Step 12: Decoder input LayerNorm - Normalize decoder input
+        # decoder_input_tokens: [b*v_target, 4096, 768] - Normalized decoder input
         decoder_input_tokens = self.transformer_input_layernorm_decoder(decoder_input_tokens)
 
+        #& Step 13: Transformer decoder - Generate target image tokens through 12 transformer blocks
+        # According to config: decoder_n_layer=12, d=768, d_head=64, use_qk_norm=True
+        # Each layer contains: LayerNorm -> QK_Norm_SelfAttention (12 heads, 64 dim/head) -> LayerNorm -> MLP (ratio=4, hidden=3072)
+        # Decoder generates target view image tokens based on target pose and scene latent
+        # transformer_output_tokens: [b*v_target, 4096, 768] - Decoded tokens
         transformer_output_tokens = self.pass_layers(self.transformer_decoder, decoder_input_tokens, gradient_checkpoint=True, checkpoint_every=checkpoint_every)
 
-        # Discard the latent tokens
+        #& Step 14: Extract target image tokens - Discard latent tokens, keep only image tokens
+        # target_image_tokens: [b*v_target, 1024, 768] - Generated target image patch tokens
+        # _: [b*v_target, 3072, 768] - latent tokens (discarded)
         target_image_tokens, _ = transformer_output_tokens.split(
             [n_patches, n_latent_vectors], dim=1
         ) # [b*v_target, n_patches, d], [b*v_target, n_latent_vectors, d]
 
-        # [b*v_target, n_patches, p*p*3]
+        #& Step 15: Image token decoding - Decode tokens to RGB pixel values
+        # According to config: target_pose_tokenizer.patch_size=8
+        # Each 768-dim token goes through LayerNorm -> Linear(768 -> 8*8*3) -> Sigmoid
+        # rendered_images: [b*v_target, 1024, 192] - 8x8x3 pixel values per patch (range [0,1])
         rendered_images = self.image_token_decoder(target_image_tokens)
         
         height, width = target.image_h_w
 
+        #& Step 16: Reshape to images - Reassemble patches into complete images
+        # According to config: patch_size=8, image_size=256
+        # h_patches = height//8 = 256//8 = 32, w_patches = width//8 = 32
+        # rendered_images: [b, v_target, 3, 256, 256] - Final rendered RGB images
         patch_size = self.config.model.target_pose_tokenizer.patch_size
         rendered_images = rearrange(
             rendered_images, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
@@ -279,6 +343,9 @@ class Images2LatentScene(nn.Module):
             p2=patch_size, 
             c=3
         )
+        
+        #& Step 17: Compute loss (if target images are provided)
+        # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
         if has_target_image:
             loss_metrics = self.loss_computer(
                 rendered_images,
@@ -287,6 +354,7 @@ class Images2LatentScene(nn.Module):
         else:
             loss_metrics = None
 
+        #& Step 18: Return results
         result = edict(
             input=input,
             target=target,
