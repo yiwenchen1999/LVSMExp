@@ -75,7 +75,7 @@ training:
 inference:
   if_inference: False
   compute_metrics: False
-  view_idx_file_path: ./data/evaluation_index_objaverse.json
+  view_idx_file_path: ./data/evaluation_index_objaverse_test_4i3o.json
   render_video: False
   render_video_config:
     traj_type: interpolate
