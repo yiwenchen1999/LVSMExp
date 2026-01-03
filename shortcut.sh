@@ -1,6 +1,6 @@
 python process_data.py --base_path re10k --output_dir re10k_processed --mode test
 
-torchrun --nproc_per_node 8 --nnodes 1 \
+torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
 inference.py --config "configs/LVSM_scene_encoder_decoder.yaml" \
 training.dataset_path = "./re10k_processed/test/full_list.txt" \
