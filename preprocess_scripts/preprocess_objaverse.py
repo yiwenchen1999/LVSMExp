@@ -190,12 +190,13 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             # Copy image
             shutil.copy2(input_image_path, output_image_path)
             
-            # Create relative image path (relative to output_root)
-            relative_image_path = os.path.join(split, 'images', scene_name, output_image_name)
+            # Create absolute image path for the JSON file
+            # This ensures the path works regardless of where the code is run from
+            absolute_image_path = os.path.abspath(output_image_path)
             
             # Create frame entry
             frame = {
-                "image_path": relative_image_path,
+                "image_path": absolute_image_path,
                 "fxfycxcy": fxfycxcy,
                 "w2c": w2c.tolist()
             }
