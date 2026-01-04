@@ -38,7 +38,7 @@ amp_dtype_mapping = {
     "fp32": torch.float32, 
     'tf32': torch.float32
 }
-
+print(f"------0.0 training script started, basic config set up------")
 # Load dataset
 dataset_name = config.training.get("dataset_name", "data.dataset.Dataset")
 module, class_name = dataset_name.rsplit(".", 1)
@@ -60,6 +60,7 @@ dataloader = DataLoader(
 )
 dataloader_iter = iter(dataloader)
 
+print(f"------1.0 dataloader set up------")
 total_train_steps = config.training.train_steps
 grad_accum_steps = config.training.grad_accum_steps
 total_param_update_steps = total_train_steps
@@ -72,7 +73,7 @@ module, class_name = config.model.class_name.rsplit(".", 1)
 LVSM = importlib.import_module(module).__dict__[class_name]
 model = LVSM(config).to(ddp_info.device)
 model = DDP(model, device_ids=[ddp_info.local_rank])
-
+print(f"------2.0 model initialized and wrapped with DDP------")
 
 optimizer, optimized_param_dict, all_param_dict = create_optimizer(
     model,
@@ -90,6 +91,7 @@ lr_scheduler = create_lr_scheduler(
     config.training.warmup,
     scheduler_type=scheduler_type,
 )
+print(f"------3.0 optimizer set up------")
 
 
 if config.training.get("resume_ckpt", "") != "":
@@ -104,7 +106,7 @@ optimizer, lr_scheduler, cur_train_step, cur_param_update_step = auto_resume_job
     lr_scheduler,
     reset_training_state,
 )
-
+print(f"------4.0 checkpoint loaded and training state resumed------")
 
 enable_grad_scaler = config.training.use_amp and config.training.amp_dtype == "fp16"
 scaler = torch.amp.GradScaler('cuda', enabled=enable_grad_scaler)
@@ -113,8 +115,9 @@ dist.barrier()
 
 start_train_step = cur_train_step
 model.train()
-
+print(f"------5.0 model set to train mode------")
 while cur_train_step <= total_train_steps:
+    print(f"------5.1 training step {cur_train_step} started!------")
     tic = time.time()
     cur_epoch = int(cur_train_step * (total_batch_size / grad_accum_steps) // len(dataset) )
     try:
@@ -265,6 +268,6 @@ while cur_train_step <= total_train_steps:
         torch.cuda.empty_cache()
         dist.barrier()
         
-
+print(f"------6.0 training finished!------")
 dist.barrier()
 dist.destroy_process_group()
