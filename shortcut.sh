@@ -13,22 +13,28 @@ python process_data.py --base_path re10k --output_dir re10k_processed --mode tes
 python preprocess_scripts/preprocess_objaverse.py \
     --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format \
-    --split train
+    --split test
 python preprocess_scripts/create_evaluation_index.py \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/train/full_list.txt \
-    --output data/evaluation_index_objaverse_train.json \
+    --output data/evaluation_index_objaverse_test.json \
     --n-input 2 \
     --n-target 3 \
     --seed 42
 
+
+# train-og:
+torchrun --nproc_per_node 8 --nnodes 8 \
+    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
+    train.py --config configs/LVSM_scene_encoder_decoder.yaml
+
 python preprocess_scripts/preprocess_objaverse.py \
     --input data_samples/sample_objaverse \
     --output data_samples/objaverse_processed \
-    --split test
+    --split train
 python preprocess_scripts/create_evaluation_index.py \
     --full-list data_samples/objaverse_processed/test/full_list.txt \
     --output data/evaluation_index_objaverse_test.json \
-    --n-input 2 \
+    --n-input 4 \
     --n-target 3 \
     --seed 42
 
@@ -47,6 +53,7 @@ training.num_target_views = 3 \
 inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = true \
+inference.view_idx_file_path = "./data/evaluation_index_re10k.json" \
 inference_out_dir = ./experiments/evaluation/test
 
 # base, objaverse
@@ -63,4 +70,5 @@ training.num_target_views = 3 \
 inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = true \
+inference.view_idx_file_path = "./data/evaluation_index_objaverse_test.json" \
 inference_out_dir = ./experiments/evaluation/train_obj_2i3o
