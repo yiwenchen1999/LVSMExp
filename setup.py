@@ -235,12 +235,13 @@ def init_wandb_and_backup(config):
     )
 
     # Source code backup
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
-    trgt_dir = os.path.join(config.training.checkpoint_dir, "src", os.path.basename(cur_dir))
-    os.makedirs(trgt_dir, exist_ok=True)
-    extension_to_backup=(".py", ".yaml", ".sh", ".bash", ".json")
-    exclude_dirs=("wandb", ".git", "checkpoints", "experiments")
-    local_backup_src_code(cur_dir, trgt_dir, extension_to_backup=extension_to_backup, exclude_dirs=exclude_dirs)
+    # Temporarily disabled for testing
+    # cur_dir = os.path.dirname(os.path.realpath(__file__))
+    # trgt_dir = os.path.join(config.training.checkpoint_dir, "src", os.path.basename(cur_dir))
+    # os.makedirs(trgt_dir, exist_ok=True)
+    # extension_to_backup=(".py", ".yaml", ".sh", ".bash", ".json")
+    # exclude_dirs=("wandb", ".git", "checkpoints", "experiments", "re10k_processed", "data_samples", "result_previews")
+    # local_backup_src_code(cur_dir, trgt_dir, extension_to_backup=extension_to_backup, exclude_dirs=exclude_dirs)
 
     # Save config file
     config_save_path = os.path.join(config.training.checkpoint_dir, "config.yaml")
