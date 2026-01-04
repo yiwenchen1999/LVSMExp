@@ -21,22 +21,22 @@ python preprocess_scripts/create_evaluation_index.py \
     --n-target 3 \
     --seed 42
 
-
-# train-og:
-torchrun --nproc_per_node 8 --nnodes 8 \
-    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
-    train.py --config configs/LVSM_scene_encoder_decoder.yaml
-
 python preprocess_scripts/preprocess_objaverse.py \
     --input data_samples/sample_objaverse \
     --output data_samples/objaverse_processed \
     --split train
 python preprocess_scripts/create_evaluation_index.py \
     --full-list data_samples/objaverse_processed/test/full_list.txt \
-    --output data/evaluation_index_objaverse_test.json \
+    --output data/evaluation_index_objaverse_test_4i3o.json \
     --n-input 4 \
     --n-target 3 \
     --seed 42
+
+# train-og:
+torchrun --nproc_per_node 8 --nnodes 8 \
+    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
+    train.py --config configs/LVSM_scene_encoder_decoder.yaml
+
 
 # inference
 # base, re10k
@@ -63,12 +63,12 @@ inference.py --config "configs/LVSM_scene_encoder_decoder.yaml" \
 training.dataset_path = "./data_samples/objaverse_processed/test/full_list.txt" \
 training.batch_size_per_gpu = 4 \
 training.target_has_input =  false \
-training.num_views = 5 \
+training.num_views = 7 \
 training.square_crop = true \
-training.num_input_views = 2 \
+training.num_input_views = 4 \
 training.num_target_views = 3 \
 inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = true \
-inference.view_idx_file_path = "./data/evaluation_index_objaverse_test.json" \
-inference_out_dir = ./experiments/evaluation/train_obj_2i3o
+inference.view_idx_file_path = "./data/evaluation_index_objaverse_test_4i3o.json" \
+inference_out_dir = ./experiments/evaluation/test_obj_4i3o
