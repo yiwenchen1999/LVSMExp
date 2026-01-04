@@ -144,6 +144,13 @@ def auto_resume_job(
     if not reset_training_state:
         try:
             optimizer.load_state_dict(checkpoint["optimizer"])
+            # Move optimizer state to the correct device
+            # This is necessary when using fused optimizers and loading from CPU
+            device = next(model.parameters()).device
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(device)
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
             forward_pass_step = checkpoint["fwdbwd_pass_step"]
             param_update_step = checkpoint["param_update_step"]
