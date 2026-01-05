@@ -199,5 +199,6 @@ class Dataset(Dataset):
             # Try another random index instead
             traceback.print_exc()
             print(f"Error loading scene at index {idx}, trying another random index")
+            return None
             return self.__getitem__(random.randint(0, len(self) - 1))
 
