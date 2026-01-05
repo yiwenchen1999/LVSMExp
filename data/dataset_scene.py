@@ -75,6 +75,24 @@ class Dataset(Dataset):
                 image = image.crop((start_w, start_h, start_w + min_size, start_h + min_size))
 
             image = np.array(image) / 255.0
+            
+            # Handle RGBA images: alpha blend with white background
+            if image.shape[2] == 4:  # RGBA image
+                rgb = image[:, :, :3]  # Extract RGB channels
+                alpha = image[:, :, 3:4]  # Extract alpha channel [h, w, 1]
+                # Alpha blend with white background: RGB * alpha + (1 - alpha) * white
+                # white = 1.0 (normalized)
+                image = rgb * alpha + (1.0 - alpha) * 1.0
+            elif image.shape[2] == 3:  # RGB image
+                image = image
+            else:
+                # Convert grayscale or other formats to RGB
+                if len(image.shape) == 2:  # Grayscale
+                    image = np.stack([image, image, image], axis=2)
+                else:
+                    # Take first 3 channels if more than 3
+                    image = image[:, :, :3]
+            
             image = torch.from_numpy(image).permute(2, 0, 1).float()
             fxfycxcy = np.array(cur_frame["fxfycxcy"])
             resize_ratio_x = resize_w / original_image_w
@@ -204,11 +222,10 @@ class Dataset(Dataset):
                 "index": indices,
                 "scene_name": scene_name
             }
-        except (ValueError, IndexError, KeyError) as e:
-            # Fallback for any data loading errors (including view_selector failures)
+        except (ValueError, IndexError, KeyError, FileNotFoundError, RuntimeError) as e:
+            # Fallback for any data loading errors (including view_selector failures, file not found, or tensor shape mismatches)
             # Try another random index instead
             traceback.print_exc()
             print(f"Error loading scene at index {idx}, trying another random index")
-            return None
             return self.__getitem__(random.randint(0, len(self) - 1))
 
