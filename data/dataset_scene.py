@@ -131,8 +131,8 @@ class Dataset(Dataset):
         return in_c2ws
 
     def view_selector(self, frames):
-        print(f"frames: {len(frames)}")
-        print(f"num_views: {self.config.training.num_views}")
+        # print(f"frames: {len(frames)}")
+        # print(f"num_views: {self.config.training.num_views}")
         if len(frames) < self.config.training.num_views:
             return None
         # sample view candidates
@@ -163,8 +163,8 @@ class Dataset(Dataset):
             data_json = json.load(open(scene_path, 'r'))
             frames = data_json["frames"]
             scene_name = data_json["scene_name"]
-            print(f"scene_name: {scene_name}")
-            print(f"frames: {len(frames)}")
+            # print(f"scene_name: {scene_name}")
+            # print(f"frames: {len(frames)}")
 
             if self.inference and scene_name in self.view_idx_list:
                 current_view_idx = self.view_idx_list[scene_name]

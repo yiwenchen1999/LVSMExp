@@ -117,7 +117,7 @@ start_train_step = cur_train_step
 model.train()
 print(f"------5.0 model set to train mode------")
 while cur_train_step <= total_train_steps:
-    # print(f"------5.1 training step {cur_train_step} started!------")
+    print(f"------5.1 training step {cur_train_step} started!------")
     tic = time.time()
     cur_epoch = int(cur_train_step * (total_batch_size / grad_accum_steps) // len(dataset) )
     try:
