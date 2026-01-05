@@ -32,7 +32,7 @@ training:
   checkpoint_dir: ckpt/LVSM_scene_encoder_decoder
   checkpoint_every: 2000
   dataset_name: data.dataset_scene.Dataset
-  dataset_path: ./re10k_processed/test/full_list.txt
+  dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/test/full_list.txt
   grad_accum_steps: 1
   grad_checkpoint_every: 1
   grad_clip_norm: 1.0
@@ -42,9 +42,9 @@ training:
   reset_training_state: True
 
   lr: 0.0004
-  train_steps: 200000
-  num_input_views: 2
-  num_target_views: 6
+  train_steps: 100000
+  num_input_views: 4
+  num_target_views: 8
   num_threads: 4
   num_views: 8
   num_workers: 2
@@ -61,8 +61,8 @@ training:
   use_rel_pose: false
   use_tf32: true
   view_selector:
-    max_frame_dist: 192
-    min_frame_dist: 25
+    max_frame_dist: 5
+    min_frame_dist: 1
   vis_every: 1000
   wandb_exp_name: LVSM_scene_encoder_decoder
   wandb_log_every: 50
@@ -76,7 +76,7 @@ training:
 inference:
   if_inference: False
   compute_metrics: False
-  view_idx_file_path: ./data/evaluation_index_re10k.json
+  view_idx_file_path: ./data/evaluation_index_objaverse_test.json
   render_video: False
   render_video_config:
     traj_type: interpolate

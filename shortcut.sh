@@ -15,10 +15,10 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/train/full_list.txt \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/test/full_list.txt \
     --output data/evaluation_index_objaverse_test.json \
-    --n-input 2 \
-    --n-target 3 \
+    --n-input 4 \
+    --n-target 8 \
     --seed 42
 
 python preprocess_scripts/preprocess_objaverse.py \
@@ -36,7 +36,7 @@ python preprocess_scripts/create_evaluation_index.py \
 torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
     train.py --config configs/LVSM_scene_encoder_decoder.yaml \
-    training.batch_size_per_gpu = 4
+    training.batch_size_per_gpu = 8
 
 
 
