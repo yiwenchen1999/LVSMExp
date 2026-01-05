@@ -144,50 +144,56 @@ class Dataset(Dataset):
             return None
         start_frame = random.randint(0, len(frames) - frame_dist - 1)
         end_frame = start_frame + frame_dist
-        sampled_frames = random.sample(range(start_frame + 1, end_frame), self.config.training.num_views-2)
+        # Check if we have enough frames in the range to sample
+        # We need num_views-2 samples from range(start_frame+1, end_frame)
+        # which has size: end_frame - start_frame - 1 = frame_dist - 1
+        num_samples_needed = self.config.training.num_views - 2
+        available_range_size = end_frame - start_frame - 1
+        if available_range_size < num_samples_needed:
+            return None
+        sampled_frames = random.sample(range(start_frame + 1, end_frame), num_samples_needed)
         image_indices = [start_frame, end_frame] + sampled_frames
         return image_indices
 
     def __getitem__(self, idx):
-        # try:
-        scene_path = self.all_scene_paths[idx].strip()
-        data_json = json.load(open(scene_path, 'r'))
-        frames = data_json["frames"]
-        scene_name = data_json["scene_name"]
+        try:
+            scene_path = self.all_scene_paths[idx].strip()
+            data_json = json.load(open(scene_path, 'r'))
+            frames = data_json["frames"]
+            scene_name = data_json["scene_name"]
 
-        if self.inference and scene_name in self.view_idx_list:
-            current_view_idx = self.view_idx_list[scene_name]
-            image_indices= current_view_idx["context"] + current_view_idx["target"]
-        else:
-            # sample input and target views
-            image_indices = self.view_selector(frames)
-            if image_indices is None:
-                return self.__getitem__(random.randint(0, len(self) - 1))
-        image_paths_chosen = [frames[ic]["image_path"] for ic in image_indices]
-        frames_chosen = [frames[ic] for ic in image_indices]
-        input_images, input_intrinsics, input_c2ws = self.preprocess_frames(frames_chosen, image_paths_chosen)
-    
-        # except:
-        #     traceback.print_exc()
-        #     print(f"error loading")
-        #     print(image_indices)
-        #     print(image_paths_chosen)
-        #     return self.__getitem__(random.randint(0, len(self) - 1))
+            if self.inference and scene_name in self.view_idx_list:
+                current_view_idx = self.view_idx_list[scene_name]
+                image_indices= current_view_idx["context"] + current_view_idx["target"]
+            else:
+                # sample input and target views
+                image_indices = self.view_selector(frames)
+                if image_indices is None:
+                    # Fallback: try another random index
+                    return self.__getitem__(random.randint(0, len(self) - 1))
+            image_paths_chosen = [frames[ic]["image_path"] for ic in image_indices]
+            frames_chosen = [frames[ic] for ic in image_indices]
+            input_images, input_intrinsics, input_c2ws = self.preprocess_frames(frames_chosen, image_paths_chosen)
 
+            # centerize and scale the poses (for unbounded scenes)
+            scene_scale_factor = self.config.training.get("scene_scale_factor", 1.35)
+            input_c2ws = self.preprocess_poses(input_c2ws, scene_scale_factor)
 
-        # centerize and scale the poses (for unbounded scenes)
-        scene_scale_factor = self.config.training.get("scene_scale_factor", 1.35)
-        input_c2ws = self.preprocess_poses(input_c2ws, scene_scale_factor)
+            image_indices = torch.tensor(image_indices).long().unsqueeze(-1)  # [v, 1]
+            scene_indices = torch.full_like(image_indices, idx)  # [v, 1]
+            indices = torch.cat([image_indices, scene_indices], dim=-1)  # [v, 2]
 
-        image_indices = torch.tensor(image_indices).long().unsqueeze(-1)  # [v, 1]
-        scene_indices = torch.full_like(image_indices, idx)  # [v, 1]
-        indices = torch.cat([image_indices, scene_indices], dim=-1)  # [v, 2]
-
-        return {
-            "image": input_images,
-            "c2w": input_c2ws,
-            "fxfycxcy": input_intrinsics,
-            "index": indices,
-            "scene_name": scene_name
-        }
+            return {
+                "image": input_images,
+                "c2w": input_c2ws,
+                "fxfycxcy": input_intrinsics,
+                "index": indices,
+                "scene_name": scene_name
+            }
+        except (ValueError, IndexError, KeyError) as e:
+            # Fallback for any data loading errors (including view_selector failures)
+            # Try another random index instead
+            traceback.print_exc()
+            print(f"Error loading scene at index {idx}, trying another random index")
+            return self.__getitem__(random.randint(0, len(self) - 1))
 
