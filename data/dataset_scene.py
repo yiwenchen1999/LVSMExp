@@ -131,8 +131,8 @@ class Dataset(Dataset):
         return in_c2ws
 
     def view_selector(self, frames):
-        print(f"frames: {len(frames)}")
-        print(f"num_views: {self.config.training.num_views}")
+        # print(f"frames: {len(frames)}")
+        # print(f"num_views: {self.config.training.num_views}")
         if len(frames) < self.config.training.num_views:
             print(f"Not enough frames to sample")
             return None
