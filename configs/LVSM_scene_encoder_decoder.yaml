@@ -46,7 +46,7 @@ training:
   num_input_views: 4
   num_target_views: 8
   num_threads: 4
-  num_views: 8
+  num_views: 12
   num_workers: 2
 
   prefetch_factor: 32
@@ -61,8 +61,8 @@ training:
   use_rel_pose: false
   use_tf32: true
   view_selector:
-    max_frame_dist: 5
-    min_frame_dist: 1
+    max_frame_dist: 60
+    min_frame_dist: 15
   vis_every: 1000
   wandb_exp_name: LVSM_scene_encoder_decoder
   wandb_log_every: 50
