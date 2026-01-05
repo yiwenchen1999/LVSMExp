@@ -131,18 +131,25 @@ class Dataset(Dataset):
         return in_c2ws
 
     def view_selector(self, frames):
-        # print(f"frames: {len(frames)}")
-        # print(f"num_views: {self.config.training.num_views}")
+        print(f"frames: {len(frames)}")
+        print(f"num_views: {self.config.training.num_views}")
         if len(frames) < self.config.training.num_views:
+            print(f"Not enough frames to sample")
             return None
         # sample view candidates
         view_selector_config = self.config.training.view_selector
         min_frame_dist = view_selector_config.get("min_frame_dist", 25)
         max_frame_dist = min(len(frames) - 1, view_selector_config.get("max_frame_dist", 100))
         if max_frame_dist <= min_frame_dist:
+            print(f"max_frame_dist: {max_frame_dist}")
+            print(f"min_frame_dist: {min_frame_dist}")
+            print(f"max_frame_dist <= min_frame_dist")
             return None
         frame_dist = random.randint(min_frame_dist, max_frame_dist)
         if len(frames) <= frame_dist:
+            print(f"len(frames): {len(frames)}")
+            print(f"frame_dist: {frame_dist}")
+            print(f"len(frames) <= frame_dist")
             return None
         start_frame = random.randint(0, len(frames) - frame_dist - 1)
         end_frame = start_frame + frame_dist
@@ -152,6 +159,9 @@ class Dataset(Dataset):
         num_samples_needed = self.config.training.num_views - 2
         available_range_size = end_frame - start_frame - 1
         if available_range_size < num_samples_needed:
+            print(f"available_range_size: {available_range_size}")
+            print(f"num_samples_needed: {num_samples_needed}")
+            print(f"available_range_size < num_samples_needed")
             return None
         sampled_frames = random.sample(range(start_frame + 1, end_frame), num_samples_needed)
         image_indices = [start_frame, end_frame] + sampled_frames
