@@ -61,7 +61,7 @@ training:
   use_rel_pose: false
   use_tf32: true
   view_selector:
-    max_frame_dist: 60
+    max_frame_dist: 180
     min_frame_dist: 15
   vis_every: 1000
   wandb_exp_name: LVSM_obj_encoder_decoder_sparse
