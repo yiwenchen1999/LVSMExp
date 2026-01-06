@@ -12,7 +12,7 @@ from .transformer import QK_Norm_TransformerBlock, init_weights
 from .loss import LossComputer
 
 
-class Images2LatentScene(nn.Module):
+class LatentSceneEditor(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -60,6 +60,22 @@ class Images2LatentScene(nn.Module):
             patch_size = self.config.model.target_pose_tokenizer.patch_size,
             d_model = self.config.model.transformer.d
         )
+        
+        # Environment tokenizer (RGB + ray directions)
+        env_config = self.config.model.get("env_tokenizer", {})
+        if env_config:
+            self.env_tokenizer = self._create_tokenizer(
+                in_channels = env_config.get("in_channels", 6),  # 3 RGB + 3 ray_d
+                patch_size = env_config.get("patch_size", 8),
+                d_model = self.config.model.transformer.d
+            )
+        else:
+            # Default: 3 RGB + 3 ray_d = 6 channels
+            self.env_tokenizer = self._create_tokenizer(
+                in_channels = 6,
+                patch_size = 8,
+                d_model = self.config.model.transformer.d
+            )
         
         # Image token decoder (decode image tokens into pixels)
         self.image_token_decoder = nn.Sequential(
@@ -131,6 +147,31 @@ class Images2LatentScene(nn.Module):
         self.transformer_encoder = nn.ModuleList(self.transformer_encoder)
         self.transformer_decoder = nn.ModuleList(self.transformer_decoder)
         self.transformer_input_layernorm_decoder = nn.LayerNorm(config.d, bias=False)
+        
+        # Transformer editor block (for editing latent tokens)
+        editor_config = config.get("editor", {})
+        editor_n_layer = editor_config.get("n_layer", 1)
+        self.transformer_editor = nn.ModuleList([
+            QK_Norm_TransformerBlock(
+                config.d, config.d_head, use_qk_norm=use_qk_norm
+            ) for _ in range(editor_n_layer)
+        ])
+        # Initialize editor blocks with smaller weights to start near identity
+        # This prevents the editor from disrupting pre-trained latent tokens initially
+        editor_init_scale = editor_config.get("init_scale", 0.1)  # Default: 0.1x of normal init
+        if config.get("special_init", False):
+            for idx, block in enumerate(self.transformer_editor):
+                if config.get("depth_init", False):
+                    # Use smaller initialization for editor (scaled by editor_init_scale)
+                    weight_init_std = (0.02 / (2 * (idx + 1)) ** 0.5) * editor_init_scale
+                else:
+                    weight_init_std = (0.02 / (2 * editor_n_layer) ** 0.5) * editor_init_scale
+                block.apply(lambda module: init_weights(module, weight_init_std))
+        else:
+            # Use smaller initialization for editor (scaled by editor_init_scale)
+            editor_std = 0.02 * editor_init_scale
+            for block in self.transformer_editor:
+                block.apply(lambda module: init_weights(module, editor_std))
 
 
     def train(self, mode=True):
@@ -529,6 +570,94 @@ class Images2LatentScene(nn.Module):
             return None
         
         self.load_state_dict(checkpoint["model"], strict=False)
+        return 0
+
+    @torch.no_grad()
+    def init_from_LVSM(self, lvsm_checkpoint_path):
+        """
+        从 Images2LatentScene 模型初始化 LatentSceneEditor
+        
+        Args:
+            lvsm_checkpoint_path: Images2LatentScene 模型的 checkpoint 路径
+            
+        Returns:
+            0 if successful, None if failed
+        """
+        # Import Images2LatentScene
+        from .LVSM_scene_encoder_decoder import Images2LatentScene
+        
+        # Load checkpoint
+        if os.path.isdir(lvsm_checkpoint_path):
+            ckpt_names = [file_name for file_name in os.listdir(lvsm_checkpoint_path) if file_name.endswith(".pt")]
+            ckpt_names = sorted(ckpt_names, key=lambda x: x)
+            ckpt_paths = [os.path.join(lvsm_checkpoint_path, ckpt_name) for ckpt_name in ckpt_names]
+        else:
+            ckpt_paths = [lvsm_checkpoint_path]
+        
+        try:
+            checkpoint = torch.load(ckpt_paths[-1], map_location="cpu", weights_only=True)
+        except:
+            traceback.print_exc()
+            print(f"Failed to load LVSM checkpoint from {ckpt_paths[-1]}")
+            return None
+        
+        # Create Images2LatentScene model and load weights
+        lvsm_model = Images2LatentScene(self.config)
+        lvsm_model.load_state_dict(checkpoint["model"], strict=False)
+        
+        # Get state dicts
+        lvsm_state_dict = lvsm_model.state_dict()
+        editor_state_dict = self.state_dict()
+        
+        # Copy matching weights from Images2LatentScene to LatentSceneEditor
+        matched_keys = []
+        unmatched_keys = []
+        for key in editor_state_dict.keys():
+            if key in lvsm_state_dict:
+                # Check if shapes match
+                if editor_state_dict[key].shape == lvsm_state_dict[key].shape:
+                    editor_state_dict[key] = lvsm_state_dict[key]
+                    matched_keys.append(key)
+                else:
+                    print(f"Warning: Shape mismatch for {key}: {editor_state_dict[key].shape} vs {lvsm_state_dict[key].shape}")
+                    unmatched_keys.append(key)
+            else:
+                unmatched_keys.append(key)
+        
+        # Optionally initialize editor from decoder weights
+        editor_config = self.config.model.transformer.get("editor", {})
+        init_editor_from_decoder = editor_config.get("init_from_decoder", False)
+        
+        if init_editor_from_decoder:
+            # Copy weights from decoder to editor (useful since both process latent tokens)
+            editor_n_layer = len(self.transformer_editor)
+            decoder_n_layer = len(self.transformer_decoder)
+            
+            # Copy decoder weights to editor (use last N layers if editor has fewer layers)
+            copy_start_idx = max(0, decoder_n_layer - editor_n_layer)
+            copied_layers = 0
+            
+            for editor_idx in range(editor_n_layer):
+                decoder_idx = copy_start_idx + editor_idx
+                if decoder_idx < decoder_n_layer:
+                    # Copy weights from decoder layer to editor layer
+                    editor_block = self.transformer_editor[editor_idx]
+                    decoder_block = self.transformer_decoder[decoder_idx]
+                    
+                    editor_block.load_state_dict(decoder_block.state_dict(), strict=True)
+                    copied_layers += 1
+            
+            print(f"  - Initialized {copied_layers}/{editor_n_layer} editor layers from decoder")
+        
+        # Load the combined state dict
+        self.load_state_dict(editor_state_dict, strict=False)
+        
+        print(f"Initialized LatentSceneEditor from Images2LatentScene:")
+        print(f"  - Matched keys: {len(matched_keys)}")
+        print(f"  - Unmatched keys (using new weights): {len(unmatched_keys)}")
+        if unmatched_keys:
+            print(f"  - New components: {', '.join(unmatched_keys)}")
+        
         return 0
 
 
