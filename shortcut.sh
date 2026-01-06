@@ -36,7 +36,7 @@ python preprocess_scripts/create_evaluation_index.py \
 torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
     train.py --config configs/LVSM_scene_encoder_decoder.yaml \
-    training.batch_size_per_gpu = 16
+    training.batch_size_per_gpu = 8
 
 
 
