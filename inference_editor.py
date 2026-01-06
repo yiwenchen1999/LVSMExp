@@ -59,21 +59,38 @@ module, class_name = config.model.class_name.rsplit(".", 1)
 LVSM = importlib.import_module(module).__dict__[class_name]
 model = LVSM(config).to(ddp_info.device)
 
-# Initialize from Images2LatentScene if LVSM_checkpoint_dir is provided and checkpoint_dir doesn't exist
-if config.training.get("LVSM_checkpoint_dir", "") and not (config.training.get("checkpoint_dir", "") and os.path.exists(config.training.checkpoint_dir)):
+# Check if checkpoint_dir has .pt files
+checkpoint_dir = config.training.get("checkpoint_dir", "")
+has_checkpoint = False
+if checkpoint_dir:
+    if os.path.isdir(checkpoint_dir):
+        ckpt_files = [f for f in os.listdir(checkpoint_dir) if f.endswith(".pt")]
+        has_checkpoint = len(ckpt_files) > 0
+    elif os.path.isfile(checkpoint_dir) and checkpoint_dir.endswith(".pt"):
+        has_checkpoint = True
+
+# Try to load from checkpoint_dir first
+if has_checkpoint:
+    result = model.load_ckpt(checkpoint_dir)
+    if result is not None:
+        print(f"Loaded checkpoint from {checkpoint_dir}")
+    else:
+        print(f"Warning: Failed to load checkpoint from {checkpoint_dir}, trying LVSM_checkpoint_dir...")
+        has_checkpoint = False  # Mark as failed, will try LVSM_checkpoint_dir
+
+# If no checkpoint in checkpoint_dir, try to initialize from LVSM_checkpoint_dir
+if not has_checkpoint and config.training.get("LVSM_checkpoint_dir", ""):
     lvsm_checkpoint_dir = config.training.LVSM_checkpoint_dir
     print(f"Initializing LatentSceneEditor from Images2LatentScene at {lvsm_checkpoint_dir}")
     result = model.init_from_LVSM(lvsm_checkpoint_dir)
     if result is None:
-        print(f"Warning: Failed to initialize from LVSM checkpoint")
+        print(f"Warning: Failed to initialize from LVSM checkpoint at {lvsm_checkpoint_dir}")
+        print(f"Warning: Starting completely from fresh (random initialization)")
     else:
         print(f"Successfully initialized from Images2LatentScene")
-elif config.training.get("checkpoint_dir", ""):
-    # Load directly from checkpoint_dir
-    model.module.load_ckpt(config.training.checkpoint_dir)
-    print(f"Loaded checkpoint from {config.training.checkpoint_dir}")
-else:
-    print(f"Warning: No checkpoint_dir or LVSM_checkpoint_dir specified, using random initialization")
+elif not has_checkpoint:
+    print(f"Warning: No checkpoint found in checkpoint_dir and no LVSM_checkpoint_dir specified")
+    print(f"Warning: Starting completely from fresh (random initialization)")
 
 model = DDP(model, device_ids=[ddp_info.local_rank])
 

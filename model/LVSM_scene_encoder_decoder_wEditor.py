@@ -561,12 +561,21 @@ class LatentSceneEditor(nn.Module):
             ckpt_names = sorted(ckpt_names, key=lambda x: x)
             ckpt_paths = [os.path.join(load_path, ckpt_name) for ckpt_name in ckpt_names]
         else:
-            ckpt_paths = [load_path]
+            if os.path.exists(load_path) and load_path.endswith(".pt"):
+                ckpt_paths = [load_path]
+            else:
+                ckpt_paths = []
+        
+        # Check if checkpoint files exist
+        if len(ckpt_paths) == 0:
+            print(f"No checkpoint files found in {load_path}")
+            return None
+        
         try:
             checkpoint = torch.load(ckpt_paths[-1], map_location="cpu", weights_only=True)
-        except:
+        except Exception as e:
             traceback.print_exc()
-            print(f"Failed to load {ckpt_paths[-1]}")
+            print(f"Failed to load {ckpt_paths[-1]}: {e}")
             return None
         
         self.load_state_dict(checkpoint["model"], strict=False)

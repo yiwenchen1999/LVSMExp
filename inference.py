@@ -59,7 +59,16 @@ module, class_name = config.model.class_name.rsplit(".", 1)
 LVSM = importlib.import_module(module).__dict__[class_name]
 model = LVSM(config).to(ddp_info.device)
 model = DDP(model, device_ids=[ddp_info.local_rank])
-model.module.load_ckpt(config.training.checkpoint_dir)
+
+# Try to load checkpoint, if fails, start from fresh
+if config.training.get("checkpoint_dir", ""):
+    result = model.module.load_ckpt(config.training.checkpoint_dir)
+    if result is None:
+        print(f"Warning: No checkpoint found in {config.training.checkpoint_dir}, starting from fresh")
+    else:
+        print(f"Loaded checkpoint from {config.training.checkpoint_dir}")
+else:
+    print(f"Warning: No checkpoint_dir specified, starting from fresh")
 
 
 if ddp_info.is_main_process:  
