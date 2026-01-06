@@ -62,7 +62,7 @@ inference_out_dir = ./experiments/evaluation/test
 # base, objaverse
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-inference.py --config "configs/LVSM_scene_encoder_decoder.yaml" \
+inference.py --config "configs/LVSM_scene_encoder_decoder_wEditor.yaml" \
 training.dataset_path = "./data_samples/objaverse_processed/test/full_list.txt" \
 training.batch_size_per_gpu = 4 \
 training.target_has_input =  false \
@@ -74,4 +74,4 @@ inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = true \
 inference.view_idx_file_path = "./data/evaluation_index_objaverse_test_4i3o.json" \
-inference_out_dir = ./experiments/evaluation/test_obj_4i3o
+inference_out_dir = ./experiments/evaluation/test_obj_4i3o_wEditorTest

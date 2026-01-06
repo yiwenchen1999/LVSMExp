@@ -333,11 +333,14 @@ class Images2LatentScene(nn.Module):
         
         #& Step 2: Reconstructor - Get scene latent_tokens from input images
         latent_tokens, n_patches, d = self.reconstructor(input)
+
+        # todo: step3: Editor - Edit the scene latent_tokens(placeholder for now, add layer later)
+        # latent_tokens = self.editor(latent_tokens)
         
-        #& Step 3: Renderer - Decode results from target ray maps
+        #& Step 4: Renderer - Decode results from target ray maps
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)
         
-        #& Step 4: Compute loss (if target images are provided)
+        #& Step 5: Compute loss (if target images are provided)
         # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
         if has_target_image:
             loss_metrics = self.loss_computer(
