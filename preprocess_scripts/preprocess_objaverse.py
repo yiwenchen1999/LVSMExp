@@ -21,6 +21,15 @@ import argparse
 from pathlib import Path
 from PIL import Image
 import shutil
+import torch
+import torch.nn.functional as F
+import cv2
+try:
+    import pyexr
+    HAS_PYEXR = True
+except ImportError:
+    HAS_PYEXR = False
+    print("Warning: pyexr not available, HDR EXR files cannot be read")
 
 
 def blender_to_opencv_c2w(c2w_blender):
@@ -80,7 +89,219 @@ def fov_to_fxfycxcy(fov_degrees, image_width, image_height):
     return [fx, fy, cx, cy]
 
 
-def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'):
+def check_scene_broken(split_path, object_id):
+    """
+    Check if a scene is broken (no materials) by checking albedo mask and RGB images.
+    
+    Args:
+        split_path: Path to the split folder (test/ or train/)
+        object_id: Object ID
+        
+    Returns:
+        bool: True if scene is broken, False otherwise
+    """
+    albedo_dir = os.path.join(split_path, 'albedo')
+    if not os.path.exists(albedo_dir):
+        return False  # No albedo folder, cannot check
+    
+    # Get first albedo image to check mask
+    albedo_files = sorted([f for f in os.listdir(albedo_dir) if f.endswith('.png')])
+    if not albedo_files:
+        return False  # No albedo images
+    
+    first_albedo_path = os.path.join(albedo_dir, albedo_files[0])
+    try:
+        albedo_img = Image.open(first_albedo_path)
+        if albedo_img.mode == 'RGBA':
+            albedo_array = np.array(albedo_img)
+            alpha_channel = albedo_array[:, :, 3]
+            # Mask is where alpha is 0
+            mask = (alpha_channel == 0)
+            mask_ratio = np.sum(mask) / mask.size
+            
+            # If mask takes up less than 1/4 of image, mark as broken
+            if mask_ratio < 0.25:
+                # Check RGB images inside the mask
+                # Find corresponding RGB image (gt_0.png for albedo_cam_0.png)
+                cam_idx = albedo_files[0].replace('albedo_cam_', '').replace('.png', '')
+                try:
+                    cam_idx_int = int(cam_idx)
+                    # Look for gt_{cam_idx}.png in any env folder
+                    env_folders = [d for d in os.listdir(split_path) 
+                                 if os.path.isdir(os.path.join(split_path, d)) 
+                                 and (d.startswith('env_') or d.startswith('white_env_'))]
+                    
+                    for env_folder in env_folders:
+                        env_path = os.path.join(split_path, env_folder)
+                        rgb_path = os.path.join(env_path, f'gt_{cam_idx_int}.png')
+                        if os.path.exists(rgb_path):
+                            rgb_img = Image.open(rgb_path).convert('RGB')
+                            rgb_array = np.array(rgb_img)
+                            
+                            # Get RGB values inside the mask
+                            masked_rgb = rgb_array[mask]
+                            if len(masked_rgb) > 0:
+                                # Check if average color is all black (smaller than (1,1,1) in 0-255 scale)
+                                avg_color = np.mean(masked_rgb, axis=0)
+                                if np.all(avg_color < 1.0):
+                                    return True  # Scene is broken
+                            break
+                except (ValueError, FileNotFoundError):
+                    pass
+        else:
+            # If albedo doesn't have alpha channel, check if it's all black or very dark
+            albedo_array = np.array(albedo_img.convert('RGB'))
+            avg_color = np.mean(albedo_array, axis=(0, 1))
+            if np.all(avg_color < 1.0):
+                return True  # Scene is broken
+    except Exception as e:
+        print(f"Error checking scene {object_id}: {e}")
+    
+    return False
+
+
+def generate_envir_map_dir(envmap_h, envmap_w):
+    """Generate environment map directions and weights."""
+    lat_step_size = np.pi / envmap_h
+    lng_step_size = 2 * np.pi / envmap_w
+    theta, phi = torch.meshgrid([
+        torch.linspace(np.pi / 2 - 0.5 * lat_step_size, -np.pi / 2 + 0.5 * lat_step_size, envmap_h), 
+        torch.linspace(np.pi - 0.5 * lng_step_size, -np.pi + 0.5 * lng_step_size, envmap_w)
+    ], indexing='ij')
+    
+    sin_theta = torch.sin(torch.pi / 2 - theta)
+    light_area_weight = 4 * np.pi * sin_theta / torch.sum(sin_theta)
+    light_area_weight = light_area_weight.to(torch.float32)
+    
+    view_dirs = torch.stack([
+        torch.cos(phi) * torch.cos(theta), 
+        torch.sin(phi) * torch.cos(theta), 
+        torch.sin(theta)
+    ], dim=-1).view(-1, 3)
+    
+    return light_area_weight, view_dirs
+
+
+def get_light(envir_map, incident_dir, hdr_weight=None, if_weighted=False):
+    """Sample light from environment map given incident direction."""
+    try:
+        envir_map = envir_map.permute(2, 0, 1).unsqueeze(0)  # [1, 3, H, W]
+        if hdr_weight is not None:
+            hdr_weight = hdr_weight.unsqueeze(0).unsqueeze(0)  # [1, 1, H, W]
+        incident_dir = incident_dir.clamp(-1, 1)
+        theta = torch.arccos(incident_dir[:, 2]).reshape(-1)
+        phi = torch.atan2(incident_dir[:, 1], incident_dir[:, 0]).reshape(-1)
+        
+        query_y = (theta / np.pi) * 2 - 1
+        query_y = query_y.clamp(-1+1e-8, 1-1e-8)
+        query_x = -phi / np.pi
+        query_x = query_x.clamp(-1+1e-8, 1-1e-8)
+        
+        grid = torch.stack((query_x, query_y)).permute(1, 0).unsqueeze(0).unsqueeze(0).float()
+        
+        if if_weighted and hdr_weight is not None:
+            weighted_envir_map = envir_map * hdr_weight
+            light_rgbs = F.grid_sample(weighted_envir_map, grid, align_corners=True).squeeze().permute(1, 0).reshape(-1, 3)
+            light_rgbs = light_rgbs / hdr_weight.reshape(-1, 1)
+        else:
+            light_rgbs = F.grid_sample(envir_map, grid, align_corners=True).squeeze().permute(1, 0).reshape(-1, 3)
+        
+        return light_rgbs
+    except Exception as e:
+        print(f"Error in get_light: {e}")
+        return None
+
+
+def read_hdr_exr(path):
+    """Read HDR EXR file."""
+    if not HAS_PYEXR:
+        raise ImportError("pyexr is required to read EXR files")
+    try:
+        rgb = pyexr.read(path)
+        if rgb is not None and rgb.shape[-1] == 4:
+            rgb = rgb[:, :, :3]
+        return rgb
+    except Exception as e:
+        print(f"Error reading HDR file {path}: {e}")
+        return None
+
+
+def read_hdr(path):
+    """Read HDR file (supports both .hdr and .exr)."""
+    if path.endswith('.exr'):
+        return read_hdr_exr(path)
+    else:
+        try:
+            with open(path, 'rb') as h:
+                buffer_ = np.frombuffer(h.read(), np.uint8)
+            bgr = cv2.imdecode(buffer_, cv2.IMREAD_UNCHANGED)
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            return rgb
+        except Exception as e:
+            print(f"Error reading HDR file {path}: {e}")
+            return None
+
+
+def rotate_and_preprocess_envir_map(envir_map, camera_pose, euler_rotation=None, light_area_weight=None, view_dirs=None):
+    """
+    Rotate and preprocess environment map based on euler rotation and camera pose.
+    Returns HDR raw, LDR, and HDR processed versions.
+    """
+    try:
+        env_h, env_w = envir_map.shape[0], envir_map.shape[1]
+        if light_area_weight is None or view_dirs is None:
+            light_area_weight, view_dirs = generate_envir_map_dir(env_h, env_w)
+        
+        # Store original for raw version
+        envir_map_raw = envir_map.copy()
+        
+        # Step 1: Apply euler rotation (horizontal roll) if provided
+        if euler_rotation is not None:
+            z_rotation = euler_rotation[2] if len(euler_rotation) >= 3 else 0.0
+            rotation_angle_deg = np.degrees(z_rotation)
+            shift = int((rotation_angle_deg / 360.0) * env_w)
+            envir_map = np.roll(envir_map, shift, axis=1)
+        
+        # Convert to tensor
+        envir_map_tensor = torch.from_numpy(envir_map).float()
+        
+        # Step 2: Apply camera pose rotation
+        if camera_pose.shape == (4, 4):
+            c2w_rotation = camera_pose[:3, :3]
+            w2c_rotation = c2w_rotation.T
+        else:
+            w2c_rotation = camera_pose.T
+        
+        # Blender's convention
+        axis_aligned_transform = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
+        axis_aligned_R = axis_aligned_transform @ w2c_rotation
+        view_dirs_world = view_dirs @ torch.from_numpy(axis_aligned_R).float()
+        
+        # Apply rotation using get_light
+        rotated_hdr_rgb = get_light(envir_map_tensor, view_dirs_world.clamp(-1, 1))
+        if rotated_hdr_rgb is not None and rotated_hdr_rgb.numel() > 0:
+            rotated_hdr_rgb = rotated_hdr_rgb.reshape(env_h, env_w, 3).cpu().numpy()
+        else:
+            rotated_hdr_rgb = envir_map_raw
+        
+        # HDR raw
+        envir_map_hdr_raw = rotated_hdr_rgb
+        
+        # LDR (gamma correction)
+        envir_map_ldr = rotated_hdr_rgb.clip(0, 1)
+        envir_map_ldr = envir_map_ldr ** (1/2.2)
+        
+        # HDR processed (log transform)
+        envir_map_hdr = np.log1p(10 * rotated_hdr_rgb)
+        envir_map_hdr_rescaled = (envir_map_hdr / np.max(envir_map_hdr)).clip(0, 1)
+        
+        return envir_map_hdr_raw, envir_map_ldr, envir_map_hdr_rescaled
+    except Exception as e:
+        print(f"Error in rotate_and_preprocess_envir_map: {e}")
+        return None, None, None
+
+
+def process_objaverse_scene(objaverse_root, object_id, output_root, split='test', hdri_dir=None):
     """
     Process a single Objaverse object and convert all env scenes to re10k format.
     
@@ -89,19 +310,28 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         object_id: Object ID folder name
         output_root: Root directory for output (e.g., data_samples/objaverse_processed)
         split: 'train' or 'test'
+        hdri_dir: Directory containing HDR environment maps (optional)
     """
     object_path = os.path.join(objaverse_root, object_id)
     split_path = os.path.join(object_path, split)
     
     if not os.path.exists(split_path):
         print(f"Warning: {split_path} does not exist, skipping")
-        return
+        return None
+    
+    # Check if scene is broken (no materials)
+    if check_scene_broken(split_path, object_id):
+        print(f"Scene {object_id} is broken (no materials), marking...")
+        broken_file = os.path.join(object_path, 'broken.txt')
+        with open(broken_file, 'w') as f:
+            f.write("broken\n")
+        return "broken"
     
     # Load cameras.json
     cameras_json_path = os.path.join(split_path, 'cameras.json')
     if not os.path.exists(cameras_json_path):
         print(f"Warning: {cameras_json_path} does not exist, skipping {object_id}")
-        return
+        return None
     
     with open(cameras_json_path, 'r') as f:
         cameras_data = json.load(f)
@@ -158,8 +388,43 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         # Create output directories
         output_metadata_dir = os.path.join(output_root, split, 'metadata')
         output_images_dir = os.path.join(output_root, split, 'images', scene_name)
+        output_envmaps_dir = os.path.join(output_root, split, 'envmaps', scene_name)
         os.makedirs(output_metadata_dir, exist_ok=True)
         os.makedirs(output_images_dir, exist_ok=True)
+        os.makedirs(output_envmaps_dir, exist_ok=True)
+        
+        # Load environment map info if available
+        env_json_path = os.path.join(env_path, 'env.json')
+        white_env_json_path = os.path.join(env_path, 'white_env.json')
+        env_info = None
+        if os.path.exists(env_json_path):
+            with open(env_json_path, 'r') as f:
+                env_info = json.load(f)
+        elif os.path.exists(white_env_json_path):
+            with open(white_env_json_path, 'r') as f:
+                env_info = json.load(f)
+        
+        # Load environment map if available
+        env_map = None
+        euler_rotation = None
+        if env_info and hdri_dir:
+            env_map_name = env_info.get('env_map', '')
+            if env_map_name:
+                env_map_path = os.path.join(hdri_dir, env_map_name)
+                if os.path.exists(env_map_path):
+                    env_map = read_hdr(env_map_path)
+                    if env_map is not None:
+                        env_map = torch.from_numpy(env_map).float()
+                        euler_rotation = env_info.get('rotation_euler', None)
+                else:
+                    print(f"Warning: Environment map {env_map_path} not found")
+        
+        # Generate environment map directions if needed
+        light_area_weight = None
+        view_dirs = None
+        if env_map is not None:
+            env_h, env_w = env_map.shape[0], env_map.shape[1]
+            light_area_weight, view_dirs = generate_envir_map_dir(env_h, env_w)
         
         # Process frames
         frames = []
@@ -190,6 +455,28 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             # Copy image
             shutil.copy2(input_image_path, output_image_path)
             
+            # Process environment map if available
+            if env_map is not None:
+                # Get camera pose (c2w)
+                c2w_blender = np.array(camera_info['c2w'])
+                c2w_opencv = blender_to_opencv_c2w(c2w_blender)
+                
+                # Rotate and preprocess environment map
+                env_hdr_raw, env_ldr, env_hdr = rotate_and_preprocess_envir_map(
+                    env_map, c2w_opencv, euler_rotation=euler_rotation,
+                    light_area_weight=light_area_weight, view_dirs=view_dirs
+                )
+                
+                if env_hdr_raw is not None:
+                    # Save environment maps
+                    output_envmap_name = f"{frame_idx:05d}.png"
+                    output_envmap_path = os.path.join(output_envmaps_dir, output_envmap_name)
+                    
+                    # Save LDR version (for visualization)
+                    env_ldr_uint8 = np.uint8(env_ldr * 255)
+                    env_ldr_img = Image.fromarray(env_ldr_uint8)
+                    env_ldr_img.save(output_envmap_path)
+            
             # Create absolute image path for the JSON file
             # This ensures the path works regardless of where the code is run from
             absolute_image_path = os.path.abspath(output_image_path)
@@ -216,13 +503,14 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         print(f"Processed {scene_name}: {len(frames)} frames")
 
 
-def create_full_list(output_root, split='test'):
+def create_full_list(output_root, split='test', broken_scenes=None):
     """
-    Create full_list.txt file listing all scene JSON files.
+    Create full_list.txt file listing all scene JSON files, excluding broken scenes.
     
     Args:
         output_root: Root directory for output
         split: 'train' or 'test'
+        broken_scenes: List of broken scene names to exclude
     """
     metadata_dir = os.path.join(output_root, split, 'metadata')
     if not os.path.exists(metadata_dir):
@@ -231,14 +519,24 @@ def create_full_list(output_root, split='test'):
     
     json_files = sorted([f for f in os.listdir(metadata_dir) if f.endswith('.json')])
     
+    if broken_scenes is None:
+        broken_scenes = []
+    
+    # Filter out broken scenes
+    valid_json_files = []
+    for json_file in json_files:
+        scene_name = json_file.replace('.json', '')
+        if scene_name not in broken_scenes:
+            valid_json_files.append(json_file)
+    
     full_list_path = os.path.join(output_root, split, 'full_list.txt')
     with open(full_list_path, 'w') as f:
-        for json_file in json_files:
+        for json_file in valid_json_files:
             json_path = os.path.join(metadata_dir, json_file)
             # Write absolute path
             f.write(f"{os.path.abspath(json_path)}\n")
     
-    print(f"Created {full_list_path} with {len(json_files)} scenes")
+    print(f"Created {full_list_path} with {len(valid_json_files)} scenes (excluded {len(broken_scenes)} broken scenes)")
 
 
 def main():
@@ -251,6 +549,8 @@ def main():
                        help='Split to process (default: test)')
     parser.add_argument('--object-id', type=str, default=None,
                        help='Process specific object ID only (default: process all)')
+    parser.add_argument('--hdri-dir', type=str, default=None,
+                       help='Directory containing HDR environment maps (e.g., data_samples/sample_hdris)')
     
     args = parser.parse_args()
     
@@ -270,20 +570,46 @@ def main():
     
     print(f"Processing {len(object_ids)} objects...")
     
+    broken_scenes = []
+    processed_scenes = []
+    
     for object_id in sorted(object_ids):
         print(f"\nProcessing object: {object_id}")
         try:
-            process_objaverse_scene(objaverse_root, object_id, output_root, split=args.split)
+            result = process_objaverse_scene(objaverse_root, object_id, output_root, 
+                                            split=args.split, hdri_dir=args.hdri_dir)
+            if result == "broken":
+                # Find all scenes for this object and mark them as broken
+                split_path = os.path.join(objaverse_root, object_id, args.split)
+                if os.path.exists(split_path):
+                    env_folders = [d for d in os.listdir(split_path) 
+                                 if os.path.isdir(os.path.join(split_path, d)) 
+                                 and (d.startswith('env_') or d.startswith('white_env_'))]
+                    for env_folder in env_folders:
+                        scene_name = f"{object_id}_{env_folder}"
+                        broken_scenes.append(scene_name)
+            elif result is None:
+                # Scene was processed successfully, collect scene names
+                split_path = os.path.join(objaverse_root, object_id, args.split)
+                if os.path.exists(split_path):
+                    env_folders = [d for d in os.listdir(split_path) 
+                                 if os.path.isdir(os.path.join(split_path, d)) 
+                                 and (d.startswith('env_') or d.startswith('white_env_'))]
+                    for env_folder in env_folders:
+                        scene_name = f"{object_id}_{env_folder}"
+                        processed_scenes.append(scene_name)
         except Exception as e:
             print(f"Error processing {object_id}: {e}")
             import traceback
             traceback.print_exc()
     
-    # Create full_list.txt
+    # Create full_list.txt (excluding broken scenes)
     print(f"\nCreating full_list.txt for {args.split} split...")
-    create_full_list(output_root, split=args.split)
+    create_full_list(output_root, split=args.split, broken_scenes=broken_scenes)
     
-    print("\nPreprocessing complete!")
+    print(f"\nPreprocessing complete!")
+    print(f"  - Processed {len(processed_scenes)} scenes")
+    print(f"  - Marked {len(broken_scenes)} scenes as broken")
 
 
 if __name__ == '__main__':

@@ -59,7 +59,17 @@ class Dataset(Dataset):
         images = []
         intrinsics = []
         for cur_frame, cur_image_path in zip(frames_chosen, image_paths_chosen):
-            image = PIL.Image.open(cur_image_path)
+            try:
+                # Try to open the image file
+                image = PIL.Image.open(cur_image_path)
+                # Verify the image is valid by attempting to load it
+                image.load()
+            except (PIL.UnidentifiedImageError, OSError, IOError, Exception) as e:
+                # If image file is corrupted or cannot be identified, raise an error
+                error_msg = f"Error loading image file '{cur_image_path}': {type(e).__name__}: {str(e)}"
+                print(error_msg)
+                raise RuntimeError(error_msg) from e
+            
             original_image_w, original_image_h = image.size
             
             resize_w = int(resize_h / original_image_h * original_image_w)
@@ -185,26 +195,72 @@ class Dataset(Dataset):
         image_indices = [start_frame, end_frame] + sampled_frames
         return image_indices
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx, max_retries=10, _retry_count=0):
+        """
+        Get item from dataset with error handling and retry logic.
+        
+        Args:
+            idx: Index of the item to retrieve
+            max_retries: Maximum number of retries before giving up
+            _retry_count: Internal counter for retry attempts
+        """
+        if _retry_count >= max_retries:
+            # If we've exhausted retries, raise an error with helpful message
+            error_msg = f"Failed to load data after {max_retries} retries. Last attempted index: {idx}"
+            print(error_msg)
+            raise RuntimeError(error_msg)
+        
         try:
             scene_path = self.all_scene_paths[idx].strip()
-            data_json = json.load(open(scene_path, 'r'))
-            frames = data_json["frames"]
-            scene_name = data_json["scene_name"]
+            
+            # Check if file exists
+            if not os.path.exists(scene_path):
+                raise FileNotFoundError(f"Scene JSON file not found: {scene_path}")
+            
+            # Load scene JSON
+            try:
+                with open(scene_path, 'r') as f:
+                    data_json = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                raise RuntimeError(f"Error reading/parsing scene JSON '{scene_path}': {type(e).__name__}: {str(e)}") from e
+            
+            frames = data_json.get("frames", [])
+            if not frames:
+                raise ValueError(f"No frames found in scene JSON: {scene_path}")
+            
+            scene_name = data_json.get("scene_name", f"scene_{idx}")
             # print(f"scene_name: {scene_name}")
             # print(f"frames: {len(frames)}")
 
             if self.inference and scene_name in self.view_idx_list:
                 current_view_idx = self.view_idx_list[scene_name]
-                image_indices= current_view_idx["context"] + current_view_idx["target"]
+                image_indices = current_view_idx["context"] + current_view_idx["target"]
             else:
                 # sample input and target views
                 image_indices = self.view_selector(frames)
                 if image_indices is None:
                     # Fallback: try another random index
-                    return self.__getitem__(random.randint(0, len(self) - 1))
+                    print(f"view_selector returned None for scene {scene_name} at index {idx}, trying another random index")
+                    return self.__getitem__(random.randint(0, len(self) - 1), max_retries=max_retries, _retry_count=_retry_count + 1)
+            
+            # Validate image indices
+            if not image_indices or len(image_indices) == 0:
+                raise ValueError(f"No valid image indices selected for scene {scene_name}")
+            
+            # Check if all indices are valid
+            for ic in image_indices:
+                if ic < 0 or ic >= len(frames):
+                    raise IndexError(f"Image index {ic} out of range for scene {scene_name} (has {len(frames)} frames)")
+            
             image_paths_chosen = [frames[ic]["image_path"] for ic in image_indices]
             frames_chosen = [frames[ic] for ic in image_indices]
+            
+            # Check if all image paths exist
+            for img_path in image_paths_chosen:
+                if not os.path.exists(img_path):
+                    raise FileNotFoundError(f"Image file not found: {img_path}")
+            
+            # Preprocess frames (this may raise PIL.UnidentifiedImageError or other errors)
             input_images, input_intrinsics, input_c2ws = self.preprocess_frames(frames_chosen, image_paths_chosen)
 
             # centerize and scale the poses (for unbounded scenes)
@@ -222,10 +278,18 @@ class Dataset(Dataset):
                 "index": indices,
                 "scene_name": scene_name
             }
-        except (ValueError, IndexError, KeyError, FileNotFoundError, RuntimeError) as e:
-            # Fallback for any data loading errors (including view_selector failures, file not found, or tensor shape mismatches)
+        except (ValueError, IndexError, KeyError, FileNotFoundError, RuntimeError, 
+                PIL.UnidentifiedImageError, OSError, IOError, json.JSONDecodeError,
+                torch.cuda.OutOfMemoryError) as e:
+            # Fallback for any data loading errors
             # Try another random index instead
-            traceback.print_exc()
-            print(f"Error loading scene at index {idx}, trying another random index")
-            return self.__getitem__(random.randint(0, len(self) - 1))
+            error_type = type(e).__name__
+            error_msg = f"Error loading scene at index {idx} (attempt {_retry_count + 1}/{max_retries}): {error_type}: {str(e)}"
+            print(error_msg)
+            if _retry_count < 2:  # Only print traceback for first few attempts
+                traceback.print_exc()
+            
+            # Try another random index
+            new_idx = random.randint(0, len(self) - 1)
+            return self.__getitem__(new_idx, max_retries=max_retries, _retry_count=_retry_count + 1)
 
