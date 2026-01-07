@@ -551,6 +551,10 @@ def main():
                        help='Process specific object ID only (default: process all)')
     parser.add_argument('--hdri-dir', type=str, default=None,
                        help='Directory containing HDR environment maps (e.g., data_samples/sample_hdris)')
+    parser.add_argument('--test-run', action='store_true',
+                       help='Test run: only process first 5 objects (default: False)')
+    parser.add_argument('--max-objects', type=int, default=None,
+                       help='Maximum number of objects to process (overrides --test-run if specified)')
     
     args = parser.parse_args()
     
@@ -567,6 +571,16 @@ def main():
     else:
         object_ids = [d for d in os.listdir(objaverse_root) 
                      if os.path.isdir(os.path.join(objaverse_root, d))]
+    
+    # Apply test run or max objects limit
+    original_count = len(object_ids)
+    if args.max_objects is not None:
+        object_ids = object_ids[:args.max_objects]
+        print(f"Limiting to {args.max_objects} objects (from {original_count} total)")
+    elif args.test_run:
+        test_count = min(5, len(object_ids))
+        object_ids = object_ids[:test_count]
+        print(f"TEST RUN: Processing first {test_count} objects only (from {original_count} total)")
     
     print(f"Processing {len(object_ids)} objects...")
     
