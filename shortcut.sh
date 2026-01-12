@@ -36,9 +36,9 @@ python preprocess_scripts/create_evaluation_index.py \
 python preprocess_scripts/preprocess_objaverse.py \
   --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
   --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
-  --split test \
+  --split train \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
-  --test-run
+  --max-objects 10
 
 # train-og:
 torchrun --nproc_per_node 1 --nnodes 1 \

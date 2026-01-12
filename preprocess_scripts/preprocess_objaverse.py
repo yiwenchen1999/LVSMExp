@@ -400,8 +400,22 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         os.makedirs(output_envmaps_dir, exist_ok=True)
         
         # Load environment map info if available
-        env_json_path = os.path.join(env_path, 'env.json')
-        white_env_json_path = os.path.join(env_path, 'white_env.json')
+        # For train split, look for env info in the corresponding test folder
+        if split == 'train':
+            test_split_path = os.path.join(object_path, 'test')
+            test_env_path = os.path.join(test_split_path, env_folder) if os.path.exists(test_split_path) else None
+            if test_env_path and os.path.exists(test_env_path):
+                env_json_path = os.path.join(test_env_path, 'env.json')
+                white_env_json_path = os.path.join(test_env_path, 'white_env.json')
+            else:
+                # Fallback to current split if test folder doesn't exist
+                env_json_path = os.path.join(env_path, 'env.json')
+                white_env_json_path = os.path.join(env_path, 'white_env.json')
+        else:
+            # For test split, use current folder
+            env_json_path = os.path.join(env_path, 'env.json')
+            white_env_json_path = os.path.join(env_path, 'white_env.json')
+        
         env_info = None
         if os.path.exists(env_json_path):
             with open(env_json_path, 'r') as f:
