@@ -32,6 +32,7 @@ python preprocess_scripts/create_evaluation_index.py \
     --n-target 3 \
     --seed 42
 
+# preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \
   --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
   --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \

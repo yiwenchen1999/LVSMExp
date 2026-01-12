@@ -248,22 +248,28 @@ def rotate_and_preprocess_envir_map(envir_map, camera_pose, euler_rotation=None,
     Returns HDR raw, LDR, and HDR processed versions.
     """
     try:
-        env_h, env_w = envir_map.shape[0], envir_map.shape[1]
+        # Convert to numpy if it's a tensor
+        if isinstance(envir_map, torch.Tensor):
+            envir_map_np = envir_map.cpu().numpy()
+        else:
+            envir_map_np = envir_map.copy()
+        
+        env_h, env_w = envir_map_np.shape[0], envir_map_np.shape[1]
         if light_area_weight is None or view_dirs is None:
             light_area_weight, view_dirs = generate_envir_map_dir(env_h, env_w)
         
         # Store original for raw version
-        envir_map_raw = envir_map.copy()
+        envir_map_raw = envir_map_np.copy()
         
         # Step 1: Apply euler rotation (horizontal roll) if provided
         if euler_rotation is not None:
             z_rotation = euler_rotation[2] if len(euler_rotation) >= 3 else 0.0
             rotation_angle_deg = np.degrees(z_rotation)
             shift = int((rotation_angle_deg / 360.0) * env_w)
-            envir_map = np.roll(envir_map, shift, axis=1)
+            envir_map_np = np.roll(envir_map_np, shift, axis=1)
         
         # Convert to tensor
-        envir_map_tensor = torch.from_numpy(envir_map).float()
+        envir_map_tensor = torch.from_numpy(envir_map_np).float()
         
         # Step 2: Apply camera pose rotation
         if camera_pose.shape == (4, 4):
@@ -410,14 +416,31 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         if env_info and hdri_dir:
             env_map_name = env_info.get('env_map', '')
             if env_map_name:
-                env_map_path = os.path.join(hdri_dir, env_map_name)
-                if os.path.exists(env_map_path):
+                # Try different filename variations (with/without extension, with _8k suffix, etc.)
+                possible_names = [
+                    env_map_name,  # Original name as-is
+                    f"{env_map_name}.exr",  # Add .exr extension
+                    f"{env_map_name}.hdr",  # Add .hdr extension
+                    f"{env_map_name}_8k.exr",  # Add _8k.exr suffix
+                    f"{env_map_name}_8k.hdr",  # Add _8k.hdr suffix
+                ]
+                
+                env_map_path = None
+                for name in possible_names:
+                    test_path = os.path.join(hdri_dir, name)
+                    if os.path.exists(test_path):
+                        env_map_path = test_path
+                        break
+                
+                if env_map_path:
                     env_map = read_hdr(env_map_path)
                     if env_map is not None:
                         env_map = torch.from_numpy(env_map).float()
                         euler_rotation = env_info.get('rotation_euler', None)
+                    else:
+                        print(f"Warning: Failed to read environment map {env_map_path}")
                 else:
-                    print(f"Warning: Environment map {env_map_path} not found")
+                    print(f"Warning: Environment map '{env_map_name}' not found in {hdri_dir} (tried: {', '.join(possible_names)})")
         
         # Generate environment map directions if needed
         light_area_weight = None
