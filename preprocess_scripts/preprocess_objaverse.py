@@ -480,13 +480,12 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             
             # Process environment map if available
             if env_map is not None:
-                # Get camera pose (c2w)
+                # Get camera pose (c2w) - use Blender format before OpenCV conversion
                 c2w_blender = np.array(camera_info['c2w'])
-                c2w_opencv = blender_to_opencv_c2w(c2w_blender)
                 
-                # Rotate and preprocess environment map
+                # Rotate and preprocess environment map (using Blender format c2w)
                 env_hdr_raw, env_ldr, env_hdr = rotate_and_preprocess_envir_map(
-                    env_map, c2w_opencv, euler_rotation=euler_rotation,
+                    env_map, c2w_blender, euler_rotation=euler_rotation,
                     light_area_weight=light_area_weight, view_dirs=view_dirs
                 )
                 
