@@ -490,14 +490,20 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
                 )
                 
                 if env_hdr_raw is not None:
-                    # Save environment maps
-                    output_envmap_name = f"{frame_idx:05d}.png"
-                    output_envmap_path = os.path.join(output_envmaps_dir, output_envmap_name)
+                    # Save HDR and LDR versions separately
+                    # HDR version: log transform and rescale
+                    env_hdr_uint8 = np.uint8(env_hdr * 255)
+                    env_hdr_img = Image.fromarray(env_hdr_uint8)
+                    output_envmap_hdr_name = f"{frame_idx:05d}_hdr.png"
+                    output_envmap_hdr_path = os.path.join(output_envmaps_dir, output_envmap_hdr_name)
+                    env_hdr_img.save(output_envmap_hdr_path)
                     
-                    # Save LDR version (for visualization)
+                    # LDR version: gamma correction
                     env_ldr_uint8 = np.uint8(env_ldr * 255)
                     env_ldr_img = Image.fromarray(env_ldr_uint8)
-                    env_ldr_img.save(output_envmap_path)
+                    output_envmap_ldr_name = f"{frame_idx:05d}_ldr.png"
+                    output_envmap_ldr_path = os.path.join(output_envmaps_dir, output_envmap_ldr_name)
+                    env_ldr_img.save(output_envmap_ldr_path)
             
             # Create absolute image path for the JSON file
             # This ensures the path works regardless of where the code is run from
