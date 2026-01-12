@@ -32,6 +32,13 @@ python preprocess_scripts/create_evaluation_index.py \
     --n-target 3 \
     --seed 42
 
+python preprocess_scripts/preprocess_objaverse.py \
+  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
+  --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
+  --split test \
+  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
+  --test-run
+
 # train-og:
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \

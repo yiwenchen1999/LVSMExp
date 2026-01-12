@@ -41,7 +41,7 @@ training:
   perceptual_loss_weight: 0.5
   reset_training_state: True
 
-  lr: 0.0004
+  lr: 0.0002
   train_steps: 100000
   num_input_views: 4
   num_target_views: 8
@@ -68,7 +68,7 @@ training:
   wandb_log_every: 50
   
   wandb_project: LVSM
-  warmup: 3000
+  warmup: 1000
   weight_decay: 0.05
 
 
