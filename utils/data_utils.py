@@ -81,6 +81,75 @@ class ProcessData(nn.Module):
 
         return ray_o, ray_d
     
+    @torch.no_grad()
+    def compute_env_dir(self, c2w, envmap_h=256, envmap_w=512, device="cuda"):
+        """
+        Compute environment map viewing directions in world space.
+        
+        Args:
+            c2w (torch.tensor): [b, v, 4, 4] camera-to-world transformation matrices (OpenCV convention)
+            envmap_h (int): height of the environment map, default 256
+            envmap_w (int): width of the environment map, default 512
+            device (str): device to compute on, default "cuda"
+            
+        Returns:
+            env_dir (torch.tensor): [b, v, 3, envmap_h, envmap_w] viewing directions in world space
+        """
+        b, v = c2w.size()[:2]
+        
+        # Generate environment map directions (similar to generate_envir_map_dir)
+        lat_step_size = np.pi / envmap_h
+        lng_step_size = 2 * np.pi / envmap_w
+        theta, phi = torch.meshgrid([
+            torch.linspace(np.pi / 2 - 0.5 * lat_step_size, -np.pi / 2 + 0.5 * lat_step_size, envmap_h, device=device),
+            torch.linspace(np.pi - 0.5 * lng_step_size, -np.pi + 0.5 * lng_step_size, envmap_w, device=device)
+        ], indexing='ij')
+        
+        # Compute view directions in local environment map coordinate system
+        # [envmap_h, envmap_w, 3]
+        view_dirs_local = torch.stack([
+            torch.cos(phi) * torch.cos(theta),
+            torch.sin(phi) * torch.cos(theta),
+            torch.sin(theta)
+        ], dim=-1)  # [envmap_h, envmap_w, 3]
+        
+        # Reshape to [envmap_h * envmap_w, 3]
+        view_dirs_local = view_dirs_local.reshape(-1, 3)  # [envmap_h * envmap_w, 3]
+        
+        # Convert c2w to w2c rotation (OpenCV convention)
+        # c2w is [b, v, 4, 4], we need w2c rotation which is c2w[:3, :3].T
+        c2w_rotation = c2w[:, :, :3, :3]  # [b, v, 3, 3]
+        w2c_rotation = c2w_rotation.transpose(-2, -1)  # [b, v, 3, 3]
+        
+        # Apply Blender convention transformation
+        # The reference code uses: axis_aligned_transform @ w2c_rotation
+        # where axis_aligned_transform = [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
+        # This converts from OpenCV to Blender convention
+        axis_aligned_transform = torch.tensor([
+            [1, 0, 0],
+            [0, 0, -1],
+            [0, 1, 0]
+        ], dtype=torch.float32, device=device)  # [3, 3]
+        
+        # Apply transformation: axis_aligned_R = axis_aligned_transform @ w2c_rotation
+        # Expand axis_aligned_transform to match batch dimensions
+        axis_aligned_transform_expanded = axis_aligned_transform.unsqueeze(0).unsqueeze(0)  # [1, 1, 3, 3]
+        axis_aligned_R = torch.matmul(axis_aligned_transform_expanded, w2c_rotation)  # [b, v, 3, 3]
+        
+        # Transform view directions to world space
+        # view_dirs_local: [envmap_h * envmap_w, 3]
+        # axis_aligned_R: [b, v, 3, 3]
+        # We need to apply: view_dirs_world = view_dirs_local @ axis_aligned_R
+        # Expand view_dirs_local to [b, v, envmap_h * envmap_w, 3]
+        view_dirs_local_expanded = view_dirs_local.unsqueeze(0).unsqueeze(0).expand(b, v, -1, -1)  # [b, v, envmap_h * envmap_w, 3]
+        # Matrix multiplication: [b, v, envmap_h * envmap_w, 3] @ [b, v, 3, 3] = [b, v, envmap_h * envmap_w, 3]
+        view_dirs_world = torch.matmul(view_dirs_local_expanded, axis_aligned_R)  # [b, v, envmap_h * envmap_w, 3]
+        
+        # Reshape to [b, v, 3, envmap_h, envmap_w]
+        env_dir = view_dirs_world.reshape(b, v, envmap_h, envmap_w, 3).permute(0, 1, 4, 2, 3)  # [b, v, 3, envmap_h, envmap_w]
+        
+        return env_dir
+    
     def fetch_views(self, data_batch, has_target_image=False, target_has_input=True):
         """
         Splits the input data batch into input and target sets.
@@ -186,6 +255,12 @@ class ProcessData(nn.Module):
 
                 ray_o, ray_d = self.compute_rays(c2w, fxfycxcy, image_height, image_width, device=data_batch["image"].device)
                 dict["ray_o"], dict["ray_d"] = ray_o, ray_d
+        
+        # Compute environment map directions for input and target
+        for dict in [input_dict, target_dict]:
+            c2w = dict["c2w"]
+            env_dir = self.compute_env_dir(c2w, envmap_h=256, envmap_w=512, device=data_batch["image"].device)
+            dict["env_dir"] = env_dir
 
         return input_dict, target_dict
 
