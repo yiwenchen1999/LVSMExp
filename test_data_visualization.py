@@ -305,6 +305,95 @@ def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=
     plt.close()
     
     print(f"Saved visualization to {output_path}")
+    
+    # Also create a separate visualization for env_dir only
+    visualize_envdir_only(data_dict, view_idx, output_dir, prefix=prefix)
+
+
+def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
+    """
+    Visualize only env_dir points at (0,0,0) + 1*env_dir.
+    """
+    # Get env_dir and env_hdr
+    env_dir = data_dict["env_dir"][0, view_idx].cpu().numpy()  # [3, envH, envW]
+    has_env_hdr = "env_hdr" in data_dict and data_dict["env_hdr"] is not None
+    if has_env_hdr:
+        env_hdr = data_dict["env_hdr"][0, view_idx].cpu().numpy()  # [3, envH, envW]
+        env_hdr = env_hdr.transpose(1, 2, 0)  # [envH, envW, 3]
+        if env_hdr.min() < 0:
+            env_hdr = (env_hdr + 1) / 2.0
+        env_hdr = np.clip(env_hdr, 0, 1)
+    else:
+        env_hdr = None
+    
+    envH, envW = env_dir.shape[1], env_dir.shape[2]
+    
+    # Reshape env_dir
+    env_dir_flat = env_dir.transpose(1, 2, 0).reshape(-1, 3)  # [envH*envW, 3]
+    env_points = 1.0 * env_dir_flat  # [envH*envW, 3] - Use 1.0 instead of 3.0
+    
+    # Create 3D plot
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    if env_hdr is not None:
+        env_hdr_flat = env_hdr.reshape(-1, 3)  # [envH*envW, 3]
+        # Subsample env points for better visualization
+        env_subsample = max(1, envH * envW // 2000)  # Limit to ~2000 points
+        env_indices = np.arange(envH * envW)[::env_subsample]
+        env_points_sub = env_points[env_indices]
+        env_hdr_sub = env_hdr_flat[env_indices]
+        
+        ax.scatter(
+            env_points_sub[:, 0],
+            env_points_sub[:, 1],
+            env_points_sub[:, 2],
+            c=env_hdr_sub,
+            s=2,
+            alpha=0.9
+        )
+    else:
+        # Use default color if env_hdr not available
+        env_subsample = max(1, envH * envW // 2000)
+        env_indices = np.arange(envH * envW)[::env_subsample]
+        env_points_sub = env_points[env_indices]
+        
+        ax.scatter(
+            env_points_sub[:, 0],
+            env_points_sub[:, 1],
+            env_points_sub[:, 2],
+            c='blue',
+            s=2,
+            alpha=0.7
+        )
+    
+    # Set labels and title
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(f'{prefix} View {view_idx:02d} - Environment Directions Only')
+    
+    # Set equal aspect ratio
+    max_range = np.array([
+        env_points_sub[:, 0].max() - env_points_sub[:, 0].min(),
+        env_points_sub[:, 1].max() - env_points_sub[:, 1].min(),
+        env_points_sub[:, 2].max() - env_points_sub[:, 2].min()
+    ]).max()
+    
+    mid_x = (env_points_sub[:, 0].max() + env_points_sub[:, 0].min()) * 0.5
+    mid_y = (env_points_sub[:, 1].max() + env_points_sub[:, 1].min()) * 0.5
+    mid_z = (env_points_sub[:, 2].max() + env_points_sub[:, 2].min()) * 0.5
+    
+    ax.set_xlim(mid_x - max_range/2, mid_x + max_range/2)
+    ax.set_ylim(mid_y - max_range/2, mid_y + max_range/2)
+    ax.set_zlim(mid_z - max_range/2, mid_z + max_range/2)
+    
+    # Save figure
+    output_path = os.path.join(output_dir, f"{prefix}_view_{view_idx:02d}_envdir_only.png")
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Saved env_dir-only visualization to {output_path}")
 
 
 def main():
