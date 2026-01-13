@@ -127,8 +127,8 @@ class ProcessData(nn.Module):
         # This converts from OpenCV to Blender convention
         axis_aligned_transform = torch.tensor([
             [1, 0, 0],
-            [0, 0, -1],
-            [0, 1, 0]
+            [0, 1, 0],
+            [0, 0, 1]
         ], dtype=torch.float32, device=device)  # [3, 3]
         
         # Apply transformation: axis_aligned_R = axis_aligned_transform @ w2c_rotation
