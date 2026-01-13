@@ -122,13 +122,24 @@ class ProcessData(nn.Module):
         w2c_rotation = c2w_rotation.transpose(-2, -1)  # [b, v, 3, 3]
         
         # Apply Blender convention transformation
-        # The reference code uses: axis_aligned_transform @ w2c_rotation
-        # where axis_aligned_transform = [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
-        # This converts from OpenCV to Blender convention
+        # We need to apply two transformations:
+        # 1. OpenCV c2w -> Blender c2w: multiply by diag(1, -1, -1) on the right
+        #    R_blender = R_opencv @ T_cv2b
+        #    Then w2c_blender = R_blender.T = (R_opencv @ T_cv2b).T = T_cv2b.T @ R_opencv.T
+        #    Since T_cv2b is diagonal, T_cv2b.T = T_cv2b
+        # 2. Blender w2c -> Gaffer World: multiply by axis_aligned_transform on the left
+        #    R_final = axis_aligned_transform @ w2c_blender
+        #    R_final = axis_aligned_transform @ (T_cv2b @ w2c_opencv)
+        #    R_final = (axis_aligned_transform @ T_cv2b) @ w2c_opencv
+        
+        # axis_aligned_transform (Gaffer): [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
+        # T_cv2b (Blender<->OpenCV):       [[1, 0, 0], [0, -1, 0], [0, 0, -1]]
+        # Combined = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
+        
         axis_aligned_transform = torch.tensor([
             [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
+            [0, 0, 1],
+            [0, -1, 0]
         ], dtype=torch.float32, device=device)  # [3, 3]
         
         # Apply transformation: axis_aligned_R = axis_aligned_transform @ w2c_rotation
