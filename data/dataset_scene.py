@@ -267,17 +267,142 @@ class Dataset(Dataset):
             scene_scale_factor = self.config.training.get("scene_scale_factor", 1.35)
             input_c2ws = self.preprocess_poses(input_c2ws, scene_scale_factor)
 
+            # Load relit images and environment maps from a different env scene with the same object_id
+            relit_images = None
+            env_ldr = None
+            env_hdr = None
+            try:
+                # Extract object_id and env_name from scene_name (e.g., "0007a7c8fcb44074b20fa4e14b8730a6_env_0")
+                scene_name_parts = scene_name.rsplit('_', 1)
+                if len(scene_name_parts) == 2:
+                    object_id = scene_name_parts[0]
+                    current_env_name = scene_name_parts[1]
+                    
+                    # Extract base directory from scene_path (e.g., ".../train/metadata/...")
+                    scene_path_dir = os.path.dirname(scene_path)
+                    base_dir = os.path.dirname(scene_path_dir)  # Go up from metadata to train/test
+                    
+                    # Find all scenes with the same object_id but different env_name
+                    metadata_dir = os.path.join(base_dir, 'metadata')
+                    if os.path.exists(metadata_dir):
+                        all_scene_json_files = [f for f in os.listdir(metadata_dir) if f.endswith('.json')]
+                        candidate_scenes = []
+                        for json_file in all_scene_json_files:
+                            candidate_scene_name = json_file[:-5]  # Remove .json extension
+                            if candidate_scene_name.startswith(object_id + '_') and candidate_scene_name != scene_name:
+                                candidate_scenes.append(candidate_scene_name)
+                        
+                        # Randomly select one candidate scene
+                        if candidate_scenes:
+                            relit_scene_name = random.choice(candidate_scenes)
+                            relit_scene_path = os.path.join(metadata_dir, relit_scene_name + '.json')
+                            
+                            # Load relit scene JSON
+                            if os.path.exists(relit_scene_path):
+                                with open(relit_scene_path, 'r') as f:
+                                    relit_data_json = json.load(f)
+                                relit_frames = relit_data_json.get("frames", [])
+                                
+                                # Check if relit scene has enough frames
+                                if len(relit_frames) > max(image_indices):
+                                    # Load relit images with same indices
+                                    relit_image_paths = [relit_frames[ic]["image_path"] for ic in image_indices]
+                                    relit_frames_chosen = [relit_frames[ic] for ic in image_indices]
+                                    
+                                    # Check if all relit image paths exist
+                                    all_exist = True
+                                    for img_path in relit_image_paths:
+                                        if not os.path.exists(img_path):
+                                            all_exist = False
+                                            break
+                                    
+                                    if all_exist:
+                                        relit_images, _, _ = self.preprocess_frames(relit_frames_chosen, relit_image_paths)
+                                        
+                                        # Load environment maps from envmaps folder
+                                        images_dir = os.path.join(base_dir, 'images', relit_scene_name)
+                                        envmaps_dir = os.path.join(base_dir, 'envmaps', relit_scene_name)
+                                        
+                                        if os.path.exists(envmaps_dir):
+                                            env_ldr_list = []
+                                            env_hdr_list = []
+                                            all_envmaps_exist = True
+                                            
+                                            for ic in image_indices:
+                                                env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
+                                                env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
+                                                
+                                                if not (os.path.exists(env_ldr_path) and os.path.exists(env_hdr_path)):
+                                                    all_envmaps_exist = False
+                                                    break
+                                                
+                                                try:
+                                                    env_ldr_img = PIL.Image.open(env_ldr_path)
+                                                    env_ldr_img.load()
+                                                    env_ldr_array = np.array(env_ldr_img) / 255.0
+                                                    if len(env_ldr_array.shape) == 2:
+                                                        env_ldr_array = np.stack([env_ldr_array, env_ldr_array, env_ldr_array], axis=2)
+                                                    elif env_ldr_array.shape[2] == 4:
+                                                        rgb = env_ldr_array[:, :, :3]
+                                                        alpha = env_ldr_array[:, :, 3:4]
+                                                        env_ldr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                                    elif env_ldr_array.shape[2] == 3:
+                                                        pass
+                                                    else:
+                                                        env_ldr_array = env_ldr_array[:, :, :3]
+                                                    env_ldr_tensor = torch.from_numpy(env_ldr_array).permute(2, 0, 1).float()
+                                                    
+                                                    env_hdr_img = PIL.Image.open(env_hdr_path)
+                                                    env_hdr_img.load()
+                                                    env_hdr_array = np.array(env_hdr_img) / 255.0
+                                                    if len(env_hdr_array.shape) == 2:
+                                                        env_hdr_array = np.stack([env_hdr_array, env_hdr_array, env_hdr_array], axis=2)
+                                                    elif env_hdr_array.shape[2] == 4:
+                                                        rgb = env_hdr_array[:, :, :3]
+                                                        alpha = env_hdr_array[:, :, 3:4]
+                                                        env_hdr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                                    elif env_hdr_array.shape[2] == 3:
+                                                        pass
+                                                    else:
+                                                        env_hdr_array = env_hdr_array[:, :, :3]
+                                                    env_hdr_tensor = torch.from_numpy(env_hdr_array).permute(2, 0, 1).float()
+                                                    
+                                                    env_ldr_list.append(env_ldr_tensor)
+                                                    env_hdr_list.append(env_hdr_tensor)
+                                                except Exception as e:
+                                                    all_envmaps_exist = False
+                                                    break
+                                            
+                                            if all_envmaps_exist and len(env_ldr_list) == len(image_indices):
+                                                env_ldr = torch.stack(env_ldr_list, dim=0)  # [v, 3, h, w]
+                                                env_hdr = torch.stack(env_hdr_list, dim=0)  # [v, 3, h, w]
+            except Exception as e:
+                # If loading relit images or envmaps fails, just continue without them
+                # They are optional, so we don't want to fail the entire data loading
+                if _retry_count < 2:
+                    print(f"Warning: Failed to load relit images/envmaps for scene {scene_name}: {e}")
+
             image_indices = torch.tensor(image_indices).long().unsqueeze(-1)  # [v, 1]
             scene_indices = torch.full_like(image_indices, idx)  # [v, 1]
             indices = torch.cat([image_indices, scene_indices], dim=-1)  # [v, 2]
 
-            return {
+            result_dict = {
                 "image": input_images,
                 "c2w": input_c2ws,
                 "fxfycxcy": input_intrinsics,
                 "index": indices,
                 "scene_name": scene_name
             }
+            
+            # Add optional relit images and environment maps
+            if relit_images is not None:
+                result_dict["relit_images"] = relit_images
+            if env_ldr is not None:
+                result_dict["env_ldr"] = env_ldr
+            if env_hdr is not None:
+                result_dict["env_hdr"] = env_hdr
+            
+            return result_dict
         except (ValueError, IndexError, KeyError, FileNotFoundError, RuntimeError, 
                 PIL.UnidentifiedImageError, OSError, IOError, json.JSONDecodeError,
                 torch.cuda.OutOfMemoryError) as e:
