@@ -236,6 +236,9 @@ def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=
     # Compute ray endpoints (ray_o + ray_d * 1.0)
     ray_endpoints = ray_o_sub + ray_d_norm_sub * 1.0  # [N, 3]
     
+    # Compute ray points at ray_o + 0.25*ray_d for point visualization
+    ray_points = ray_o_sub + 0.25 * ray_d_norm_sub  # [N, 3]
+    
     # Create 3D plot
     fig = plt.figure(figsize=(16, 12))
     ax = fig.add_subplot(111, projection='3d')
@@ -250,6 +253,16 @@ def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=
             linewidth=0.5,
             alpha=0.6
         )
+    
+    # Plot ray points at ray_o + 0.25*ray_d
+    ax.scatter(
+        ray_points[:, 0],
+        ray_points[:, 1],
+        ray_points[:, 2],
+        c=colors_sub,
+        s=1,
+        alpha=0.8
+    )
     
     # Plot env_dir points
     if env_dir is not None:
@@ -315,6 +328,14 @@ def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=
     
     # Also create a separate visualization for env_dir only
     visualize_envdir_only(data_dict, view_idx, output_dir, prefix=prefix)
+    
+    # Save combined ray and env_dir points as .ply
+    if HAS_OPEN3D:
+        save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix=prefix, subsample=subsample)
+    
+    # Save combined ray and env_dir points as .ply
+    if HAS_OPEN3D:
+        save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix=prefix, subsample=subsample)
 
 
 def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
@@ -440,6 +461,107 @@ def save_envdir_as_ply(env_points, env_colors, output_dir, view_idx, prefix=""):
     o3d.io.write_point_cloud(ply_path, pcd)
     
     print(f"Saved env_dir point cloud to {ply_path}")
+
+
+def save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix="", subsample=10):
+    """
+    Save combined ray points and env_dir points as a single .ply point cloud file.
+    Ray points are at ray_o + 0.25*ray_d with colors from relit_image.
+    Env_dir points are at 0.5*env_dir with colors from env_hdr.
+    
+    Args:
+        data_dict: Data dictionary containing ray_o, ray_d, env_dir, etc.
+        view_idx: View index
+        output_dir: Output directory
+        prefix: Prefix for filename
+        subsample: Subsample factor for rays
+    """
+    if not HAS_OPEN3D:
+        return
+    
+    # Get ray data
+    ray_o = data_dict["ray_o"][0, view_idx].cpu().numpy()  # [3, H, W]
+    ray_d = data_dict["ray_d"][0, view_idx].cpu().numpy()  # [3, H, W]
+    
+    # Get relit_image for ray colors
+    has_relit = "relit_images" in data_dict and data_dict["relit_images"] is not None
+    if has_relit:
+        relit_image = data_dict["relit_images"][0, view_idx].cpu().numpy()  # [3, H, W]
+        relit_image = relit_image.transpose(1, 2, 0)  # [H, W, 3]
+        if relit_image.min() < 0:
+            relit_image = (relit_image + 1) / 2.0
+        relit_image = np.clip(relit_image, 0, 1)
+    else:
+        # Use regular image if relit_image not available
+        image = data_dict["image"][0, view_idx].cpu().numpy()  # [3, H, W]
+        relit_image = image.transpose(1, 2, 0)  # [H, W, 3]
+        if relit_image.min() < 0:
+            relit_image = (relit_image + 1) / 2.0
+        relit_image = np.clip(relit_image, 0, 1)
+    
+    # Get env_dir and env_hdr
+    env_dir = data_dict["env_dir"][0, view_idx].cpu().numpy()  # [3, envH, envW]
+    has_env_hdr = "env_hdr" in data_dict and data_dict["env_hdr"] is not None
+    if has_env_hdr:
+        env_hdr = data_dict["env_hdr"][0, view_idx].cpu().numpy()  # [3, envH, envW]
+        env_hdr = env_hdr.transpose(1, 2, 0)  # [envH, envW, 3]
+        if env_hdr.min() < 0:
+            env_hdr = (env_hdr + 1) / 2.0
+        env_hdr = np.clip(env_hdr, 0, 1)
+    else:
+        env_hdr = None
+    
+    H, W = ray_o.shape[1], ray_o.shape[2]
+    envH, envW = env_dir.shape[1], env_dir.shape[2]
+    
+    # Process ray data
+    ray_o_flat = ray_o.transpose(1, 2, 0).reshape(-1, 3)  # [H*W, 3]
+    ray_d_flat = ray_d.transpose(1, 2, 0).reshape(-1, 3)  # [H*W, 3]
+    relit_image_flat = relit_image.reshape(-1, 3)  # [H*W, 3]
+    
+    # Normalize ray_d to unit length
+    ray_d_norm = ray_d_flat / (np.linalg.norm(ray_d_flat, axis=1, keepdims=True) + 1e-8)
+    
+    # Subsample rays
+    indices = np.arange(H * W)
+    subsampled_indices = indices[::subsample]
+    ray_o_sub = ray_o_flat[subsampled_indices]  # [N, 3]
+    ray_d_norm_sub = ray_d_norm[subsampled_indices]  # [N, 3]
+    ray_colors_sub = relit_image_flat[subsampled_indices]  # [N, 3]
+    
+    # Compute ray points at ray_o + 0.25*ray_d
+    ray_points = ray_o_sub + 0.25 * ray_d_norm_sub  # [N, 3]
+    
+    # Process env_dir data
+    env_dir_flat = env_dir.transpose(1, 2, 0).reshape(-1, 3)  # [envH*envW, 3]
+    env_points = 0.5 * env_dir_flat  # [envH*envW, 3]
+    
+    # Subsample env points
+    env_subsample = max(1, envH * envW // 2000)  # Limit to ~2000 points
+    env_indices = np.arange(envH * envW)[::env_subsample]
+    env_points_sub = env_points[env_indices]  # [M, 3]
+    
+    if env_hdr is not None:
+        env_hdr_flat = env_hdr.reshape(-1, 3)  # [envH*envW, 3]
+        env_colors_sub = env_hdr_flat[env_indices]  # [M, 3]
+    else:
+        # Use default blue color if env_hdr not available
+        env_colors_sub = np.array([[0.0, 0.0, 1.0]] * len(env_points_sub))
+    
+    # Combine ray points and env points
+    all_points = np.vstack([ray_points, env_points_sub])  # [N+M, 3]
+    all_colors = np.vstack([ray_colors_sub, env_colors_sub])  # [N+M, 3]
+    
+    # Create point cloud
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(all_points)
+    pcd.colors = o3d.utility.Vector3dVector(np.clip(all_colors, 0, 1))
+    
+    # Save as .ply file
+    ply_path = os.path.join(output_dir, f"{prefix}_view_{view_idx:02d}_rays_envdir_combined.ply")
+    o3d.io.write_point_cloud(ply_path, pcd)
+    
+    print(f"Saved combined rays and env_dir point cloud to {ply_path} ({len(ray_points)} ray points + {len(env_points_sub)} env points)")
 
 
 def main():
