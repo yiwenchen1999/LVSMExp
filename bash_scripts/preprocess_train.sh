@@ -8,8 +8,6 @@
 #SBATCH --output=myjob.preprocess_train.out
 #SBATCH --error=myjob.preprocess_train.err
 
-cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp
-conda activate /projects/vig/yiwenc/all_env/rayzer
 
 python preprocess_scripts/preprocess_objaverse.py \
   --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
