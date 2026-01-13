@@ -330,7 +330,7 @@ def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
     
     # Reshape env_dir
     env_dir_flat = env_dir.transpose(1, 2, 0).reshape(-1, 3)  # [envH*envW, 3]
-    env_points = 1.0 * env_dir_flat  # [envH*envW, 3] - Use 1.0 instead of 3.0
+    env_points = 0.5 * env_dir_flat  # [envH*envW, 3] - Use 1.0 instead of 3.0
     
     # Create 3D plot
     fig = plt.figure(figsize=(12, 10))

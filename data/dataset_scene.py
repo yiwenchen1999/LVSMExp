@@ -266,6 +266,7 @@ class Dataset(Dataset):
             # centerize and scale the poses (for unbounded scenes)
             scene_scale_factor = self.config.training.get("scene_scale_factor", 1.35)
             input_c2ws = self.preprocess_poses(input_c2ws, scene_scale_factor)
+            
 
             # Load relit images and environment maps from a different env scene with the same object_id
             relit_images = None

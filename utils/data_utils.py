@@ -135,7 +135,9 @@ class ProcessData(nn.Module):
         # Expand axis_aligned_transform to match batch dimensions
         axis_aligned_transform_expanded = axis_aligned_transform.unsqueeze(0).unsqueeze(0)  # [1, 1, 3, 3]
         axis_aligned_R = torch.matmul(axis_aligned_transform_expanded, w2c_rotation)  # [b, v, 3, 3]
-        
+        # set the align_R to be identity,
+        #todo: remove this line after debugging
+        axis_aligned_R = torch.eye(3, device=device).unsqueeze(0).unsqueeze(0).expand(b, v, -1, -1)  # [b, v, 3, 3]
         # Transform view directions to world space
         # view_dirs_local: [envmap_h * envmap_w, 3]
         # axis_aligned_R: [b, v, 3, 3]
