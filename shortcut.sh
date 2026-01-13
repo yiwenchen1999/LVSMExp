@@ -40,7 +40,7 @@ python preprocess_scripts/preprocess_objaverse.py \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
   --max-objects 10
 # visualize data
-python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wEditor.yaml --output-dir ./test_output --subsample 10 --batch-idx 10
+python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wEditor.yaml --output-dir ./test_output --subsample 10 --env-sample-num 10000 --batch-idx 1
 # train-og:
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \

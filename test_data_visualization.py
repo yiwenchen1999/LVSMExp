@@ -143,7 +143,7 @@ def save_data(data_dict, input_dict, target_dict, output_dir):
     print(f"Data saved to {output_dir}")
 
 
-def visualize_rays_and_envdir(input_dict, target_dict, output_dir, subsample=10):
+def visualize_rays_and_envdir(input_dict, target_dict, output_dir, subsample=10, env_sample_num=2000):
     """
     Visualize ray_o, ray_d, and env_dir in 3D space.
     
@@ -163,7 +163,7 @@ def visualize_rays_and_envdir(input_dict, target_dict, output_dir, subsample=10)
     
     for view_idx in range(v):
         visualize_single_view(
-            input_dict, view_idx, input_viz_dir, subsample, prefix="input"
+            input_dict, view_idx, input_viz_dir, subsample, prefix="input", env_sample_num=env_sample_num
         )
     
     # Visualize target views
@@ -174,11 +174,11 @@ def visualize_rays_and_envdir(input_dict, target_dict, output_dir, subsample=10)
     
     for view_idx in range(v):
         visualize_single_view(
-            target_dict, view_idx, target_viz_dir, subsample, prefix="target"
+            target_dict, view_idx, target_viz_dir, subsample, prefix="target", env_sample_num=env_sample_num
         )
 
 
-def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=""):
+def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix="", env_sample_num=2000):
     """
     Visualize rays and env_dir for a single view.
     """
@@ -272,7 +272,7 @@ def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=
         if env_hdr is not None:
             env_hdr_flat = env_hdr.reshape(-1, 3)  # [envH*envW, 3]
             # Subsample env points
-            env_subsample = max(1, envH * envW // 1000)  # Limit to ~1000 points
+            env_subsample = max(1, envH * envW // env_sample_num)  # Limit to env_sample_num points
             env_indices = np.arange(envH * envW)[::env_subsample]
             env_points_sub = env_points[env_indices]
             env_hdr_sub = env_hdr_flat[env_indices]
@@ -327,18 +327,18 @@ def visualize_single_view(data_dict, view_idx, output_dir, subsample=10, prefix=
     print(f"Saved visualization to {output_path}")
     
     # Also create a separate visualization for env_dir only
-    visualize_envdir_only(data_dict, view_idx, output_dir, prefix=prefix)
+    visualize_envdir_only(data_dict, view_idx, output_dir, prefix=prefix, env_sample_num=env_sample_num)
     
     # Save combined ray and env_dir points as .ply
     if HAS_OPEN3D:
-        save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix=prefix, subsample=subsample)
+        save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix=prefix, subsample=subsample, env_sample_num=env_sample_num)
     
     # Save combined ray and env_dir points as .ply
     if HAS_OPEN3D:
         save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix=prefix, subsample=subsample)
 
 
-def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
+def visualize_envdir_only(data_dict, view_idx, output_dir, prefix="", env_sample_num=2000):
     """
     Visualize only env_dir points at (0,0,0) + 1*env_dir.
     """
@@ -365,7 +365,7 @@ def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
     ax = fig.add_subplot(111, projection='3d')
     
     # Subsample env points for better visualization
-    env_subsample = max(1, envH * envW // 2000)  # Limit to ~2000 points
+    env_subsample = max(1, envH * envW // env_sample_num)  # Limit to env_sample_num points
     env_indices = np.arange(envH * envW)[::env_subsample]
     env_points_sub = env_points[env_indices]
     
@@ -463,7 +463,7 @@ def save_envdir_as_ply(env_points, env_colors, output_dir, view_idx, prefix=""):
     print(f"Saved env_dir point cloud to {ply_path}")
 
 
-def save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix="", subsample=10):
+def save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix="", subsample=10, env_sample_num=2000):
     """
     Save combined ray points and env_dir points as a single .ply point cloud file.
     Ray points are at ray_o + 0.25*ray_d with colors from relit_image.
@@ -537,7 +537,7 @@ def save_combined_rays_envdir_as_ply(data_dict, view_idx, output_dir, prefix="",
     env_points = 0.5 * env_dir_flat  # [envH*envW, 3]
     
     # Subsample env points
-    env_subsample = max(1, envH * envW // 2000)  # Limit to ~2000 points
+    env_subsample = max(1, envH * envW // env_sample_num)  # Limit to env_sample_num points
     env_indices = np.arange(envH * envW)[::env_subsample]
     env_points_sub = env_points[env_indices]  # [M, 3]
     
@@ -569,6 +569,7 @@ def main():
     parser.add_argument("--config", "-c", required=True, help="Path to config file")
     parser.add_argument("--output-dir", "-o", default="./test_data_output", help="Output directory")
     parser.add_argument("--subsample", type=int, default=10, help="Subsample factor for rays (default: 10)")
+    parser.add_argument("--env-sample-num", type=int, default=2000, help="Number of env_dir points to sample (default: 2000)")
     parser.add_argument("--batch-idx", type=int, default=0, help="Batch index to visualize (default: 0)")
     args, unknown = parser.parse_known_args()
     
@@ -639,7 +640,7 @@ def main():
     print("Creating visualizations...")
     
     # Create visualizations
-    visualize_rays_and_envdir(input_dict, target_dict, args.output_dir, subsample=args.subsample)
+    visualize_rays_and_envdir(input_dict, target_dict, args.output_dir, subsample=args.subsample, env_sample_num=args.env_sample_num)
     
     print(f"All done! Results saved to {args.output_dir}")
 
