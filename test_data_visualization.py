@@ -13,6 +13,13 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.collections import LineCollection
 import argparse
 
+try:
+    import open3d as o3d
+    HAS_OPEN3D = True
+except ImportError:
+    HAS_OPEN3D = False
+    print("Warning: open3d not available. .ply files will not be saved.")
+
 
 def denormalize_image(image_tensor):
     """
@@ -336,12 +343,13 @@ def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
     
+    # Subsample env points for better visualization
+    env_subsample = max(1, envH * envW // 2000)  # Limit to ~2000 points
+    env_indices = np.arange(envH * envW)[::env_subsample]
+    env_points_sub = env_points[env_indices]
+    
     if env_hdr is not None:
         env_hdr_flat = env_hdr.reshape(-1, 3)  # [envH*envW, 3]
-        # Subsample env points for better visualization
-        env_subsample = max(1, envH * envW // 2000)  # Limit to ~2000 points
-        env_indices = np.arange(envH * envW)[::env_subsample]
-        env_points_sub = env_points[env_indices]
         env_hdr_sub = env_hdr_flat[env_indices]
         
         ax.scatter(
@@ -354,9 +362,7 @@ def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
         )
     else:
         # Use default color if env_hdr not available
-        env_subsample = max(1, envH * envW // 2000)
-        env_indices = np.arange(envH * envW)[::env_subsample]
-        env_points_sub = env_points[env_indices]
+        env_hdr_sub = None
         
         ax.scatter(
             env_points_sub[:, 0],
@@ -394,6 +400,46 @@ def visualize_envdir_only(data_dict, view_idx, output_dir, prefix=""):
     plt.close()
     
     print(f"Saved env_dir-only visualization to {output_path}")
+    
+    # Save as .ply point cloud
+    if HAS_OPEN3D:
+        save_envdir_as_ply(env_points_sub, env_hdr_sub if env_hdr is not None else None, 
+                           output_dir, view_idx, prefix)
+
+
+def save_envdir_as_ply(env_points, env_colors, output_dir, view_idx, prefix=""):
+    """
+    Save environment direction points as .ply point cloud file.
+    
+    Args:
+        env_points: numpy array of shape [N, 3] - point positions
+        env_colors: numpy array of shape [N, 3] or None - RGB colors in [0, 1] range
+        output_dir: output directory
+        view_idx: view index
+        prefix: prefix for filename
+    """
+    if not HAS_OPEN3D:
+        return
+    
+    # Create point cloud
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(env_points)
+    
+    # Set colors
+    if env_colors is not None:
+        # Ensure colors are in [0, 1] range
+        colors = np.clip(env_colors, 0, 1)
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+    else:
+        # Use default blue color
+        default_color = np.array([[0.0, 0.0, 1.0]] * len(env_points))
+        pcd.colors = o3d.utility.Vector3dVector(default_color)
+    
+    # Save as .ply file
+    ply_path = os.path.join(output_dir, f"{prefix}_view_{view_idx:02d}_envdir.ply")
+    o3d.io.write_point_cloud(ply_path, pcd)
+    
+    print(f"Saved env_dir point cloud to {ply_path}")
 
 
 def main():
