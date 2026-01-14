@@ -178,6 +178,57 @@ class LatentSceneEditor(nn.Module):
         """Override the train method to keep the loss computer in eval mode"""
         super().train(mode)
         self.loss_computer.eval()
+    
+    def freeze_reconstructor_and_renderer(self):
+        """
+        Freeze all layers used in reconstructor and renderer, 
+        only keep editor layers (transformer_editor and env_tokenizer) trainable.
+        
+        Reconstructor layers:
+        - image_tokenizer
+        - n_light_field_latent
+        - transformer_encoder
+        
+        Renderer layers:
+        - target_pose_tokenizer
+        - transformer_input_layernorm_decoder
+        - transformer_decoder
+        - image_token_decoder
+        
+        Editor layers (kept trainable):
+        - env_tokenizer
+        - transformer_editor
+        """
+        # Freeze reconstructor layers
+        for param in self.image_tokenizer.parameters():
+            param.requires_grad = False
+        self.n_light_field_latent.requires_grad = False
+        for param in self.transformer_encoder.parameters():
+            param.requires_grad = False
+        
+        # Freeze renderer layers
+        for param in self.target_pose_tokenizer.parameters():
+            param.requires_grad = False
+        for param in self.transformer_input_layernorm_decoder.parameters():
+            param.requires_grad = False
+        for param in self.transformer_decoder.parameters():
+            param.requires_grad = False
+        for param in self.image_token_decoder.parameters():
+            param.requires_grad = False
+        
+        # Keep editor layers trainable
+        for param in self.env_tokenizer.parameters():
+            param.requires_grad = True
+        for param in self.transformer_editor.parameters():
+            param.requires_grad = True
+        
+        print("Frozen reconstructor and renderer layers. Only editor layers (env_tokenizer, transformer_editor) are trainable.")
+    
+    def unfreeze_all(self):
+        """Unfreeze all layers for full model training"""
+        for param in self.parameters():
+            param.requires_grad = True
+        print("Unfrozen all layers.")
 
 
     

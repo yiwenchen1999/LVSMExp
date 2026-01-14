@@ -83,6 +83,12 @@ if config.training.get("LVSM_checkpoint_dir", ""):
     else:
         print(f"------2.2 Successfully initialized from Images2LatentScene------")
 
+# Freeze reconstructor and renderer layers, only train editor layers
+# Do this before DDP wrapping to ensure freeze state is preserved
+if config.training.get("freeze_reconstructor_renderer", False):
+    model.freeze_reconstructor_and_renderer()
+    print(f"------2.0.1 frozen reconstructor and renderer, only editor layers trainable------")
+
 model = DDP(model, device_ids=[ddp_info.local_rank])
 print(f"------2.0 model initialized and wrapped with DDP------")
 

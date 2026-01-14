@@ -29,6 +29,7 @@ model:
       n_layer: 12  # Number of transformer blocks for editor
       init_scale: 0.1  # Initialization scale (0.1 = 10% of normal init std, keeps editor near identity)
       init_from_decoder: false  # If true, copy weights from decoder layers instead of random init
+    freeze_reconstructor_renderer: true
 
 training:
   amp_dtype: bf16
