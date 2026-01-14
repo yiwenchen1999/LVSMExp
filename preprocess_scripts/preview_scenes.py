@@ -238,9 +238,12 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
                 }
                 all_scenes_stats.append(scene_stats)
                 
+                # Log pixel statistics in real-time for all scenes
+                broken_marker = " [BROKEN]" if (is_mostly_black or is_mostly_white) else ""
+                print(f"  {scene_name}: black={black_count}/{total_pixels}({black_ratio:.2%}), white={white_count}/{total_pixels}({white_ratio:.2%}){broken_marker}")
+                
                 if is_mostly_black or is_mostly_white:
                     broken_scenes_batch.append(scene_stats)
-                    print(f"  Broken scene detected: {scene_name} (black: {black_count}/{total_pixels} ({black_ratio:.2%}), white: {white_count}/{total_pixels} ({white_ratio:.2%}))")
                 
                 images.append(img)
             else:
