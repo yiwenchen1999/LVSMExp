@@ -714,6 +714,14 @@ def main():
     print(f"\nCreating full_list.txt for {args.split} split...")
     create_full_list(output_root, split=args.split, broken_scenes=broken_scenes)
     
+    # Save broken scenes list to a file
+    if broken_scenes:
+        broken_list_path = os.path.join(output_root, args.split, 'broken_scenes.txt')
+        with open(broken_list_path, 'w') as f:
+            for scene_name in sorted(broken_scenes):
+                f.write(f"{scene_name}\n")
+        print(f"Saved broken scenes list to {broken_list_path}")
+    
     print(f"\nPreprocessing complete!")
     print(f"  - Processed {len(processed_scenes)} scenes")
     print(f"  - Skipped {len(skipped_scenes)} scenes (files already exist)")

@@ -48,6 +48,14 @@ python preprocess_scripts/preprocess_objaverse.py \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
   --max-objects 10
 
+# preview the scenes:
+python preprocess_scripts/preview_scenes.py \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
+    --output preview.png \
+    --image-idx 64 \
+    --grid-cols 8 \
+    --grid-rows 4 \
+    --images-per-grid 32
 # visualize data
 python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wEditor.yaml --output-dir ./test_output --subsample 10 --env-sample-num 5000 --batch-idx 8
 # train-og:
