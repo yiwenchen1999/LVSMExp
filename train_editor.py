@@ -58,6 +58,17 @@ dataloader = DataLoader(
     prefetch_factor=config.training.prefetch_factor,
     sampler=datasampler,
 )
+
+# Check if dataloader is empty (can happen with DistributedSampler + drop_last)
+if len(dataloader) == 0:
+    error_msg = f"Dataloader is empty! This can happen when:\n"
+    error_msg += f"  - Dataset size ({len(dataset)}) is smaller than total batch size ({batch_size_per_gpu * ddp_info.world_size})\n"
+    error_msg += f"  - Or when using DistributedSampler, some ranks get no data\n"
+    error_msg += f"  - Consider reducing batch_size_per_gpu or setting drop_last=False"
+    print_rank0(error_msg)
+    raise ValueError(error_msg)
+
+print_rank0(f"Dataloader size: {len(dataloader)} batches per epoch")
 dataloader_iter = iter(dataloader)
 
 print(f"------1.0 dataloader set up------")
