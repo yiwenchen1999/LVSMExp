@@ -273,15 +273,42 @@ class Dataset(Dataset):
             env_ldr = None
             env_hdr = None
             
-            # Extract object_id and env_name from scene_name (e.g., "0007a7c8fcb44074b20fa4e14b8730a6_env_0")
-            scene_name_parts = scene_name.rsplit('_', 1)
-            if len(scene_name_parts) != 2:
-                error_msg = f"Failed to parse scene_name '{scene_name}' into object_id and env_name"
-                print(f"Error: {error_msg}")
-                raise ValueError(error_msg)
+            # Extract object_id and env_name from scene_name
+            # Examples:
+            #   "0007a7c8fcb44074b20fa4e14b8730a6_env_0" -> object_id="0007a7c8fcb44074b20fa4e14b8730a6", env_name="env_0"
+            #   "00b100ac52b34afaa95ed4000cd9a4bb_white_env_0" -> object_id="00b100ac52b34afaa95ed4000cd9a4bb", env_name="white_env_0"
             
-            object_id = scene_name_parts[0]
-            current_env_name = scene_name_parts[1]
+            # Check for white_env_ prefix first
+            # todo: make this part slimmer
+            if scene_name.endswith('_white_env_0') or '_white_env_' in scene_name:
+                # Find the last occurrence of '_white_env_'
+                idx = scene_name.rfind('_white_env_')
+                if idx != -1:
+                    object_id = scene_name[:idx]
+                    current_env_name = scene_name[idx+1:]  # Includes 'white_env_0'
+                else:
+                    error_msg = f"Failed to parse scene_name '{scene_name}': expected '_white_env_' pattern"
+                    print(f"Error: {error_msg}")
+                    raise ValueError(error_msg)
+            elif scene_name.endswith('_env_0') or '_env_' in scene_name:
+                # Find the last occurrence of '_env_'
+                idx = scene_name.rfind('_env_')
+                if idx != -1:
+                    object_id = scene_name[:idx]
+                    current_env_name = scene_name[idx+1:]  # Includes 'env_0'
+                else:
+                    error_msg = f"Failed to parse scene_name '{scene_name}': expected '_env_' pattern"
+                    print(f"Error: {error_msg}")
+                    raise ValueError(error_msg)
+            else:
+                # Fallback to simple rsplit
+                scene_name_parts = scene_name.rsplit('_', 1)
+                if len(scene_name_parts) != 2:
+                    error_msg = f"Failed to parse scene_name '{scene_name}' into object_id and env_name"
+                    print(f"Error: {error_msg}")
+                    raise ValueError(error_msg)
+                object_id = scene_name_parts[0]
+                current_env_name = scene_name_parts[1]
             
             # Extract base directory from scene_path (e.g., ".../train/metadata/...")
             scene_path_dir = os.path.dirname(scene_path)
