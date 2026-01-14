@@ -11,16 +11,17 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-def check_image_black_or_white(img, threshold=0.9):
+def check_image_black_or_white(img, threshold=0.9, dark_threshold=15):
     """
-    Check if an image is mostly black or mostly white.
+    Check if an image is mostly black, mostly white, or mostly very dark.
     
     Args:
         img: PIL Image (RGB)
         threshold: Threshold ratio (default: 0.9, meaning 90%)
+        dark_threshold: Threshold for very dark pixels (sum of RGB channels < dark_threshold, default: 15)
         
     Returns:
-        tuple: (is_mostly_black, is_mostly_white, black_ratio, white_ratio)
+        tuple: (is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio)
     """
     
     # Convert to numpy array
@@ -39,10 +40,17 @@ def check_image_black_or_white(img, threshold=0.9):
     white_count = np.sum(white_pixels)
     white_ratio = white_count / total_pixels
     
+    # Check for very dark pixels (sum of RGB channels < dark_threshold)
+    channel_sum = np.sum(img_array, axis=2)  # Sum of R+G+B for each pixel
+    dark_pixels = channel_sum < dark_threshold
+    dark_count = np.sum(dark_pixels)
+    dark_ratio = dark_count / total_pixels
+    
     is_mostly_black = black_ratio > threshold
     is_mostly_white = white_ratio > threshold
+    is_mostly_dark = dark_ratio > threshold
     
-    return is_mostly_black, is_mostly_white, black_ratio, white_ratio
+    return is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio
 
 
 def load_scene_image(scene_json_path, image_idx=64):
@@ -217,32 +225,35 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
             scene_names.append(scene_name)
             
             if img is not None:
-                # Check if image is mostly black or white
-                is_mostly_black, is_mostly_white, black_ratio, white_ratio = check_image_black_or_white(img, threshold=0.9)
+                # Check if image is mostly black, white, or very dark
+                is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio = check_image_black_or_white(img, threshold=0.9, dark_threshold=15)
                 
                 # Calculate total pixels and counts
                 img_array = np.array(img)
                 total_pixels = img_array.shape[0] * img_array.shape[1]
                 black_count = int(black_ratio * total_pixels)
                 white_count = int(white_ratio * total_pixels)
+                dark_count = int(dark_ratio * total_pixels)
                 
                 # Record statistics for ALL scenes
                 scene_stats = {
                     'name': scene_name,
                     'black_count': black_count,
                     'white_count': white_count,
+                    'dark_count': dark_count,
                     'black_ratio': black_ratio,
                     'white_ratio': white_ratio,
+                    'dark_ratio': dark_ratio,
                     'total_pixels': total_pixels,
-                    'is_broken': is_mostly_black or is_mostly_white
+                    'is_broken': is_mostly_black or is_mostly_white or is_mostly_dark
                 }
                 all_scenes_stats.append(scene_stats)
                 
                 # Log pixel statistics in real-time for all scenes
-                broken_marker = " [BROKEN]" if (is_mostly_black or is_mostly_white) else ""
-                print(f"  {scene_name}: black={black_count}/{total_pixels}({black_ratio:.2%}), white={white_count}/{total_pixels}({white_ratio:.2%}){broken_marker}")
+                broken_marker = " [BROKEN]" if (is_mostly_black or is_mostly_white or is_mostly_dark) else ""
+                print(f"  {scene_name}: black={black_count}/{total_pixels}({black_ratio:.2%}), white={white_count}/{total_pixels}({white_ratio:.2%}), dark={dark_count}/{total_pixels}({dark_ratio:.2%}){broken_marker}")
                 
-                if is_mostly_black or is_mostly_white:
+                if is_mostly_black or is_mostly_white or is_mostly_dark:
                     broken_scenes_batch.append(scene_stats)
                 
                 images.append(img)
@@ -335,18 +346,20 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
         # Save statistics for ALL scenes
         all_stats_file = os.path.join(output_dir, 'all_scenes_pixel_stats.txt')
         with open(all_stats_file, 'w') as f:
-            f.write("scene_name\tblack_count/total_pixels(black_ratio%)\twhite_count/total_pixels(white_ratio%)\tis_broken\n")
+            f.write("scene_name\tblack_count/total_pixels(black_ratio%)\twhite_count/total_pixels(white_ratio%)\tdark_count/total_pixels(dark_ratio%)\tis_broken\n")
             for scene_info in unique_scenes_stats:
                 scene_name = scene_info['name']
                 black_count = scene_info['black_count']
                 white_count = scene_info['white_count']
+                dark_count = scene_info['dark_count']
                 total_pixels = scene_info['total_pixels']
                 black_ratio = scene_info['black_ratio']
                 white_ratio = scene_info['white_ratio']
+                dark_ratio = scene_info['dark_ratio']
                 is_broken = scene_info['is_broken']
                 
                 # Write scene name and pixel counts
-                f.write(f"{scene_name}\tblack:{black_count}/{total_pixels}({black_ratio:.2%})\twhite:{white_count}/{total_pixels}({white_ratio:.2%})\tbroken:{is_broken}\n")
+                f.write(f"{scene_name}\tblack:{black_count}/{total_pixels}({black_ratio:.2%})\twhite:{white_count}/{total_pixels}({white_ratio:.2%})\tdark:{dark_count}/{total_pixels}({dark_ratio:.2%})\tbroken:{is_broken}\n")
         
         print(f"\nPixel statistics for all {len(unique_scenes_stats)} scenes saved to {all_stats_file}")
         
@@ -359,17 +372,19 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
                     scene_name = scene_info['name']
                     black_count = scene_info['black_count']
                     white_count = scene_info['white_count']
+                    dark_count = scene_info['dark_count']
                     total_pixels = scene_info['total_pixels']
                     black_ratio = scene_info['black_ratio']
                     white_ratio = scene_info['white_ratio']
+                    dark_ratio = scene_info['dark_ratio']
                     
                     # Write scene name and pixel counts
-                    f.write(f"{scene_name}\tblack:{black_count}/{total_pixels}({black_ratio:.2%})\twhite:{white_count}/{total_pixels}({white_ratio:.2%})\n")
+                    f.write(f"{scene_name}\tblack:{black_count}/{total_pixels}({black_ratio:.2%})\twhite:{white_count}/{total_pixels}({white_ratio:.2%})\tdark:{dark_count}/{total_pixels}({dark_ratio:.2%})\n")
             
-            print(f"Found {len(broken_scenes_filtered)} broken scenes (images with >90% black or white pixels)")
+            print(f"Found {len(broken_scenes_filtered)} broken scenes (images with >90% black, white, or very dark pixels)")
             print(f"Broken scenes list saved to {broken_scene_file}")
         else:
-            print(f"No broken scenes detected (all images have <90% black/white pixels)")
+            print(f"No broken scenes detected (all images have <90% black/white/dark pixels)")
     else:
         print(f"\nNo scene statistics recorded")
     
