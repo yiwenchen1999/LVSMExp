@@ -56,7 +56,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor \
     training.LVSM_checkpoint_dir = ckpt/LVSM_object_encoder_decoder
 
-
+find /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/images -maxdepth 1 -type d | wc -l
 
 # inference
 # base, re10k

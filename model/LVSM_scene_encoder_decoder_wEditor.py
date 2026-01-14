@@ -443,10 +443,17 @@ class LatentSceneEditor(nn.Module):
         
         #& Step 5: Compute loss (if target images are provided)
         # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
+        # Use relit_images target split if available, otherwise fall back to original image
         if has_target_image:
+            # Check if relit_images are available in target (from relit scene)
+            if hasattr(target, 'relit_images') and target.relit_images is not None:
+                target_images = target.relit_images
+            else:
+                target_images = target.image
+            
             loss_metrics = self.loss_computer(
                 rendered_images,
-                target.image
+                target_images
             )
         else:
             loss_metrics = None
