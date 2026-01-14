@@ -352,6 +352,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         return
     
     # Process each env folder as a separate scene
+    processed_scene_names = []  # Track all processed scene names (including skipped ones)
     for env_folder in sorted(env_folders):
         env_path = os.path.join(split_path, env_folder)
         
@@ -451,7 +452,8 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             
             if all_files_exist:
                 print(f"Skipping {scene_name}: all files already exist")
-                return scene_name  # Return scene name to add to full_list
+                processed_scene_names.append(scene_name)  # Add to processed list
+                continue  # Continue to next env_folder instead of returning
         
         # Create directories if they don't exist
         os.makedirs(output_images_dir, exist_ok=True)
@@ -576,6 +578,14 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             json.dump(scene_data, f, indent=2)
         
         print(f"Processed {scene_name}: {len(frames)} frames")
+        processed_scene_names.append(scene_name)  # Add to processed list
+    
+    # Return list of all processed scene names (including skipped ones)
+    # If no scenes were processed, return None
+    if processed_scene_names:
+        return processed_scene_names
+    else:
+        return None
 
 
 def create_full_list(output_root, split='test', broken_scenes=None):
@@ -678,19 +688,22 @@ def main():
                     for env_folder in env_folders:
                         scene_name = f"{object_id}_{env_folder}"
                         broken_scenes.append(scene_name)
-            elif isinstance(result, str) and result != "broken":
-                # Scene was skipped (files already exist), add to skipped_scenes
-                skipped_scenes.append(result)
-            elif result is None:
-                # Scene was processed successfully, collect scene names
-                split_path = os.path.join(objaverse_root, object_id, args.split)
-                if os.path.exists(split_path):
-                    env_folders = [d for d in os.listdir(split_path) 
-                                 if os.path.isdir(os.path.join(split_path, d)) 
-                                 and (d.startswith('env_') or d.startswith('white_env_'))]
-                    for env_folder in env_folders:
-                        scene_name = f"{object_id}_{env_folder}"
+            elif isinstance(result, list):
+                # result is a list of scene names (processed or skipped)
+                # We can't distinguish between processed and skipped from the return value alone
+                # But all scenes in the list should be added (they're either processed or skipped)
+                for scene_name in result:
+                    # Check if scene was skipped by checking if it exists in output
+                    output_images_dir = os.path.join(output_root, args.split, 'images', scene_name)
+                    output_json_path = os.path.join(output_root, args.split, 'metadata', f"{scene_name}.json")
+                    if os.path.exists(output_images_dir) and os.path.exists(output_json_path):
+                        # Check if files were just created (recent modification) or already existed
+                        # For simplicity, we'll assume if it's in the result list, it was processed
+                        # The skipped scenes are already in the output, so they'll be in full_list automatically
                         processed_scenes.append(scene_name)
+            elif result is None:
+                # No scenes were processed (maybe all were skipped or object had no valid scenes)
+                pass
         except Exception as e:
             print(f"Error processing {object_id}: {e}")
             import traceback
