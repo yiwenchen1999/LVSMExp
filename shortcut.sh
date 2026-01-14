@@ -39,6 +39,15 @@ python preprocess_scripts/preprocess_objaverse.py \
   --split train \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
   --max-objects 10
+
+  # preprocess objaverse with envmaps
+python preprocess_scripts/preprocess_objaverse.py \
+  --input data_samples/sample_objaverse \
+  --output data_samples/objaverse_processed_with_envmaps \
+  --split train \
+  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
+  --max-objects 10
+
 # visualize data
 python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wEditor.yaml --output-dir ./test_output --subsample 10 --env-sample-num 5000 --batch-idx 8
 # train-og:
