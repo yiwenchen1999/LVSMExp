@@ -58,6 +58,10 @@ python preprocess_scripts/preview_scenes.py \
     --images-per-grid 32
 # visualize data
 python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wEditor.yaml --output-dir ./test_output --subsample 10 --env-sample-num 5000 --batch-idx 8
+# delete broken scenes
+python preprocess_scripts/remove_broken_scenes.py \
+    --broken-scene scene_preview/broken_scene.txt \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/full_list.txt
 # train-og:
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
