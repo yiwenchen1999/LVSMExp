@@ -3,11 +3,11 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a5000:4
 #SBATCH --time=72:00:00
-#SBATCH --job-name=finetune_objaverse_lvsm
+#SBATCH --job-name=overfit_objaverse
 #SBATCH --mem=32
 #SBATCH --ntasks=16
-#SBATCH --output=myjob.finetune_objaverse_lvsm.out
-#SBATCH --error=myjob.finetune_objaverse_lvsm.err
+#SBATCH --output=myjob.overfit_objaverse.out
+#SBATCH --error=myjob.overfit_objaverse.err
 export HF_HOME=/projects/vig/yiwenc/caches
 export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 

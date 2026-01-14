@@ -396,10 +396,8 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         output_images_dir = os.path.join(output_root, split, 'images', scene_name)
         output_envmaps_dir = os.path.join(output_root, split, 'envmaps', scene_name)
         os.makedirs(output_metadata_dir, exist_ok=True)
-        os.makedirs(output_images_dir, exist_ok=True)
-        os.makedirs(output_envmaps_dir, exist_ok=True)
         
-        # Load environment map info if available
+        # Load environment map info if available (needed to check if envmaps should exist)
         # For train split, look for env info in the corresponding test folder
         if split == 'train':
             test_split_path = os.path.join(object_path, 'test')
@@ -423,6 +421,41 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         elif os.path.exists(white_env_json_path):
             with open(white_env_json_path, 'r') as f:
                 env_info = json.load(f)
+        
+        # Check if scene already exists and all files are present
+        output_json_path = os.path.join(output_metadata_dir, f"{scene_name}.json")
+        scene_exists = os.path.exists(output_images_dir) and os.path.exists(output_envmaps_dir) and os.path.exists(output_json_path)
+        
+        if scene_exists:
+            # Check if all expected files exist
+            all_files_exist = True
+            
+            # Check if all image files exist
+            for frame_idx, image_file in image_files_with_idx:
+                output_image_name = f"{frame_idx:05d}.png"
+                output_image_path = os.path.join(output_images_dir, output_image_name)
+                if not os.path.exists(output_image_path):
+                    all_files_exist = False
+                    break
+            
+            # Check if environment maps exist (if env_info is available and hdri_dir is provided)
+            if all_files_exist and env_info and hdri_dir:
+                for frame_idx, image_file in image_files_with_idx:
+                    output_envmap_hdr_name = f"{frame_idx:05d}_hdr.png"
+                    output_envmap_ldr_name = f"{frame_idx:05d}_ldr.png"
+                    output_envmap_hdr_path = os.path.join(output_envmaps_dir, output_envmap_hdr_name)
+                    output_envmap_ldr_path = os.path.join(output_envmaps_dir, output_envmap_ldr_name)
+                    if not (os.path.exists(output_envmap_hdr_path) and os.path.exists(output_envmap_ldr_path)):
+                        all_files_exist = False
+                        break
+            
+            if all_files_exist:
+                print(f"Skipping {scene_name}: all files already exist")
+                return scene_name  # Return scene name to add to full_list
+        
+        # Create directories if they don't exist
+        os.makedirs(output_images_dir, exist_ok=True)
+        os.makedirs(output_envmaps_dir, exist_ok=True)
         
         # Load environment map if available
         env_map = None
@@ -628,6 +661,7 @@ def main():
     
     broken_scenes = []
     processed_scenes = []
+    skipped_scenes = []  # Scenes that were skipped because files already exist
     
     for object_id in sorted(object_ids):
         print(f"\nProcessing object: {object_id}")
@@ -644,6 +678,9 @@ def main():
                     for env_folder in env_folders:
                         scene_name = f"{object_id}_{env_folder}"
                         broken_scenes.append(scene_name)
+            elif isinstance(result, str) and result != "broken":
+                # Scene was skipped (files already exist), add to skipped_scenes
+                skipped_scenes.append(result)
             elif result is None:
                 # Scene was processed successfully, collect scene names
                 split_path = os.path.join(objaverse_root, object_id, args.split)
@@ -660,11 +697,13 @@ def main():
             traceback.print_exc()
     
     # Create full_list.txt (excluding broken scenes)
+    # Note: Skipped scenes are already in the metadata directory, so they will be included automatically
     print(f"\nCreating full_list.txt for {args.split} split...")
     create_full_list(output_root, split=args.split, broken_scenes=broken_scenes)
     
     print(f"\nPreprocessing complete!")
     print(f"  - Processed {len(processed_scenes)} scenes")
+    print(f"  - Skipped {len(skipped_scenes)} scenes (files already exist)")
     print(f"  - Marked {len(broken_scenes)} scenes as broken")
 
 
