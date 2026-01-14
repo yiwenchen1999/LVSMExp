@@ -14,7 +14,7 @@ model:
   env_tokenizer:
     image_size: 256
     patch_size: 8
-    in_channels: 6  # 3 RGB + 3 ray_d
+    in_channels: 9  # 3 RGB + 3 ray_d
 
   transformer:
     d: 768
