@@ -11,14 +11,14 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-def check_image_black_or_white(img, threshold=0.9, dark_threshold=15):
+def check_image_black_or_white(img, threshold=0.95, dark_threshold=5):
     """
     Check if an image is mostly black, mostly white, or mostly very dark.
     
     Args:
         img: PIL Image (RGB)
         threshold: Threshold ratio (default: 0.9, meaning 90%)
-        dark_threshold: Threshold for very dark pixels (sum of RGB channels < dark_threshold, default: 15)
+        dark_threshold: Threshold for very dark pixels (sum of RGB channels < dark_threshold, default: 5)
         
     Returns:
         tuple: (is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio)
@@ -226,7 +226,7 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
             
             if img is not None:
                 # Check if image is mostly black, white, or very dark
-                is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio = check_image_black_or_white(img, threshold=0.9, dark_threshold=15)
+                is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio = check_image_black_or_white(img, threshold=0.9, dark_threshold=5)
                 
                 # Calculate total pixels and counts
                 img_array = np.array(img)
