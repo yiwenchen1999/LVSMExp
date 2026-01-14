@@ -13,5 +13,4 @@ python preprocess_scripts/preprocess_objaverse.py \
   --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
   --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
   --split train \
-  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
-  --max-objects 1000
+  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs 
