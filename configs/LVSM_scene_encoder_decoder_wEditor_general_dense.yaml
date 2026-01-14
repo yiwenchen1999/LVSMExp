@@ -1,0 +1,97 @@
+model:
+  class_name: model.LVSM_scene_encoder_decoder_wEditor.LatentSceneEditor
+
+  image_tokenizer:
+    image_size: 256
+    patch_size: 8
+    in_channels: 9  # 3 RGB + 3 direction + 3 Reference
+
+  target_pose_tokenizer:
+    image_size: 256
+    patch_size: 8
+    in_channels: 6  # 3 direction + 3 Reference
+
+  env_tokenizer:
+    image_size: 256
+    patch_size: 8
+    in_channels: 9  # 3 RGB + 3 ray_d
+
+  transformer:
+    d: 768
+    d_head: 64
+    encoder_n_layer: 12
+    decoder_n_layer: 12
+    special_init: true
+    depth_init: true
+    use_qk_norm: true
+    n_latent_vectors: 3072 # 3x32x32
+    editor:
+      n_layer: 12  # Number of transformer blocks for editor
+      init_scale: 0.1  # Initialization scale (0.1 = 10% of normal init std, keeps editor near identity)
+      init_from_decoder: false  # If true, copy weights from decoder layers instead of random init
+    freeze_reconstructor_renderer: true
+
+training:
+  amp_dtype: bf16
+  api_key_path: ./configs/api_keys.yaml
+  batch_size_per_gpu: 8
+  beta1: 0.9
+  beta2: 0.95
+  allowed_gradnorm_factor: 5
+  center_crop: true
+  scene_scale_factor: 1.35
+  LVSM_checkpoint_dir: ckpt/LVSM_scene_encoder_decoder
+  checkpoint_dir: ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense
+  checkpoint_every: 2000
+  dataset_name: data.dataset_scene.Dataset
+  dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/train/full_list.txt
+  grad_accum_steps: 1
+  grad_checkpoint_every: 1
+  grad_clip_norm: 1.0
+  l2_loss_weight: 1.0
+  lpips_loss_weight: 0.0
+  perceptual_loss_weight: 0.5
+  reset_training_state: True
+
+  lr: 0.0002
+  train_steps: 100000
+  num_input_views: 4
+  num_target_views: 8
+  num_threads: 4
+  num_views: 12
+  num_workers: 2
+
+  prefetch_factor: 32
+  print_every: 20
+
+
+
+
+  square_crop: true
+  target_has_input: true
+  use_amp: true
+  use_rel_pose: false
+  use_tf32: true
+  view_selector:
+    max_frame_dist: 60
+    min_frame_dist: 15
+  vis_every: 1000
+  wandb_exp_name: LVSM_edit_dense_general
+  wandb_log_every: 50
+  
+  wandb_project: LVSM
+  warmup: 1500
+  weight_decay: 0.05
+
+
+# inference / evaluation
+inference:
+  if_inference: False
+  compute_metrics: False
+  view_idx_file_path: ./data/evaluation_index_objaverse_train.json
+  render_video: False
+  render_video_config:
+    traj_type: interpolate
+    num_frames: 60
+    loop_video: True 
+    order_poses: False
