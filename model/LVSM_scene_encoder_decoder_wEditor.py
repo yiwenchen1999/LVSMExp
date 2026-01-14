@@ -376,67 +376,67 @@ class LatentSceneEditor(nn.Module):
         latent_tokens, n_patches, d = self.reconstructor(input)
 
         # #& Step 3: Editor - Edit the scene latent_tokens using environment maps
-        # # 3.1: Create directional_env by concatenating env_ldr, env_hdr, and env_dir
-        # if hasattr(input, 'env_ldr') and hasattr(input, 'env_hdr') and hasattr(input, 'env_dir'):
-        #     # Check if environment maps are available
-        #     if input.env_ldr is not None and input.env_hdr is not None and input.env_dir is not None:
-        #         # env_ldr: [b, v_input, 3, env_h, env_w]
-        #         # env_hdr: [b, v_input, 3, env_h, env_w]
-        #         # env_dir: [b, v_input, 3, env_h, env_w]
-        #         # Note: env_dir has shape [b, v_input, 3, envmap_h, envmap_w] where envmap_h=256, envmap_w=512
-        #         # env_ldr and env_hdr may have different spatial dimensions, so we need to resize them to match env_dir
-        #         b, v_input = input.env_dir.shape[:2]
-        #         env_h, env_w = input.env_dir.shape[3], input.env_dir.shape[4]
+        # 3.1: Create directional_env by concatenating env_ldr, env_hdr, and env_dir
+        if hasattr(input, 'env_ldr') and hasattr(input, 'env_hdr') and hasattr(input, 'env_dir'):
+            # Check if environment maps are available
+            if input.env_ldr is not None and input.env_hdr is not None and input.env_dir is not None:
+                # env_ldr: [b, v_input, 3, env_h, env_w]
+                # env_hdr: [b, v_input, 3, env_h, env_w]
+                # env_dir: [b, v_input, 3, env_h, env_w]
+                # Note: env_dir has shape [b, v_input, 3, envmap_h, envmap_w] where envmap_h=256, envmap_w=512
+                # env_ldr and env_hdr may have different spatial dimensions, so we need to resize them to match env_dir
+                b, v_input = input.env_dir.shape[:2]
+                env_h, env_w = input.env_dir.shape[3], input.env_dir.shape[4]
                 
-        #         # Resize env_ldr and env_hdr to match env_dir dimensions if needed
-        #         if input.env_ldr.shape[3] != env_h or input.env_ldr.shape[4] != env_w:
-        #             env_ldr_resized = torch.nn.functional.interpolate(
-        #                 input.env_ldr.reshape(b * v_input, 3, input.env_ldr.shape[3], input.env_ldr.shape[4]),
-        #                 size=(env_h, env_w),
-        #                 mode='bilinear',
-        #                 align_corners=False
-        #             ).reshape(b, v_input, 3, env_h, env_w)
-        #         else:
-        #             env_ldr_resized = input.env_ldr
+                # Resize env_ldr and env_hdr to match env_dir dimensions if needed
+                if input.env_ldr.shape[3] != env_h or input.env_ldr.shape[4] != env_w:
+                    env_ldr_resized = torch.nn.functional.interpolate(
+                        input.env_ldr.reshape(b * v_input, 3, input.env_ldr.shape[3], input.env_ldr.shape[4]),
+                        size=(env_h, env_w),
+                        mode='bilinear',
+                        align_corners=False
+                    ).reshape(b, v_input, 3, env_h, env_w)
+                else:
+                    env_ldr_resized = input.env_ldr
                 
-        #         if input.env_hdr.shape[3] != env_h or input.env_hdr.shape[4] != env_w:
-        #             env_hdr_resized = torch.nn.functional.interpolate(
-        #                 input.env_hdr.reshape(b * v_input, 3, input.env_hdr.shape[3], input.env_hdr.shape[4]),
-        #                 size=(env_h, env_w),
-        #                 mode='bilinear',
-        #                 align_corners=False
-        #             ).reshape(b, v_input, 3, env_h, env_w)
-        #         else:
-        #             env_hdr_resized = input.env_hdr
+                if input.env_hdr.shape[3] != env_h or input.env_hdr.shape[4] != env_w:
+                    env_hdr_resized = torch.nn.functional.interpolate(
+                        input.env_hdr.reshape(b * v_input, 3, input.env_hdr.shape[3], input.env_hdr.shape[4]),
+                        size=(env_h, env_w),
+                        mode='bilinear',
+                        align_corners=False
+                    ).reshape(b, v_input, 3, env_h, env_w)
+                else:
+                    env_hdr_resized = input.env_hdr
                 
-        #         # directional_env: [b, v_input, 9, env_h, env_w] (3+3+3=9)
-        #         directional_env = torch.cat([env_ldr_resized, env_hdr_resized, input.env_dir], dim=2)  # [b, v_input, 9, env_h, env_w]
+                # directional_env: [b, v_input, 9, env_h, env_w] (3+3+3=9)
+                directional_env = torch.cat([env_ldr_resized, env_hdr_resized, input.env_dir], dim=2)  # [b, v_input, 9, env_h, env_w]
                 
-        #         # 3.2: Tokenize directional_env
-        #         # Similar to image tokenization: [b*v, n_env_patches, d]
-        #         env_tokens = self.env_tokenizer(directional_env)  # [b*v_input, n_env_patches, d]
-        #         _, n_env_patches, _ = env_tokens.size()
+                # 3.2: Tokenize directional_env
+                # Similar to image tokenization: [b*v, n_env_patches, d]
+                env_tokens = self.env_tokenizer(directional_env)  # [b*v_input, n_env_patches, d]
+                _, n_env_patches, _ = env_tokens.size()
                 
-        #         # Reshape env_tokens to merge batch and view dimensions
-        #         env_tokens = env_tokens.reshape(b, v_input * n_env_patches, d)  # [b, v_input*n_env_patches, d]
+                # Reshape env_tokens to merge batch and view dimensions
+                env_tokens = env_tokens.reshape(b, v_input * n_env_patches, d)  # [b, v_input*n_env_patches, d]
                 
-        #         # 3.3: Concatenate latent_tokens with env_tokens and pass through transformer_editor
-        #         editor_input_tokens = torch.cat([latent_tokens, env_tokens], dim=1)  # [b, n_latent_vectors + v_input*n_env_patches, d]
+                # 3.3: Concatenate latent_tokens with env_tokens and pass through transformer_editor
+                editor_input_tokens = torch.cat([latent_tokens, env_tokens], dim=1)  # [b, n_latent_vectors + v_input*n_env_patches, d]
                 
-        #         # Pass through transformer_editor
-        #         checkpoint_every = self.config.training.grad_checkpoint_every
-        #         editor_output_tokens = self.pass_layers(
-        #             self.transformer_editor, 
-        #             editor_input_tokens, 
-        #             gradient_checkpoint=True, 
-        #             checkpoint_every=checkpoint_every
-        #         )  # [b, n_latent_vectors + v_input*n_env_patches, d]
+                # Pass through transformer_editor
+                checkpoint_every = self.config.training.grad_checkpoint_every
+                editor_output_tokens = self.pass_layers(
+                    self.transformer_editor, 
+                    editor_input_tokens, 
+                    gradient_checkpoint=True, 
+                    checkpoint_every=checkpoint_every
+                )  # [b, n_latent_vectors + v_input*n_env_patches, d]
                 
-        #         # Extract latent_tokens after self-attention (keep only the latent_tokens part)
-        #         n_latent_vectors = self.config.model.transformer.n_latent_vectors
-        #         latent_tokens, _ = editor_output_tokens.split(
-        #             [n_latent_vectors, v_input * n_env_patches], dim=1
-        #         )  # [b, n_latent_vectors, d], [b, v_input*n_env_patches, d]
+                # Extract latent_tokens after self-attention (keep only the latent_tokens part)
+                n_latent_vectors = self.config.model.transformer.n_latent_vectors
+                latent_tokens, _ = editor_output_tokens.split(
+                    [n_latent_vectors, v_input * n_env_patches], dim=1
+                )  # [b, n_latent_vectors, d], [b, v_input*n_env_patches, d]
         
         #& Step 4: Renderer - Decode results from target ray maps
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)

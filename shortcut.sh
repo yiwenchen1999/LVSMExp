@@ -54,7 +54,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor.yaml \
     training.batch_size_per_gpu = 4 \
     training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor \
-    training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder
+    training.LVSM_checkpoint_dir = ckpt/LVSM_object_encoder_decoder
 
 
 
