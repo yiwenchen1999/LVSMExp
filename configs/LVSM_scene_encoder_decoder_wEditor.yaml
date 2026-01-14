@@ -39,7 +39,7 @@ training:
   allowed_gradnorm_factor: 5
   center_crop: true
   scene_scale_factor: 1.35
-  LVSM_checkpoint_dir: ckpt/LVSM_scene_encoder_decoder
+  LVSM_checkpoint_dir: ckpt/LVSM_object_encoder_decoder
   checkpoint_dir: ckpt/LVSM_scene_encoder_decoder_wEditor
   checkpoint_every: 2000
   dataset_name: data.dataset_scene.Dataset
