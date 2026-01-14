@@ -146,8 +146,14 @@ def export_results(
         
         # Compute and save metrics if requested
         if compute_metrics:
+            # Use relit_images if available, otherwise fall back to original image
+            if hasattr(target_data, 'relit_images') and target_data.relit_images is not None:
+                target_img_for_metrics = target_data.relit_images[batch_idx]
+            else:
+                target_img_for_metrics = target_data.image[batch_idx]
+            
             _save_metrics(
-                target_data.image[batch_idx],
+                target_img_for_metrics,
                 result.render[batch_idx],
                 target_indices,
                 sample_dir,
@@ -164,7 +170,12 @@ def visualize_intermediate_results(out_dir, result):
     input, target = result.input, result.target
 
     if result.render is not None:
-        target_image = target.image
+        # Use relit_images if available, otherwise fall back to original image
+        if hasattr(target, 'relit_images') and target.relit_images is not None:
+            target_image = target.relit_images
+        else:
+            target_image = target.image
+        
         rendered_image = result.render
         b, v, _, h, w = rendered_image.size()
         rendered_image = rendered_image.reshape(b * v, -1, h, w)
@@ -207,8 +218,14 @@ def _save_images(result, batch_idx, out_dir):
     Image.fromarray(input_img).save(os.path.join(out_dir, "input.png"))
 
     # Save GT vs prediction side-by-side
+    # Use relit_images if available, otherwise fall back to original image
+    if hasattr(result.target, 'relit_images') and result.target.relit_images is not None:
+        target_img = result.target.relit_images[batch_idx]
+    else:
+        target_img = result.target.image[batch_idx]
+    
     comparison = torch.cat(
-        (result.target.image[batch_idx], result.render[batch_idx]), 
+        (target_img, result.render[batch_idx]), 
         dim=2
     ).detach().cpu()
     comparison = rearrange(comparison, "v c h w -> h (v w) c")
