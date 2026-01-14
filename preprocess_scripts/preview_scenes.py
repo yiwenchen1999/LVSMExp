@@ -208,7 +208,7 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
         # Load images for this batch
         images = []
         scene_names = []
-        broken_scenes_batch = []  # Track broken scenes in this batch
+        broken_scenes_batch = []  # Track broken scenes in this batch (with pixel counts)
         
         for scene_path in batch_scene_paths:
             img, scene_name = load_scene_image(scene_path, image_idx)
@@ -218,9 +218,22 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
                 # Check if image is mostly black or white
                 is_mostly_black, is_mostly_white, black_ratio, white_ratio = check_image_black_or_white(img, threshold=0.9)
                 
+                # Calculate total pixels and counts
+                img_array = np.array(img)
+                total_pixels = img_array.shape[0] * img_array.shape[1]
+                black_count = int(black_ratio * total_pixels)
+                white_count = int(white_ratio * total_pixels)
+                
                 if is_mostly_black or is_mostly_white:
-                    broken_scenes_batch.append(scene_name)
-                    print(f"  Broken scene detected: {scene_name} (black: {black_ratio:.2%}, white: {white_ratio:.2%})")
+                    broken_scenes_batch.append({
+                        'name': scene_name,
+                        'black_count': black_count,
+                        'white_count': white_count,
+                        'black_ratio': black_ratio,
+                        'white_ratio': white_ratio,
+                        'total_pixels': total_pixels
+                    })
+                    print(f"  Broken scene detected: {scene_name} (black: {black_count}/{total_pixels} ({black_ratio:.2%}), white: {white_count}/{total_pixels} ({white_ratio:.2%}))")
                 
                 images.append(img)
             else:
@@ -298,12 +311,32 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
         output_dir = os.path.dirname(output_path_template) if os.path.dirname(output_path_template) else '.'
         broken_scene_file = os.path.join(output_dir, 'broken_scene.txt')
         
-        with open(broken_scene_file, 'w') as f:
-            for scene_name in sorted(set(broken_scenes_list)):  # Remove duplicates and sort
-                f.write(f"{scene_name}\n")
+        # Remove duplicates by scene name, keeping the first occurrence
+        seen_names = set()
+        unique_broken_scenes = []
+        for scene_info in broken_scenes_list:
+            scene_name = scene_info['name']
+            if scene_name not in seen_names:
+                seen_names.add(scene_name)
+                unique_broken_scenes.append(scene_info)
         
-        print(f"\nFound {len(set(broken_scenes_list))} broken scenes (images with >90% black or white pixels)")
-        print(f"Broken scenes list saved to {broken_scene_file}")
+        # Sort by scene name
+        unique_broken_scenes.sort(key=lambda x: x['name'])
+        
+        with open(broken_scene_file, 'w') as f:
+            for scene_info in unique_broken_scenes:
+                scene_name = scene_info['name']
+                black_count = scene_info['black_count']
+                white_count = scene_info['white_count']
+                total_pixels = scene_info['total_pixels']
+                black_ratio = scene_info['black_ratio']
+                white_ratio = scene_info['white_ratio']
+                
+                # Write scene name and pixel counts
+                f.write(f"{scene_name}\tblack:{black_count}/{total_pixels}({black_ratio:.2%})\twhite:{white_count}/{total_pixels}({white_ratio:.2%})\n")
+        
+        print(f"\nFound {len(unique_broken_scenes)} broken scenes (images with >90% black or white pixels)")
+        print(f"Broken scenes list with pixel counts saved to {broken_scene_file}")
     else:
         print(f"\nNo broken scenes detected (all images have <90% black/white pixels)")
     
