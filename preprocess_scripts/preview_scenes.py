@@ -7,7 +7,42 @@ Samples one image from each scene (default: 65th image) and displays them in a g
 import os
 import json
 import argparse
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+
+def check_image_black_or_white(img, threshold=0.9):
+    """
+    Check if an image is mostly black or mostly white.
+    
+    Args:
+        img: PIL Image (RGB)
+        threshold: Threshold ratio (default: 0.9, meaning 90%)
+        
+    Returns:
+        tuple: (is_mostly_black, is_mostly_white, black_ratio, white_ratio)
+    """
+    
+    # Convert to numpy array
+    img_array = np.array(img)
+    
+    # Calculate total pixels
+    total_pixels = img_array.shape[0] * img_array.shape[1]
+    
+    # Check for fully black pixels (RGB = [0, 0, 0])
+    black_pixels = np.all(img_array == [0, 0, 0], axis=2)
+    black_count = np.sum(black_pixels)
+    black_ratio = black_count / total_pixels
+    
+    # Check for fully white pixels (RGB = [255, 255, 255])
+    white_pixels = np.all(img_array == [255, 255, 255], axis=2)
+    white_count = np.sum(white_pixels)
+    white_ratio = white_count / total_pixels
+    
+    is_mostly_black = black_ratio > threshold
+    is_mostly_white = white_ratio > threshold
+    
+    return is_mostly_black, is_mostly_white, black_ratio, white_ratio
 
 
 def load_scene_image(scene_json_path, image_idx=64):
@@ -19,7 +54,7 @@ def load_scene_image(scene_json_path, image_idx=64):
         image_idx: Index of the image to load (0-based, default: 64 for 65th image)
         
     Returns:
-        PIL Image or None if failed
+        tuple: (PIL Image or None if failed, scene_name)
     """
     try:
         with open(scene_json_path, 'r') as f:
@@ -49,15 +84,18 @@ def load_scene_image(scene_json_path, image_idx=64):
             image_filename = os.path.basename(image_path)
             image_path = os.path.join(split_dir, 'images', scene_name, image_filename)
         
+        scene_name = os.path.basename(scene_json_path).replace('.json', '')
+        
         if os.path.exists(image_path):
             img = Image.open(image_path).convert('RGB')
-            return img
+            return img, scene_name
         else:
             print(f"Warning: Image not found: {image_path}")
-            return None
+            return None, scene_name
     except Exception as e:
         print(f"Error loading scene {scene_json_path}: {e}")
-        return None
+        scene_name = os.path.basename(scene_json_path).replace('.json', '')
+        return None, scene_name
 
 
 def add_text_to_image(img, text, font_size=20):
@@ -140,10 +178,14 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
     print(f"Found {total_scenes} scenes in {full_list_path}")
     print(f"Sampling image index {image_idx} (the {image_idx + 1}th image) from each scene")
     print(f"Creating {grid_rows}x{grid_cols} grids with {images_per_grid} images per grid")
+    print(f"Checking for broken scenes (images with >90% black or white pixels)")
     
     # Calculate number of preview files needed
     num_previews = (total_scenes + images_per_grid - 1) // images_per_grid
     print(f"Will create {num_previews} preview files")
+    
+    # List to store all broken scene names
+    broken_scenes_list = []
     
     # Determine output directory and base name
     output_dir = os.path.dirname(output_path_template) if os.path.dirname(output_path_template) else '.'
@@ -166,17 +208,29 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
         # Load images for this batch
         images = []
         scene_names = []
+        broken_scenes_batch = []  # Track broken scenes in this batch
+        
         for scene_path in batch_scene_paths:
-            scene_name = os.path.basename(scene_path).replace('.json', '')
+            img, scene_name = load_scene_image(scene_path, image_idx)
             scene_names.append(scene_name)
             
-            img = load_scene_image(scene_path, image_idx)
             if img is not None:
+                # Check if image is mostly black or white
+                is_mostly_black, is_mostly_white, black_ratio, white_ratio = check_image_black_or_white(img, threshold=0.9)
+                
+                if is_mostly_black or is_mostly_white:
+                    broken_scenes_batch.append(scene_name)
+                    print(f"  Broken scene detected: {scene_name} (black: {black_ratio:.2%}, white: {white_ratio:.2%})")
+                
                 images.append(img)
             else:
                 # Create a placeholder image if loading failed
                 placeholder = Image.new('RGB', (256, 256), color=(128, 128, 128))
                 images.append(placeholder)
+        
+        # Append broken scenes from this batch to the main list
+        if broken_scenes_batch:
+            broken_scenes_list.extend(broken_scenes_batch)
         
         if not images:
             print(f"Warning: No images could be loaded for batch {preview_idx + 1}")
@@ -200,11 +254,11 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
             img_resized = img.resize(target_size, Image.Resampling.LANCZOS)
             # Add scene name text
             scene_name = scene_names[i]
-            # Truncate scene name if too long
-            max_name_length = 30
+            # Truncate scene name if too long (max 15 characters)
+            max_name_length = 15
             if len(scene_name) > max_name_length:
                 scene_name = scene_name[:max_name_length] + "..."
-            img_with_text = add_text_to_image(img_resized, scene_name, font_size=16)
+            img_with_text = add_text_to_image(img_resized, scene_name, font_size=12)
             resized_images.append(img_with_text)
         
         # Create grid
@@ -237,6 +291,21 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
         # Save the grid
         grid_image.save(output_path)
         print(f"Preview {preview_idx + 1} saved to {output_path} ({len(resized_images)} images)")
+    
+    # Save broken scenes list to file
+    if broken_scenes_list:
+        # Determine output directory for broken_scene.txt
+        output_dir = os.path.dirname(output_path_template) if os.path.dirname(output_path_template) else '.'
+        broken_scene_file = os.path.join(output_dir, 'broken_scene.txt')
+        
+        with open(broken_scene_file, 'w') as f:
+            for scene_name in sorted(set(broken_scenes_list)):  # Remove duplicates and sort
+                f.write(f"{scene_name}\n")
+        
+        print(f"\nFound {len(set(broken_scenes_list))} broken scenes (images with >90% black or white pixels)")
+        print(f"Broken scenes list saved to {broken_scene_file}")
+    else:
+        print(f"\nNo broken scenes detected (all images have <90% black/white pixels)")
     
     print(f"\nAll previews complete! Created {num_previews} preview files.")
 

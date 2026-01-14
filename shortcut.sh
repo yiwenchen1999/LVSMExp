@@ -51,7 +51,7 @@ python preprocess_scripts/preprocess_objaverse.py \
 # preview the scenes:
 python preprocess_scripts/preview_scenes.py \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
-    --output preview.png \
+    --output scene_preview/preview.png \
     --image-idx 64 \
     --grid-cols 8 \
     --grid-rows 4 \
