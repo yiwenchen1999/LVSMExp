@@ -451,18 +451,21 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
                         break
             
             if all_files_exist:
-                print(f"Skipping {scene_name}: all files already exist")
-                processed_scene_names.append(scene_name)  # Add to processed list
-                continue  # Continue to next env_folder instead of returning
+                print(f"Skipping image/envmap processing for {scene_name}: all files already exist")
+                # Still generate and save JSON file to ensure it's up-to-date and not corrupted
+                # This will regenerate the JSON even if files exist
+                skip_file_processing = True
+            else:
+                skip_file_processing = False
         
         # Create directories if they don't exist
         os.makedirs(output_images_dir, exist_ok=True)
         os.makedirs(output_envmaps_dir, exist_ok=True)
         
-        # Load environment map if available
+        # Load environment map if available (only if not skipping file processing)
         env_map = None
         euler_rotation = None
-        if env_info and hdri_dir:
+        if not skip_file_processing and env_info and hdri_dir:
             env_map_name = env_info.get('env_map', '')
             if env_map_name:
                 # Try different filename variations (with/without extension, with _8k suffix, etc.)
@@ -519,40 +522,42 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             fov = camera_info.get('fov', 30.0)  # Default to 30 if not specified
             fxfycxcy = fov_to_fxfycxcy(fov, image_width, image_height)
             
-            # Copy image to output directory with zero-padded name
-            input_image_path = os.path.join(env_path, image_file)
+            # Determine output image path (used for JSON even if we skip copying)
             output_image_name = f"{frame_idx:05d}.png"
             output_image_path = os.path.join(output_images_dir, output_image_name)
             
-            # Copy image
-            shutil.copy2(input_image_path, output_image_path)
-            
-            # Process environment map if available
-            if env_map is not None:
-                # Get camera pose (c2w) - use Blender format before OpenCV conversion
-                c2w_blender = np.array(camera_info['c2w'])
+            # Only copy image and process envmaps if not skipping
+            if not skip_file_processing:
+                # Copy image to output directory with zero-padded name
+                input_image_path = os.path.join(env_path, image_file)
+                shutil.copy2(input_image_path, output_image_path)
                 
-                # Rotate and preprocess environment map (using Blender format c2w)
-                env_hdr_raw, env_ldr, env_hdr = rotate_and_preprocess_envir_map(
-                    env_map, c2w_blender, euler_rotation=euler_rotation,
-                    light_area_weight=light_area_weight, view_dirs=view_dirs
-                )
-                
-                if env_hdr_raw is not None:
-                    # Save HDR and LDR versions separately
-                    # HDR version: log transform and rescale
-                    env_hdr_uint8 = np.uint8(env_hdr * 255)
-                    env_hdr_img = Image.fromarray(env_hdr_uint8)
-                    output_envmap_hdr_name = f"{frame_idx:05d}_hdr.png"
-                    output_envmap_hdr_path = os.path.join(output_envmaps_dir, output_envmap_hdr_name)
-                    env_hdr_img.save(output_envmap_hdr_path)
+                # Process environment map if available
+                if env_map is not None:
+                    # Get camera pose (c2w) - use Blender format before OpenCV conversion
+                    c2w_blender = np.array(camera_info['c2w'])
                     
-                    # LDR version: gamma correction
-                    env_ldr_uint8 = np.uint8(env_ldr * 255)
-                    env_ldr_img = Image.fromarray(env_ldr_uint8)
-                    output_envmap_ldr_name = f"{frame_idx:05d}_ldr.png"
-                    output_envmap_ldr_path = os.path.join(output_envmaps_dir, output_envmap_ldr_name)
-                    env_ldr_img.save(output_envmap_ldr_path)
+                    # Rotate and preprocess environment map (using Blender format c2w)
+                    env_hdr_raw, env_ldr, env_hdr = rotate_and_preprocess_envir_map(
+                        env_map, c2w_blender, euler_rotation=euler_rotation,
+                        light_area_weight=light_area_weight, view_dirs=view_dirs
+                    )
+                    
+                    if env_hdr_raw is not None:
+                        # Save HDR and LDR versions separately
+                        # HDR version: log transform and rescale
+                        env_hdr_uint8 = np.uint8(env_hdr * 255)
+                        env_hdr_img = Image.fromarray(env_hdr_uint8)
+                        output_envmap_hdr_name = f"{frame_idx:05d}_hdr.png"
+                        output_envmap_hdr_path = os.path.join(output_envmaps_dir, output_envmap_hdr_name)
+                        env_hdr_img.save(output_envmap_hdr_path)
+                        
+                        # LDR version: gamma correction
+                        env_ldr_uint8 = np.uint8(env_ldr * 255)
+                        env_ldr_img = Image.fromarray(env_ldr_uint8)
+                        output_envmap_ldr_name = f"{frame_idx:05d}_ldr.png"
+                        output_envmap_ldr_path = os.path.join(output_envmaps_dir, output_envmap_ldr_name)
+                        env_ldr_img.save(output_envmap_ldr_path)
             
             # Create absolute image path for the JSON file
             # This ensures the path works regardless of where the code is run from
@@ -572,12 +577,15 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             "frames": frames
         }
         
-        # Save scene JSON
+        # Save scene JSON (always regenerate, even if files were skipped)
         output_json_path = os.path.join(output_metadata_dir, f"{scene_name}.json")
         with open(output_json_path, 'w') as f:
             json.dump(scene_data, f, indent=2)
         
-        print(f"Processed {scene_name}: {len(frames)} frames")
+        if skip_file_processing:
+            print(f"Regenerated JSON for {scene_name}: {len(frames)} frames (skipped file processing)")
+        else:
+            print(f"Processed {scene_name}: {len(frames)} frames")
         processed_scene_names.append(scene_name)  # Add to processed list
     
     # Return list of all processed scene names (including skipped ones)
