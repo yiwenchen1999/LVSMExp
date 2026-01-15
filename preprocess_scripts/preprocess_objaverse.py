@@ -427,6 +427,9 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         output_json_path = os.path.join(output_metadata_dir, f"{scene_name}.json")
         scene_exists = os.path.exists(output_images_dir) and os.path.exists(output_envmaps_dir) and os.path.exists(output_json_path)
         
+        # Initialize skip_file_processing flag
+        skip_file_processing = False
+        
         if scene_exists:
             # Check if all expected files exist
             all_files_exist = True
