@@ -27,4 +27,5 @@ torchrun --nproc_per_node 4 --nnodes 1 \
     training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_dense_general \
+    trainig.dataset_path = /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
     training.lr = 0.0002
