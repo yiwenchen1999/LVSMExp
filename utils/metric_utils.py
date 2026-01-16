@@ -170,18 +170,27 @@ def visualize_intermediate_results(out_dir, result):
     input, target = result.input, result.target
 
     if result.render is not None:
-        # Use relit_images if available, otherwise fall back to original image
-        if hasattr(target, 'relit_images') and target.relit_images is not None:
-            target_image = target.relit_images
-        else:
-            target_image = target.image
+        # For supervision images, we want: unlitGT|gt|pred
+        # unlitGT = target.image (original unlit image)
+        # gt = target.relit_images (relit image, or target.image if not available)
+        # pred = rendered_image (predicted image)
         
         rendered_image = result.render
         b, v, _, h, w = rendered_image.size()
         rendered_image = rendered_image.reshape(b * v, -1, h, w)
-        target_image = target_image.reshape(b * v, -1, h, w)
-        visualized_image = torch.cat((target_image, rendered_image), dim=3).detach().cpu()
-        visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=2)
+        
+        # unlitGT: original unlit image
+        unlitGT = target.image.reshape(b * v, -1, h, w)
+        
+        # gt: relit image (or fallback to original image if not available)
+        if hasattr(target, 'relit_images') and target.relit_images is not None:
+            gt_image = target.relit_images.reshape(b * v, -1, h, w)
+        else:
+            gt_image = target.image.reshape(b * v, -1, h, w)
+        
+        # Concatenate: unlitGT | gt | pred
+        visualized_image = torch.cat((unlitGT, gt_image, rendered_image), dim=3).detach().cpu()
+        visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=3)
         visualized_image = (visualized_image.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
         
         uids = [target.index[b, 0, -1].item() for b in range(target.index.size(0))]
