@@ -26,6 +26,21 @@ class Dataset(Dataset):
             print(f"Error reading dataset paths from '{self.config.training.dataset_path}'")
             raise e
         
+        # Filter scenes if whiteEnvInput is enabled
+        # Only keep scenes ending with "white_env_0" as input images
+        self.whiteEnvInput = self.config.training.get("whiteEnvInput", False)
+        if self.whiteEnvInput:
+            total_scenes_before = len(self.all_scene_paths)
+            filtered_scene_paths = []
+            for scene_path in self.all_scene_paths:
+                # Extract scene name from path (e.g., "/path/to/metadata/scene_name.json" -> "scene_name")
+                file_name = os.path.basename(scene_path)
+                scene_name = file_name.replace('.json', '')
+                # Only keep scenes ending with "white_env_0"
+                if scene_name.endswith('_white_env_0'):
+                    filtered_scene_paths.append(scene_path)
+            self.all_scene_paths = filtered_scene_paths
+            print(f"whiteEnvInput enabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'white_env_0' (from {total_scenes_before} total)")
 
         self.inference = self.config.inference.get("if_inference", False)
         # Load file that specifies the input and target view indices to use for inference
@@ -325,8 +340,12 @@ class Dataset(Dataset):
             candidate_scenes = []
             for json_file in all_scene_json_files:
                 candidate_scene_name = json_file[:-5]  # Remove .json extension
+                # Check if scene has the same object_id and different env_name
                 if candidate_scene_name.startswith(object_id + '_') and candidate_scene_name != scene_name:
-                    candidate_scenes.append(candidate_scene_name)
+                    # Filter: only include scenes ending with _env_x (not white_env_x)
+                    # This ensures relit_images come from *_env_x scenes, not white_env_x
+                    if '_env_' in candidate_scene_name and not candidate_scene_name.endswith('_white_env_0') and not '_white_env_' in candidate_scene_name:
+                        candidate_scenes.append(candidate_scene_name)
             
             # Check if we have candidate scenes
             if not candidate_scenes:
