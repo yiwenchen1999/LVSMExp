@@ -44,7 +44,7 @@ python preprocess_scripts/preprocess_objaverse.py \
 python preprocess_scripts/preprocess_objaverse.py \
   --input data_samples/sample_objaverse \
   --output data_samples/objaverse_processed_with_envmaps \
-  --split train \
+  --split test \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
   --max-objects 10
 

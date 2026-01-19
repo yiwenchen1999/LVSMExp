@@ -27,4 +27,5 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_overfit_lr1e4 \
     training.LVSM_checkpoint_dir = ckpt/LVSM_object_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_lr1e4_sparse_overfit \
+    training.vis_every = 2 \
     training.lr = 0.0001
