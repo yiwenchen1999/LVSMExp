@@ -9,13 +9,11 @@
 #SBATCH --error=rm_rayzer_format.err
 
 # Remove the rayzer_format directory
-cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/torchSplattingMod
-
-target_dir="result"
+target_dir="re10k"
 find "$target_dir" -type f -delete
 find "$target_dir" -type d -empty -delete
 rmdir "$target_dir"
-rm -rf decoded_result
+# rm -rf decoded_result
 
 echo "Removed GSSPLAT intermediate results directory"
 
