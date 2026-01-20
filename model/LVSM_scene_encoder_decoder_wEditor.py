@@ -439,29 +439,56 @@ class LatentSceneEditor(nn.Module):
                 b, v_input = input.env_dir.shape[:2]
                 env_h, env_w = input.env_dir.shape[3], input.env_dir.shape[4]
                 
-                # Resize env_ldr and env_hdr to match env_dir dimensions if needed
-                if input.env_ldr.shape[3] != env_h or input.env_ldr.shape[4] != env_w:
-                    env_ldr_resized = torch.nn.functional.interpolate(
-                        input.env_ldr.reshape(b * v_input, 3, input.env_ldr.shape[3], input.env_ldr.shape[4]),
-                        size=(env_h, env_w),
-                        mode='bilinear',
-                        align_corners=False
-                    ).reshape(b, v_input, 3, env_h, env_w)
+                # Check if single_env_map mode is enabled
+                single_env_map = self.config.training.get("single_env_map", False)
+                if single_env_map:
+                    # Randomly sample one view index for each batch
+                    # We'll use the same view index for all samples in the batch for consistency
+                    if self.training:
+                        # During training, randomly sample a view for each batch
+                        view_idx = torch.randint(0, v_input, (b,), device=input.env_dir.device)
+                    else:
+                        # During inference, use the first view for consistency
+                        view_idx = torch.zeros(b, dtype=torch.long, device=input.env_dir.device)
+                    
+                    # Select the k-th view for each sample in the batch using efficient indexing
+                    batch_indices = torch.arange(b, device=input.env_dir.device)
+                    
+                    # [b, v_input, 3, h, w] -> [b, 3, h, w] -> [b, 1, 3, h, w]
+                    env_ldr = input.env_ldr[batch_indices, view_idx].unsqueeze(1)
+                    env_hdr = input.env_hdr[batch_indices, view_idx].unsqueeze(1)
+                    env_dir = input.env_dir[batch_indices, view_idx].unsqueeze(1)
+                    
+                    v_input = 1
                 else:
-                    env_ldr_resized = input.env_ldr
+                    # Use all views as before
+                    env_ldr = input.env_ldr
+                    env_hdr = input.env_hdr
+                    env_dir = input.env_dir
                 
-                if input.env_hdr.shape[3] != env_h or input.env_hdr.shape[4] != env_w:
-                    env_hdr_resized = torch.nn.functional.interpolate(
-                        input.env_hdr.reshape(b * v_input, 3, input.env_hdr.shape[3], input.env_hdr.shape[4]),
+                # Resize env_ldr and env_hdr to match env_dir dimensions if needed
+                if env_ldr.shape[3] != env_h or env_ldr.shape[4] != env_w:
+                    env_ldr_resized = torch.nn.functional.interpolate(
+                        env_ldr.reshape(b * v_input, 3, env_ldr.shape[3], env_ldr.shape[4]),
                         size=(env_h, env_w),
                         mode='bilinear',
                         align_corners=False
                     ).reshape(b, v_input, 3, env_h, env_w)
                 else:
-                    env_hdr_resized = input.env_hdr
+                    env_ldr_resized = env_ldr
+                
+                if env_hdr.shape[3] != env_h or env_hdr.shape[4] != env_w:
+                    env_hdr_resized = torch.nn.functional.interpolate(
+                        env_hdr.reshape(b * v_input, 3, env_hdr.shape[3], env_hdr.shape[4]),
+                        size=(env_h, env_w),
+                        mode='bilinear',
+                        align_corners=False
+                    ).reshape(b, v_input, 3, env_h, env_w)
+                else:
+                    env_hdr_resized = env_hdr
                 
                 # directional_env: [b, v_input, 9, env_h, env_w] (3+3+3=9)
-                directional_env = torch.cat([env_ldr_resized, env_hdr_resized, input.env_dir], dim=2)  # [b, v_input, 9, env_h, env_w]
+                directional_env = torch.cat([env_ldr_resized, env_hdr_resized, env_dir], dim=2)  # [b, v_input, 9, env_h, env_w]
                 
                 # 3.2: Tokenize directional_env
                 # Similar to image tokenization: [b*v, n_env_patches, d]
