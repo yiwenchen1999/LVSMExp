@@ -23,8 +23,8 @@ export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
-    training.batch_size_per_gpu = 4 \
-    training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4 \
+    training.batch_size_per_gpu = 8 \
+    training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4_singleMap \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_dense_general_lr1e4_singleMap \
     training.warmup = 3000 \
