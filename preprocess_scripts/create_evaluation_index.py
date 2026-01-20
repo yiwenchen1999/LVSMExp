@@ -70,7 +70,7 @@ def sample_frames(num_frames, n_input, n_target, max_window_size=None):
 
 
 def create_evaluation_index(full_list_path, output_path, n_input, n_target, 
-                            max_window_size=None, seed=42):
+                            max_window_size=None, seed=42, max_scenes=None):
     """
     Create evaluation index JSON file from a full_list.txt.
     
@@ -81,6 +81,7 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
         n_target: Number of target frames
         max_window_size: Maximum window size (default: 4*(n_input+n_target))
         seed: Random seed for reproducibility
+        max_scenes: Maximum number of scenes to process (optional)
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -88,6 +89,15 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
     # Read full_list.txt
     with open(full_list_path, 'r') as f:
         scene_json_paths = [line.strip() for line in f if line.strip()]
+    
+    if max_scenes is not None and max_scenes > 0:
+        if len(scene_json_paths) > max_scenes:
+            print(f"Limiting to {max_scenes} scenes (from {len(scene_json_paths)} total).")
+            # Randomly sample scenes if we have more than max_scenes
+            # Use fixed seed for reproducibility of scene selection
+            scene_json_paths = sorted(random.sample(scene_json_paths, max_scenes))
+        else:
+            print(f"Requested {max_scenes} scenes, but only {len(scene_json_paths)} available.")
     
     evaluation_index = {}
     
@@ -158,6 +168,8 @@ def main():
                        help='Maximum window size (default: 4*(n_input+n_target))')
     parser.add_argument('--seed', type=int, default=42,
                        help='Random seed (default: 42)')
+    parser.add_argument('--max-scenes', type=int, default=None,
+                       help='Maximum number of scenes to include in the index (default: all)')
     
     args = parser.parse_args()
     
@@ -169,6 +181,8 @@ def main():
     print(f"  Target frames: {args.n_target}")
     print(f"  Max window size: {args.max_window_size}")
     print(f"  Random seed: {args.seed}")
+    if args.max_scenes:
+        print(f"  Max scenes: {args.max_scenes}")
     
     create_evaluation_index(
         args.full_list,
@@ -176,7 +190,8 @@ def main():
         args.n_input,
         args.n_target,
         args.max_window_size,
-        args.seed
+        args.seed,
+        args.max_scenes
     )
 
 

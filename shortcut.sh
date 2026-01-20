@@ -15,10 +15,11 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/test/full_list.txt \
-    --output data/evaluation_index_objaverse_test.json \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
+    --output data/evaluation_index_objaverse_dense.json \
     --n-input 4 \
     --n-target 8 \
+    --max-scenes 100 \
     --seed 42
 
 python preprocess_scripts/preprocess_objaverse.py \
