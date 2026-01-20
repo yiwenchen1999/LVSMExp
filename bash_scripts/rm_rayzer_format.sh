@@ -5,12 +5,20 @@
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=rm_rayzer_format
+#SBATCH --output=rm_rayzer_format.out
+#SBATCH --error=rm_rayzer_format.err
 
 # Remove the rayzer_format directory
-cd /projects/vig/Datasets/objaverse/hf-objaverse-v1/
-rm -rf rayzer_states_temp
-rm -rf rayzer_states
-rm -rf rayzer_format
+cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/torchSplattingMod
 
-echo "Removed rayzer_format directory"
+target_dir="result"
+find "$target_dir" -type f -delete
+find "$target_dir" -type d -empty -delete
+rmdir "$target_dir"
+rm -rf decoded_result
 
+echo "Removed GSSPLAT intermediate results directory"
+
+
+# dir="/projects/vig/Datasets/objaverse/hf-objaverse-v1/"
+# find -maxdepth 1 -type d | sort | while read -r dir; do n=$(find "$dir" -type f | wc -l); printf "%4d : %s\n" $n "$dir"; done
