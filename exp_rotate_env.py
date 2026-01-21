@@ -106,6 +106,8 @@ def find_all_env_variations(scene_name, full_list_path):
             json_path = line
             json_file = os.path.basename(json_path)
             candidate_scene_name = json_file[:-5] if json_file.endswith('.json') else json_file
+            print(f"candidate_scene_name: {candidate_scene_name}")
+            print(f"scene_name: {scene_name}")
             
             # Skip the current scene itself
             if candidate_scene_name == scene_name:
