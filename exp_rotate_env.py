@@ -460,13 +460,14 @@ with torch.no_grad(), torch.autocast(
             # Concatenate all renders horizontally: [1, v_target, 3, h, k*w]
             all_renders = torch.cat(all_variation_results, dim=4)  # [1, v_target, 3, h, k*w]
             
-            # Save stitched images and video
+            # Save stitched images and videos
             if ddp_info.is_main_process:
                 safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
                 sample_dir = os.path.join(config.inference_out_dir, safe_scene_name)
                 os.makedirs(sample_dir, exist_ok=True)
                 
                 v_target, c, h, total_w = all_renders.shape[1], all_renders.shape[2], all_renders.shape[3], all_renders.shape[4]
+                num_variations = len(all_variation_results)
                 
                 # Save stitched image for each target view
                 for view_idx in range(v_target):
@@ -477,13 +478,29 @@ with torch.no_grad(), torch.autocast(
                         os.path.join(sample_dir, f"stitched_view_{view_idx:03d}.png")
                     )
                 
-                # Save as video (each frame is one target view, showing all variations horizontally)
-                # Reshape: [1, v_target, 3, h, k*w] -> [v_target, h, k*w, 3]
-                video_frames = rearrange(all_renders.squeeze(0), "v c h w -> v h w c")
-                video_frames = (video_frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-                video_path = os.path.join(sample_dir, "env_variations_video.mp4")
-                create_video_from_frames(video_frames, video_path, framerate=15)
-                print(f"Saved stitched results ({len(variation_scenes)} variations) and video to {sample_dir}")
+                # Save videos: one video per target view
+                # Each video shows the same view under different lighting variations
+                # For each target view, collect frames from all variations
+                for view_idx in range(v_target):
+                    # Collect this view from all variations: [num_variations, 3, h, w]
+                    view_frames = []
+                    for var_result in all_variation_results:
+                        # var_result: [1, v_target, 3, h, w]
+                        view_frame = var_result[0, view_idx]  # [3, h, w]
+                        view_frames.append(view_frame)
+                    
+                    # Stack frames: [num_variations, 3, h, w]
+                    view_frames = torch.stack(view_frames, dim=0)
+                    
+                    # Convert to numpy: [num_variations, h, w, 3]
+                    view_frames = rearrange(view_frames, "n c h w -> n h w c")
+                    view_frames = (view_frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                    
+                    # Save video for this view
+                    video_path = os.path.join(sample_dir, f"view_{view_idx:03d}_variations.mp4")
+                    create_video_from_frames(view_frames, video_path, framerate=15)
+                
+                print(f"Saved stitched results ({num_variations} variations) and {v_target} videos (one per view) to {sample_dir}")
         
         torch.cuda.empty_cache()
 
