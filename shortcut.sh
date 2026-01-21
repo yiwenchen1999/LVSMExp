@@ -64,6 +64,14 @@ python preprocess_scripts/remove_broken_scenes.py \
     --broken-scene scene_preview/broken_scene.txt \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/full_list.txt
 
+# create evaluation index of a consecutive traj
+python preprocess_scripts/create_rotation_traj.py \
+    --full-list path/to/full_list.txt \
+    --output path/to/rotation_traj_index.json \
+    --window-size 50 \
+    --n-input 4 \
+    --max-scenes 100 
+
 
 
 # train-og:
