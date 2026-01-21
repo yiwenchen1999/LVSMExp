@@ -95,6 +95,13 @@ def find_all_env_variations(scene_name, full_list_path):
     # Pattern to match: {object_id}_white_env_{env_num} (white_env usually doesn't have variations)
     pattern_white_env = f"^{re.escape(object_id)}_white_env_(\\d+)$"
     
+    # Debug: print patterns
+    if ddp_info.is_main_process:
+        print(f"Looking for variations of scene: {scene_name}")
+        print(f"Extracted object_id: {object_id}")
+        print(f"Pattern env: {pattern_env}")
+        print(f"Pattern white_env: {pattern_white_env}")
+    
     with open(full_list_path, 'r') as f:
         for line in f:
             line = line.strip()
@@ -106,11 +113,13 @@ def find_all_env_variations(scene_name, full_list_path):
             json_path = line
             json_file = os.path.basename(json_path)
             candidate_scene_name = json_file[:-5] if json_file.endswith('.json') else json_file
-            print(f"candidate_scene_name: {candidate_scene_name}")
-            print(f"scene_name: {scene_name}")
             
             # Skip the current scene itself
             if candidate_scene_name == scene_name:
+                continue
+            
+            # Check if candidate starts with object_id (quick check before regex)
+            if not candidate_scene_name.startswith(object_id + '_'):
                 continue
             
             # Check if it matches env pattern: {object_id}_env_{env_num}_{variation}
@@ -121,6 +130,8 @@ def find_all_env_variations(scene_name, full_list_path):
                 # Store as (0, env_num, variation_num, scene_name) for sorting
                 # Use 0 prefix to distinguish from white_env
                 variation_scenes.append((0, env_num, variation_num, candidate_scene_name))
+                if ddp_info.is_main_process:
+                    print(f"  Matched env scene: {candidate_scene_name} (env_{env_num}, var_{variation_num})")
             else:
                 # Check if it matches white_env pattern: {object_id}_white_env_{env_num}
                 match_white = re.match(pattern_white_env, candidate_scene_name)
@@ -129,6 +140,8 @@ def find_all_env_variations(scene_name, full_list_path):
                     # Store as (1, env_num, 0, scene_name) for sorting
                     # Use 1 prefix to put white_env after regular env
                     variation_scenes.append((1, env_num, 0, candidate_scene_name))
+                    if ddp_info.is_main_process:
+                        print(f"  Matched white_env scene: {candidate_scene_name} (env_{env_num})")
     
     # Sort by: type (0=env, 1=white_env), env_num, variation_num
     # This ensures order: env_0_1, env_0_2, ..., env_1_1, env_1_2, ..., white_env_0, white_env_1, ...
