@@ -1,5 +1,19 @@
-[
-    "01c9013483b6427fbc2f478e5e328810_env_0",
-    "01c9013483b6427fbc2f478e5e328810_env_1",
-    "0007a7c8fcb44074b20fa4e14b8730a6_white_env_0"
-]
+{
+    "with_variations": [
+        "01c9013483b6427fbc2f478e5e328810_env_1",
+        "03579fe1c8bf4f5abe3d4d923133b158_env_1",
+        "0cc48298504048f3b556a4eeefba1449_env_0",
+        "0e02aeb78f5b409d82b7e4a45596f65e_env_0",
+        "e561fa2f48d64a9fb62ca03daeea41be_env_4",
+        "d37afb7ea876464d931129b7f9284762_env_4"
+
+    ],
+    "without_variations": [
+        "01c9013483b6427fbc2f478e5e328810_env_0",
+        "03579fe1c8bf4f5abe3d4d923133b158_white_env_0",
+        "0cc48298504048f3b556a4eeefba1449_white_env_0",
+        "0e02aeb78f5b409d82b7e4a45596f65e_white_env_0",
+        "e561fa2f48d64a9fb62ca03daeea41be_white_env_0",
+        "d37afb7ea876464d931129b7f9284762_white_env_0"
+    ]
+}
