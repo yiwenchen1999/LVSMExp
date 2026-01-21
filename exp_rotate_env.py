@@ -470,7 +470,7 @@ with torch.no_grad(), torch.autocast(
                 
                 # Save stitched image for each target view
                 for view_idx in range(v_target):
-                    stitched_img = all_renders[0, view_idx].detach().cpu()  # [3, h, k*w]
+                    stitched_img = all_renders[0, view_idx].detach().cpu().float()  # [3, h, k*w], convert to float32
                     stitched_img = rearrange(stitched_img, "c h w -> h w c")
                     stitched_img = (stitched_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
                     Image.fromarray(stitched_img).save(
@@ -480,7 +480,7 @@ with torch.no_grad(), torch.autocast(
                 # Save as video (each frame is one target view, showing all variations horizontally)
                 # Reshape: [1, v_target, 3, h, k*w] -> [v_target, h, k*w, 3]
                 video_frames = rearrange(all_renders.squeeze(0), "v c h w -> v h w c")
-                video_frames = (video_frames.detach().cpu().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                video_frames = (video_frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
                 video_path = os.path.join(sample_dir, "env_variations_video.mp4")
                 create_video_from_frames(video_frames, video_path, framerate=15)
                 print(f"Saved stitched results ({len(variation_scenes)} variations) and video to {sample_dir}")
