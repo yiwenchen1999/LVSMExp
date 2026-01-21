@@ -305,7 +305,10 @@ def _save_video(frames, out_dir):
     Save video from rendered frames.
     Input frames should be in [v, c, h, w] format.
     """
-    frames = np.ascontiguousarray(np.array(frames.to(torch.float32)))
+    # Move to CPU and convert to numpy
+    if isinstance(frames, torch.Tensor):
+        frames = frames.detach().cpu().to(torch.float32)
+    frames = np.ascontiguousarray(np.array(frames))
     frames = rearrange(frames, "v c h w -> v h w c")
     data_utils.create_video_from_frames(
         frames, 
