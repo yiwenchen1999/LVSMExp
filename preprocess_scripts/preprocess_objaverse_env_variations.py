@@ -565,8 +565,12 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         
         # Create variations of the scene (or just process once if without variations)
         for variation_idx in range(1, actual_n_variations + 1):
-            # Create variation scene name: base_scene_name_variation_idx
-            scene_name = f"{base_scene_name}_{variation_idx}"
+            # Create variation scene name
+            if should_process_with_variations:
+                scene_name = f"{base_scene_name}_{variation_idx}"
+            else:
+                # No suffix for scenes without variations
+                scene_name = base_scene_name
             
             # Create output directories for this variation
             output_images_dir = os.path.join(output_root, split, 'images', scene_name)

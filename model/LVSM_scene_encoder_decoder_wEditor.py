@@ -546,6 +546,86 @@ class LatentSceneEditor(nn.Module):
         
         return result
 
+    def edit_scene_with_env(self, latent_tokens, input_with_env):
+        """
+        Edit scene latent tokens using environment maps from input.
+        
+        Args:
+            latent_tokens: [b, n_latent_vectors, d] - Scene latent representation
+            input_with_env: Input dict containing env_ldr, env_hdr, env_dir
+            
+        Returns:
+            edited_latent_tokens: [b, n_latent_vectors, d] - Edited scene latent representation
+        """
+        edited_latent_tokens = latent_tokens
+        
+        # Step 3: Editor - Edit the scene latent_tokens using environment maps
+        if hasattr(input_with_env, 'env_ldr') and hasattr(input_with_env, 'env_hdr') and hasattr(input_with_env, 'env_dir'):
+            if input_with_env.env_ldr is not None and input_with_env.env_hdr is not None and input_with_env.env_dir is not None:
+                b, v_input = input_with_env.env_dir.shape[:2]
+                env_h, env_w = input_with_env.env_dir.shape[3], input_with_env.env_dir.shape[4]
+                
+                # Check if single_env_map mode is enabled
+                single_env_map = self.config.training.get("single_env_map", False)
+                if single_env_map:
+                    # Use first view for consistency during inference
+                    view_idx = torch.zeros(b, dtype=torch.long, device=input_with_env.env_dir.device)
+                    batch_indices = torch.arange(b, device=input_with_env.env_dir.device)
+                    env_ldr = input_with_env.env_ldr[batch_indices, view_idx].unsqueeze(1)
+                    env_hdr = input_with_env.env_hdr[batch_indices, view_idx].unsqueeze(1)
+                    env_dir = input_with_env.env_dir[batch_indices, view_idx].unsqueeze(1)
+                    v_input = 1
+                else:
+                    env_ldr = input_with_env.env_ldr
+                    env_hdr = input_with_env.env_hdr
+                    env_dir = input_with_env.env_dir
+                
+                # Resize env_ldr and env_hdr to match env_dir dimensions if needed
+                if env_ldr.shape[3] != env_h or env_ldr.shape[4] != env_w:
+                    env_ldr = torch.nn.functional.interpolate(
+                        env_ldr.reshape(b * v_input, 3, env_ldr.shape[3], env_ldr.shape[4]),
+                        size=(env_h, env_w),
+                        mode='bilinear',
+                        align_corners=False
+                    ).reshape(b, v_input, 3, env_h, env_w)
+                
+                if env_hdr.shape[3] != env_h or env_hdr.shape[4] != env_w:
+                    env_hdr = torch.nn.functional.interpolate(
+                        env_hdr.reshape(b * v_input, 3, env_hdr.shape[3], env_hdr.shape[4]),
+                        size=(env_h, env_w),
+                        mode='bilinear',
+                        align_corners=False
+                    ).reshape(b, v_input, 3, env_h, env_w)
+                
+                # directional_env: [b, v_input, 9, env_h, env_w]
+                directional_env = torch.cat([env_ldr, env_hdr, env_dir], dim=2)
+                
+                # Tokenize directional_env
+                env_tokens = self.env_tokenizer(directional_env)  # [b*v_input, n_env_patches, d]
+                _, n_env_patches, d = env_tokens.size()
+                
+                # Reshape env_tokens
+                env_tokens = env_tokens.reshape(b, v_input * n_env_patches, d)
+                
+                # Concatenate latent_tokens with env_tokens and pass through transformer_editor
+                editor_input_tokens = torch.cat([latent_tokens, env_tokens], dim=1)
+                
+                checkpoint_every = self.config.training.grad_checkpoint_every
+                editor_output_tokens = self.pass_layers(
+                    self.transformer_editor,
+                    editor_input_tokens,
+                    gradient_checkpoint=True,
+                    checkpoint_every=checkpoint_every
+                )
+                
+                # Extract latent_tokens after editing
+                n_latent_vectors = self.config.model.transformer.n_latent_vectors
+                edited_latent_tokens, _ = editor_output_tokens.split(
+                    [n_latent_vectors, v_input * n_env_patches], dim=1
+                )
+        
+        return edited_latent_tokens
+
 
     @torch.no_grad()
     def render_video(self, data_batch, traj_type="interpolate", num_frames=60, loop_video=False, order_poses=False):
