@@ -150,6 +150,16 @@ def export_results(
         print('saving images to: ', sample_dir)
         _save_images(result, batch_idx, sample_dir)
         
+        # Check if number of target views exceeds threshold (default 36)
+        # If so, save rendered results directly as video
+        num_target_views = result.render[batch_idx].shape[0]  # [v, c, h, w]
+        auto_save_video_threshold = 36
+        
+        if num_target_views > auto_save_video_threshold:
+            print(f"  Scene {scene_name} has {num_target_views} views (> {auto_save_video_threshold}), saving rendered results as video")
+            # Save rendered images directly as video
+            _save_video(result.render[batch_idx], sample_dir)
+        
         # Compute and save metrics if requested
         if compute_metrics:
             # Use relit_images if available, otherwise fall back to original image
@@ -166,7 +176,7 @@ def export_results(
                 scene_name
             )
         
-        # Save video if available
+        # Save video if available (from render_video function)
         if hasattr(result, "video_rendering"):
             _save_video(result.video_rendering[batch_idx], sample_dir)
 
@@ -300,7 +310,7 @@ def _save_video(frames, out_dir):
     data_utils.create_video_from_frames(
         frames, 
         f"{out_dir}/rendered_video.mp4", 
-        framerate=30
+        framerate=15
     )
 
 

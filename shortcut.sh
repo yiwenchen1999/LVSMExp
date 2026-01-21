@@ -64,10 +64,18 @@ python preprocess_scripts/remove_broken_scenes.py \
     --broken-scene scene_preview/broken_scene.txt \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/full_list.txt
 
+# create evaluation indices
+python preprocess_scripts/create_evaluation_index.py \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
+    --output data/evaluation_index_objaverse_dense.json \
+    --n-input 4 \
+    --n-target 8 \
+    --max-scenes 100 \
+    --seed 42
 # create evaluation index of a consecutive traj
 python preprocess_scripts/create_rotation_traj.py \
-    --full-list path/to/full_list.txt \
-    --output path/to/rotation_traj_index.json \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
+    --output data/test_rotation_traj_index.json \
     --window-size 50 \
     --n-input 4 \
     --max-scenes 100 
@@ -125,6 +133,6 @@ training.num_input_views = 4 \
 training.num_target_views = 8 \
 inference.if_inference = true \
 inference.compute_metrics = true \
-inference.render_video = true \
-inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense.json" \
+inference.render_video = false \
+inference.view_idx_file_path = "./data/test_rotation_traj_index.json" \
 inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor
