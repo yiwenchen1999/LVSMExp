@@ -79,6 +79,14 @@ python preprocess_scripts/create_rotation_traj.py \
     --window-size 50 \
     --n-input 4 \
     --max-scenes 100 
+# create evaluation scene of scenes with rotating env:
+python preprocess_scripts/preprocess_objaverse_env_variations.py \
+    --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
+    --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_rotating_env \
+    --split test \
+    --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
+    --n-variations 36 \
+    --scene-list path/to/scene_list.json
 
 
 
@@ -126,7 +134,7 @@ inference_editor.py --config "configs/LVSM_scene_encoder_decoder_wEditor.yaml" \
 training.dataset_path = "/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt" \
 training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4 \
 training.batch_size_per_gpu = 1 \
-training.target_has_input = true \
+training.target_has_input = false \
 training.num_views = 50 \
 training.square_crop = true \
 training.num_input_views = 4 \

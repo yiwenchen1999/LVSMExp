@@ -189,12 +189,18 @@ class ProcessData(nn.Module):
         assert num_target_views < num_views, f"We have {num_views} views, but we want to select {num_target_views} target views. This is more than the total number of views we have."
         
         # Decide the target view indices
+        is_inference = self.config.inference.get("if_inference", False)
+        
         if target_has_input: 
             # Randomly sample target views across all views
             index = torch.tensor([
                 random.sample(range(num_views), num_target_views)
                 for _ in range(bs)
             ], dtype=torch.long, device=data_batch["image"].device) # [b, num_target_views]
+            
+            # In inference mode, sort indices to preserve frame order (e.g., 40, 41, 42, ...)
+            if is_inference:
+                index = torch.sort(index, dim=1).values # [b, num_target_views]
         else:
             assert (
                 self.config.training.num_input_views + num_target_views <= self.config.training.num_views
