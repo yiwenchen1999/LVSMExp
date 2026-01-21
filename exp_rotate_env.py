@@ -59,18 +59,19 @@ def find_all_env_variations(scene_name, full_list_path):
     
     object_id = None
     
-    # Try to match pattern: {object_id}_env_{env_num}_{variation}
-    match = re.match(r'^(.+)_env_(\d+)_(\d+)$', scene_name)
+    # Try to match pattern: {object_id}_white_env_{env_num} first (more specific)
+    # This must come before the generic _env_ pattern to avoid greedy matching
+    match = re.match(r'^(.+)_white_env_(\d+)$', scene_name)
     if match:
         object_id = match.group(1)
     else:
-        # Try pattern: {object_id}_env_{env_num} (without variation)
-        match = re.match(r'^(.+)_env_(\d+)$', scene_name)
+        # Try pattern: {object_id}_env_{env_num}_{variation}
+        match = re.match(r'^(.+)_env_(\d+)_(\d+)$', scene_name)
         if match:
             object_id = match.group(1)
         else:
-            # Try pattern: {object_id}_white_env_{env_num}
-            match = re.match(r'^(.+)_white_env_(\d+)$', scene_name)
+            # Try pattern: {object_id}_env_{env_num} (without variation)
+            match = re.match(r'^(.+)_env_(\d+)$', scene_name)
             if match:
                 object_id = match.group(1)
             else:
