@@ -131,7 +131,7 @@ def export_results(
     os.makedirs(out_dir, exist_ok=True)
     
     input_data, target_data = result.input, result.target
-    
+    print('calling export_results on out_dir: ', out_dir)
     for batch_idx in range(input_data.image.size(0)):
         # Use scene_name as the unique identifier (uid)
         scene_name = input_data.scene_name[batch_idx]
@@ -147,6 +147,7 @@ def export_results(
         target_indices = target_data.index[batch_idx, :, 0].cpu().numpy()
         
         # Save images
+        print('saving images to: ', sample_dir)
         _save_images(result, batch_idx, sample_dir)
         
         # Compute and save metrics if requested
@@ -232,19 +233,32 @@ def _save_images(result, batch_idx, out_dir):
     input_img = (input_img.cpu().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
     Image.fromarray(input_img).save(os.path.join(out_dir, "input.png"))
 
-    # Save GT vs prediction side-by-side
-    # Use relit_images if available, otherwise fall back to original image
+    # Save GT vs prediction comparison
+    # If relit_images is present, show three rows: prelit_target | target_image | predicted
+    # Otherwise, show two columns: target | predicted
     if hasattr(result.target, 'relit_images') and result.target.relit_images is not None:
-        target_img = result.target.relit_images[batch_idx]
+        # Three rows: prelit_target (target.image) | target_image (relit_images) | predicted
+        prelit_target = result.target.image[batch_idx]  # [v, c, h, w]
+        target_image = result.target.relit_images[batch_idx]  # [v, c, h, w]
+        predicted = result.render[batch_idx]  # [v, c, h, w]
+        
+        # Stack vertically: [3*v, c, h, w] -> [h, (3*v)*w, c]
+        comparison = torch.cat(
+            (prelit_target, target_image, predicted), 
+            dim=0  # Stack along view dimension
+        ).detach().cpu()
+        comparison = rearrange(comparison, "(n v) c h w -> (n h) (v w) c", v=prelit_target.shape[0])
+        comparison = (comparison.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
     else:
+        # Two columns: target | predicted (original behavior)
         target_img = result.target.image[batch_idx]
+        comparison = torch.cat(
+            (target_img, result.render[batch_idx]), 
+            dim=2  # Concatenate horizontally
+        ).detach().cpu()
+        comparison = rearrange(comparison, "v c h w -> h (v w) c")
+        comparison = (comparison.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
     
-    comparison = torch.cat(
-        (target_img, result.render[batch_idx]), 
-        dim=2
-    ).detach().cpu()
-    comparison = rearrange(comparison, "v c h w -> h (v w) c")
-    comparison = (comparison.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
     Image.fromarray(comparison).save(os.path.join(out_dir, "gt_vs_pred.png"))
     
 
