@@ -11,7 +11,7 @@ The script processes Objaverse data where:
 For each input scene, creates n variations with different environment map rotations:
 - Variations are named: {original_scene_name}_1, {original_scene_name}_2, ..., {original_scene_name}_n
 - Each variation uses the same environment map but with different rotation angles
-- Rotation angles are equally distributed from 0 to π around the z-axis (last axis)
+- Rotation angles are equally distributed from 0 to 2π around the z-axis (last axis)
 
 Output format matches re10k:
 - JSON files with scene_name and frames array
@@ -612,9 +612,9 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
             os.makedirs(output_envmaps_dir, exist_ok=True)
             
             # Calculate additional rotation angle for this variation
-            # Rotation angles are equally distributed from 0 to π
+            # Rotation angles are equally distributed from 0 to 2π
             # variation_idx goes from 1 to n_variations, so we use (variation_idx - 1) to get 0 to n_variations-1
-            additional_rotation = (variation_idx - 1) * (np.pi / n_variations)
+            additional_rotation = (variation_idx - 1) * (2 * np.pi / n_variations)
             
             # Create modified euler_rotation with additional rotation
             euler_rotation = None
@@ -845,7 +845,7 @@ def main():
     parser.add_argument('--hdri-dir', type=str, default=None,
                        help='Directory containing HDR environment maps (e.g., data_samples/sample_hdris)')
     parser.add_argument('--n-variations', type=int, default=1,
-                       help='Number of variations to create for each scene (default: 1). Each variation uses the same env map with different rotation angles (0 to π).')
+                       help='Number of variations to create for each scene (default: 1). Each variation uses the same env map with different rotation angles (0 to 2π).')
     parser.add_argument('--test-run', action='store_true',
                        help='Test run: only process first 5 objects (default: False)')
     parser.add_argument('--max-objects', type=int, default=None,

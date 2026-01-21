@@ -86,7 +86,7 @@ python preprocess_scripts/preprocess_objaverse_env_variations.py \
     --split test \
     --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
     --n-variations 36 \
-    --scene-list path/to/scene_list.json
+    --scene-list env_varation_scene_list.json
 
 
 
