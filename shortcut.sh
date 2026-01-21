@@ -63,6 +63,9 @@ python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wE
 python preprocess_scripts/remove_broken_scenes.py \
     --broken-scene scene_preview/broken_scene.txt \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/full_list.txt
+
+
+
 # train-og:
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
@@ -100,19 +103,20 @@ inference.render_video = true \
 inference.view_idx_file_path = "./data/evaluation_index_re10k.json" \
 inference_out_dir = ./experiments/evaluation/test
 
-# finetune, objaverse
+# inference, objaverse
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
 inference_editor.py --config "configs/LVSM_scene_encoder_decoder_wEditor.yaml" \
-training.dataset_path = "./data_samples/objaverse_processed/test/full_list.txt" \
-training.batch_size_per_gpu = 4 \
-training.target_has_input =  false \
-training.num_views = 7 \
+training.dataset_path = "/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt" \
+training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4 \
+training.batch_size_per_gpu = 8 \
+training.target_has_input = true \
+training.num_views = 12 \
 training.square_crop = true \
 training.num_input_views = 4 \
-training.num_target_views = 3 \
+training.num_target_views = 8 \
 inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = true \
-inference.view_idx_file_path = "./data/evaluation_index_objaverse_test_4i3o.json" \
-inference_out_dir = ./experiments/evaluation/test_obj_4i3o_wEditorTest
+inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense.json" \
+inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor

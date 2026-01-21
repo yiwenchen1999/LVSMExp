@@ -133,9 +133,14 @@ def export_results(
     input_data, target_data = result.input, result.target
     
     for batch_idx in range(input_data.image.size(0)):
-        uid = input_data.index[batch_idx, 0, -1].item()
+        # Use scene_name as the unique identifier (uid)
         scene_name = input_data.scene_name[batch_idx]
-        sample_dir = os.path.join(out_dir, f"{uid:06d}")
+        
+        # Sanitize scene_name to be filesystem-safe
+        safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
+        
+        # Use sanitized scene_name as the folder name
+        sample_dir = os.path.join(out_dir, safe_scene_name)
         os.makedirs(sample_dir, exist_ok=True)
         
         # Get target view indices
@@ -193,18 +198,19 @@ def visualize_intermediate_results(out_dir, result):
         visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=3)
         visualized_image = (visualized_image.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
         
-        uids = [target.index[b, 0, -1].item() for b in range(target.index.size(0))]
+        # Use scene_name for filename
+        scene_name = target.scene_name[0] if hasattr(target, 'scene_name') else "unknown"
+        safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
 
-        uid_based_filename = f"{uids[0]:08}_{uids[-1]:08}"
         Image.fromarray(visualized_image).save(
-            os.path.join(out_dir, f"supervision_{uid_based_filename}.jpg")
+            os.path.join(out_dir, f"supervision_{safe_scene_name}.jpg")
         )
-        with open(os.path.join(out_dir, f"uids.txt"), "w") as f:
-            uids = "_".join([f"{uid:08}" for uid in uids])
-            f.write(uids)
+        with open(os.path.join(out_dir, f"scene_name.txt"), "w") as f:
+            f.write(scene_name)
 
-    input_uids = [input.index[b, 0, -1].item() for b in range(input.index.size(0))]
-    input_uid_based_filename = f"{input_uids[0]:08}_{input_uids[-1]:08}"
+    # Use scene_name for filename
+    scene_name = input.scene_name[0] if hasattr(input, 'scene_name') else "unknown"
+    safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
     
     # Create a grid of input images
     b, v, c, h, w = input.image.size()
@@ -214,7 +220,7 @@ def visualize_intermediate_results(out_dir, result):
     
     # Save the input image grid
     Image.fromarray(input_grid).save(
-        os.path.join(out_dir, f"input_{input_uid_based_filename}.jpg")
+        os.path.join(out_dir, f"input_{safe_scene_name}.jpg")
     )
 
 
