@@ -35,27 +35,23 @@ amp_dtype_mapping = {
 }
 
 
-def find_all_env_variations(scene_name, metadata_dir):
+def find_all_env_variations(scene_name, full_list_path):
     """
-    Find all environment variation scenes for a given base scene.
+    Find all environment variation scenes for a given base scene from full_list.txt.
     
     For example, if scene_name is "01c9013483b6427fbc2f478e5e328810_env_0_1",
-    find all "01c9013483b6427fbc2f478e5e328810_env_1_*" scenes.
+    find all "01c9013483b6427fbc2f478e5e328810_env_*" scenes from full_list.txt.
     
     Args:
         scene_name: Current scene name (e.g., "object_id_env_0_1")
-        metadata_dir: Directory containing scene JSON files
+        full_list_path: Path to full_list.txt file containing scene JSON paths
         
     Returns:
-        list: Sorted list of variation scene names (sorted by last index digit)
+        list: Sorted list of variation scene names (sorted by env_num and variation number)
     """
-    # Parse scene name to extract object_id and current env
+    # Parse scene name to extract object_id
     # Example: "01c9013483b6427fbc2f478e5e328810_env_0_1"
     # -> object_id: "01c9013483b6427fbc2f478e5e328810"
-    # -> current_env: "env_0"
-    
-    # Find the pattern: object_id_env_X_Y where X is the env number and Y is the variation
-    # We want to find all object_id_env_1_Y scenes
     
     # Try to match pattern: {object_id}_env_{env_num}_{variation}
     match = re.match(r'^(.+)_env_(\d+)_(\d+)$', scene_name)
@@ -67,28 +63,43 @@ def find_all_env_variations(scene_name, metadata_dir):
             return []
     
     object_id = match.group(1)
-    current_env_num = int(match.group(2)) if match.lastindex >= 2 else None
     
-    # Find target env number (should be different from current)
-    # For now, we'll look for env_1 variations (assuming current is env_0)
-    target_env_num = 1 if current_env_num == 0 else 0
+    # Read scene list from full_list.txt
+    if not os.path.exists(full_list_path):
+        print(f"Warning: full_list.txt not found at {full_list_path}, skipping env variations")
+        return []
     
-    # Find all scenes matching pattern: {object_id}_env_{target_env_num}_{variation}
-    all_scene_json_files = [f for f in os.listdir(metadata_dir) if f.endswith('.json')]
     variation_scenes = []
     
-    pattern = f"^{re.escape(object_id)}_env_{target_env_num}_(\\d+)$"
-    for json_file in all_scene_json_files:
-        candidate_scene_name = json_file[:-5]  # Remove .json extension
-        match_var = re.match(pattern, candidate_scene_name)
-        if match_var:
-            variation_num = int(match_var.group(1))
-            variation_scenes.append((variation_num, candidate_scene_name))
+    # Pattern to match: {object_id}_env_{any_env_num}_{variation}
+    # This will match all env variations (env_0_*, env_1_*, env_2_*, etc.)
+    pattern = f"^{re.escape(object_id)}_env_(\\d+)_(\\d+)$"
     
-    # Sort by variation number (last index digit)
-    variation_scenes.sort(key=lambda x: x[0])
+    with open(full_list_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Extract scene name from JSON path
+            # Path format: /path/to/metadata/scene_name.json
+            json_path = line
+            json_file = os.path.basename(json_path)
+            candidate_scene_name = json_file[:-5] if json_file.endswith('.json') else json_file
+            
+            # Check if it matches the pattern
+            match_var = re.match(pattern, candidate_scene_name)
+            if match_var:
+                env_num = int(match_var.group(1))
+                variation_num = int(match_var.group(2))
+                # Store as (env_num, variation_num, scene_name) for sorting
+                variation_scenes.append((env_num, variation_num, candidate_scene_name))
     
-    return [scene_name for _, scene_name in variation_scenes]
+    # Sort by env_num first, then by variation number
+    # This ensures order: env_0_1, env_0_2, ..., env_1_1, env_1_2, ...
+    variation_scenes.sort(key=lambda x: (x[0], x[1]))
+    
+    return [scene_name for _, _, scene_name in variation_scenes]
 
 
 def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
@@ -291,8 +302,11 @@ with torch.no_grad(), torch.autocast(
         base_dir = os.path.dirname(scene_path_dir)  # Go up from metadata to train/test
         metadata_dir = os.path.join(base_dir, 'metadata')
         
-        # Find all environment variation scenes
-        variation_scenes = find_all_env_variations(scene_name, metadata_dir)
+        # Find full_list.txt path
+        full_list_path = os.path.join(base_dir, 'full_list.txt')
+        
+        # Find all environment variation scenes from full_list.txt
+        variation_scenes = find_all_env_variations(scene_name, full_list_path)
         
         if not variation_scenes:
             print(f"No environment variations found for {scene_name}, processing normally")

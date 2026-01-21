@@ -160,5 +160,5 @@ training.num_target_views = 8 \
 inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = false \
-inference.view_idx_file_path = "./data/test_rotation_traj_index.json" \
-inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor_rotation_traj
+inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense_env_variations.json" \
+inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor_env_variations
