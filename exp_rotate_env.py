@@ -39,30 +39,47 @@ def find_all_env_variations(scene_name, full_list_path):
     """
     Find all environment variation scenes for a given base scene from full_list.txt.
     
-    For example, if scene_name is "01c9013483b6427fbc2f478e5e328810_env_0_1",
-    find all "01c9013483b6427fbc2f478e5e328810_env_*" scenes from full_list.txt.
+    For example:
+    - If scene_name is "01c9013483b6427fbc2f478e5e328810_env_0_1",
+      find all "01c9013483b6427fbc2f478e5e328810_env_*" scenes
+    - If scene_name is "e561fa2f48d64a9fb62ca03daeea41be_white_env_0",
+      find all "e561fa2f48d64a9fb62ca03daeea41be*" scenes (env_* and white_env_*)
     
     Args:
-        scene_name: Current scene name (e.g., "object_id_env_0_1")
+        scene_name: Current scene name (e.g., "object_id_env_0_1" or "object_id_white_env_0")
         full_list_path: Path to full_list.txt file containing scene JSON paths
         
     Returns:
         list: Sorted list of variation scene names (sorted by env_num and variation number)
     """
     # Parse scene name to extract object_id
-    # Example: "01c9013483b6427fbc2f478e5e328810_env_0_1"
-    # -> object_id: "01c9013483b6427fbc2f478e5e328810"
+    # Examples:
+    #   "01c9013483b6427fbc2f478e5e328810_env_0_1" -> object_id: "01c9013483b6427fbc2f478e5e328810"
+    #   "e561fa2f48d64a9fb62ca03daeea41be_white_env_0" -> object_id: "e561fa2f48d64a9fb62ca03daeea41be"
+    
+    object_id = None
     
     # Try to match pattern: {object_id}_env_{env_num}_{variation}
     match = re.match(r'^(.+)_env_(\d+)_(\d+)$', scene_name)
-    if not match:
-        # Try pattern without variation suffix: {object_id}_env_{env_num}
+    if match:
+        object_id = match.group(1)
+    else:
+        # Try pattern: {object_id}_env_{env_num} (without variation)
         match = re.match(r'^(.+)_env_(\d+)$', scene_name)
-        if not match:
-            print(f"Warning: Could not parse scene name '{scene_name}', skipping env variations")
-            return []
+        if match:
+            object_id = match.group(1)
+        else:
+            # Try pattern: {object_id}_white_env_{env_num}
+            match = re.match(r'^(.+)_white_env_(\d+)$', scene_name)
+            if match:
+                object_id = match.group(1)
+            else:
+                print(f"Warning: Could not parse scene name '{scene_name}', skipping env variations")
+                return []
     
-    object_id = match.group(1)
+    if object_id is None:
+        print(f"Warning: Could not extract object_id from scene name '{scene_name}', skipping env variations")
+        return []
     
     # Read scene list from full_list.txt
     if not os.path.exists(full_list_path):
@@ -73,7 +90,10 @@ def find_all_env_variations(scene_name, full_list_path):
     
     # Pattern to match: {object_id}_env_{any_env_num}_{variation}
     # This will match all env variations (env_0_*, env_1_*, env_2_*, etc.)
-    pattern = f"^{re.escape(object_id)}_env_(\\d+)_(\\d+)$"
+    pattern_env = f"^{re.escape(object_id)}_env_(\\d+)_(\\d+)$"
+    
+    # Pattern to match: {object_id}_white_env_{env_num} (white_env usually doesn't have variations)
+    pattern_white_env = f"^{re.escape(object_id)}_white_env_(\\d+)$"
     
     with open(full_list_path, 'r') as f:
         for line in f:
@@ -87,19 +107,32 @@ def find_all_env_variations(scene_name, full_list_path):
             json_file = os.path.basename(json_path)
             candidate_scene_name = json_file[:-5] if json_file.endswith('.json') else json_file
             
-            # Check if it matches the pattern
-            match_var = re.match(pattern, candidate_scene_name)
-            if match_var:
-                env_num = int(match_var.group(1))
-                variation_num = int(match_var.group(2))
-                # Store as (env_num, variation_num, scene_name) for sorting
-                variation_scenes.append((env_num, variation_num, candidate_scene_name))
+            # Skip the current scene itself
+            if candidate_scene_name == scene_name:
+                continue
+            
+            # Check if it matches env pattern: {object_id}_env_{env_num}_{variation}
+            match_env = re.match(pattern_env, candidate_scene_name)
+            if match_env:
+                env_num = int(match_env.group(1))
+                variation_num = int(match_env.group(2))
+                # Store as (0, env_num, variation_num, scene_name) for sorting
+                # Use 0 prefix to distinguish from white_env
+                variation_scenes.append((0, env_num, variation_num, candidate_scene_name))
+            else:
+                # Check if it matches white_env pattern: {object_id}_white_env_{env_num}
+                match_white = re.match(pattern_white_env, candidate_scene_name)
+                if match_white:
+                    env_num = int(match_white.group(1))
+                    # Store as (1, env_num, 0, scene_name) for sorting
+                    # Use 1 prefix to put white_env after regular env
+                    variation_scenes.append((1, env_num, 0, candidate_scene_name))
     
-    # Sort by env_num first, then by variation number
-    # This ensures order: env_0_1, env_0_2, ..., env_1_1, env_1_2, ...
-    variation_scenes.sort(key=lambda x: (x[0], x[1]))
+    # Sort by: type (0=env, 1=white_env), env_num, variation_num
+    # This ensures order: env_0_1, env_0_2, ..., env_1_1, env_1_2, ..., white_env_0, white_env_1, ...
+    variation_scenes.sort(key=lambda x: (x[0], x[1], x[2]))
     
-    return [scene_name for _, _, scene_name in variation_scenes]
+    return [scene_name for _, _, _, scene_name in variation_scenes]
 
 
 def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
