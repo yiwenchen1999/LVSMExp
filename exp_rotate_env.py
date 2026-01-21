@@ -205,7 +205,11 @@ def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
     frames_chosen = [frames[ic] for ic in image_indices]
     
     # Use dataset's preprocess_frames method
-    images, fxfycxcy_list, c2w_list = dataset_class.preprocess_frames(frames_chosen, image_paths)
+    # preprocess_frames returns: (images, intrinsics, c2ws) where all are already stacked tensors
+    # images: [v, 3, h, w], intrinsics: [v, 4], c2ws: [v, 4, 4]
+    images, fxfycxcy, c2w = dataset_class.preprocess_frames(frames_chosen, image_paths)
+    
+    # All returns are already tensors, no need to stack
     
     # Load environment maps
     envmaps_dir = os.path.join(base_dir, 'envmaps', scene_name)
@@ -230,10 +234,13 @@ def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
     env_hdr = torch.stack(env_hdr_list, dim=0)  # [v, 3, h, w]
     
     # Create data batch
+    # images: [v, 3, h, w] -> [1, v, 3, h, w]
+    # fxfycxcy: [v, 4] -> [1, v, 4]
+    # c2w: [v, 4, 4] -> [1, v, 4, 4]
     data_batch = {
         "image": images.unsqueeze(0),  # [1, v, 3, h, w]
-        "fxfycxcy": torch.stack(fxfycxcy_list, dim=0).unsqueeze(0),  # [1, v, 4]
-        "c2w": torch.stack(c2w_list, dim=0).unsqueeze(0),  # [1, v, 4, 4]
+        "fxfycxcy": fxfycxcy.unsqueeze(0),  # [1, v, 4]
+        "c2w": c2w.unsqueeze(0),  # [1, v, 4, 4]
         "scene_name": [scene_name],
         "env_ldr": env_ldr.unsqueeze(0),  # [1, v, 3, h, w]
         "env_hdr": env_hdr.unsqueeze(0),  # [1, v, 3, h, w]
