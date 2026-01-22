@@ -2,12 +2,12 @@ model:
   class_name: model.LVSM_scene_encoder_decoder.Images2LatentScene
 
   image_tokenizer:
-    image_size: 512
+    image_size: 256
     patch_size: 8
     in_channels: 9  # 3 RGB + 3 direction + 3 Reference
 
   target_pose_tokenizer:
-    image_size: 512
+    image_size: 256
     patch_size: 8
     in_channels: 6  # 3 direction + 3 Reference
   transformer:
@@ -41,7 +41,7 @@ training:
   perceptual_loss_weight: 0.5
   reset_training_state: True
 
-  lr: 0.0001
+  lr: 0.0004
   train_steps: 100000
   num_input_views: 4
   num_target_views: 8
