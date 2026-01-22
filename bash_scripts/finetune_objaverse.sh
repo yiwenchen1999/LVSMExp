@@ -2,7 +2,7 @@
 #SBATCH --partition=jiang
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a6000:4
-#SBATCH --time=96:00:00
+#SBATCH --time=168:00:00
 #SBATCH --job-name=finetune_objaverse_lvsm
 #SBATCH --mem=32
 #SBATCH --ntasks=16
@@ -23,7 +23,8 @@ export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp
 conda activate /projects/vig/yiwenc/all_env/rayzer
 
-torchrun --nproc_per_node 1 --nnodes 1 \
+torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
     train.py --config configs/LVSM_scene_encoder_decoder_512.yaml \
-    training.batch_size_per_gpu = 8
+    training.batch_size_per_gpu = 4 \
+    training.grad_accum_steps = 2
