@@ -174,7 +174,7 @@ def main():
     args = parser.parse_args()
     
     if args.max_window_size is None:
-        args.max_window_size = 2 * (args.n_input + args.n_target)
+        args.max_window_size = 1 * (args.n_input + args.n_target)
     
     print(f"Creating evaluation index with:")
     print(f"  Input frames: {args.n_input}")
