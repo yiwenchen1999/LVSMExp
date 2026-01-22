@@ -114,18 +114,19 @@ find /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/im
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
 inference.py --config "configs/LVSM_scene_encoder_decoder.yaml" \
-training.dataset_path = "./re10k_processed/test/full_list.txt" \
+training.dataset_path = "/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt" \
 training.batch_size_per_gpu = 4 \
 training.target_has_input =  false \
-training.num_views = 5 \
+training.num_views = 12 \
 training.square_crop = true \
-training.num_input_views = 2 \
-training.num_target_views = 3 \
+training.num_input_views = 4 \
+training.num_target_views = 8 \
+training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
 inference.if_inference = true \
 inference.compute_metrics = true \
-inference.render_video = true \
-inference.view_idx_file_path = "./data/evaluation_index_re10k.json" \
-inference_out_dir = ./experiments/evaluation/test
+inference.render_video = false \
+inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense.json" \
+inference_out_dir = ./experiments/evaluation/test_dense_reconstruction
 
 # inference, objaverse
 torchrun --nproc_per_node 1 --nnodes 1 \
