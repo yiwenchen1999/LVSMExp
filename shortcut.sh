@@ -35,11 +35,11 @@ python preprocess_scripts/create_evaluation_index.py \
 
 # preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \
-  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
-  --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
-  --split train \
+  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_test_split \
+  --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_test_split \
+  --split test \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
-  --max-objects 10
+  --max-objects 100
 
   # preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \
@@ -66,11 +66,11 @@ python preprocess_scripts/remove_broken_scenes.py \
 
 # create evaluation indices
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_rotating_env/test/full_list_without_variations.txt \
-    --output data/evaluation_index_objaverse_dense_env_variations.json \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_test_split/test/full_list.txt \
+    --output data/evaluation_index_objaverse_dense_test_split.json \
     --n-input 4 \
     --n-target 8 \
-    --max-scenes 100 \
+    --max-scenes 125 \
     --seed 42
 # create evaluation index of a consecutive traj
 python preprocess_scripts/create_rotation_traj.py \
