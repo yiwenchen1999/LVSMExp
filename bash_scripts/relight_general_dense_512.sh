@@ -3,11 +3,11 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a6000:4
 #SBATCH --time=168:00:00
-#SBATCH --job-name=relight_general_dense
+#SBATCH --job-name=relight_general_dense_512
 #SBATCH --mem=128
 #SBATCH --ntasks=32
-#SBATCH --output=myjob.relight_general_dense.out
-#SBATCH --error=myjob.relight_general_dense.err
+#SBATCH --output=myjob.relight_general_dense_512.out
+#SBATCH --error=myjob.relight_general_dense_512.err
 export HF_HOME=/projects/vig/yiwenc/caches
 export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 
