@@ -9,7 +9,7 @@
 #SBATCH --error=rm_rayzer_format.err
 
 # Remove the rayzer_format directory
-target_dir="re10k"
+target_dir="gaffer_render_postprocessed_obj"
 find "$target_dir" -type f -delete
 find "$target_dir" -type d -empty -delete
 rmdir "$target_dir"
