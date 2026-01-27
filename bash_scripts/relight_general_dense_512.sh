@@ -2,7 +2,7 @@
 #SBATCH --partition=jiang
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a6000:4
-#SBATCH --time=72:00:00
+#SBATCH --time=168:00:00
 #SBATCH --job-name=relight_general_dense
 #SBATCH --mem=128
 #SBATCH --ntasks=32
