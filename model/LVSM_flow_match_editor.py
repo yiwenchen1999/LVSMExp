@@ -284,10 +284,10 @@ class FlowMatchEditor(LatentSceneEditor):
         #& Step 3: Get Scene B latent tokens (Target) - only needed for training
         # If we are in inference mode, we might not have target relit images, but flow matching training requires pairs.
         # Assuming we have paired data for training.
-        if hasattr(target, 'relit_images') and target.relit_images is not None:
+        if hasattr(input, 'relit_images') and input.relit_images is not None:
             # Create a target input dict for reconstructor
             target_input = edict(
-                image=target.relit_images,
+                image=input.relit_images,
                 ray_o=input.ray_o, # Same view poses for A and B
                 ray_d=input.ray_d
             )
