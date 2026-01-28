@@ -444,7 +444,7 @@ class FlowMatchEditor(LatentSceneEditor):
         Note: This method should be called with model.eval() to avoid DDP issues.
         """
         print("------Calling Flow Match Inference------")
-        input, target = self.process_data(data_batch, has_target_image=False, target_has_input=self.config.training.target_has_input, compute_rays=True)
+        input, target = self.process_data(data_batch, has_target_image=True, target_has_input=self.config.training.target_has_input, compute_rays=True)
         # During inference, we need to avoid gradient checkpointing to prevent DDP issues
         # Temporarily store original checkpoint setting and disable it
         original_checkpoint_every = self.config.training.grad_checkpoint_every
