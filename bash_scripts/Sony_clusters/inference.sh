@@ -15,6 +15,20 @@ singularity exec --nv $BIND $SIF bash -lc "
     --seed 42
 "
 
+singularity exec --nv $BIND $SIF bash -lc "
+  set -euo pipefail
+  export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
+  cd $PROJ
+
+  python3 preprocess_scripts/update_paths.py \
+  --old-path "/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/data_samples" \
+  --new-path "/music-shared-disk/group/ct/yiwen/codes/LVSMExp/data_samples" \
+  --root-dir ./data_samples/objaverse_processed_with_envmaps/test \
+  --extensions json txt \
+  --backup
+"
+
+
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/data_samples/objaverse_processed_with_envmaps/test/full_list.txt"
 export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder"
 
@@ -37,6 +51,6 @@ singularity exec --nv $BIND $SIF bash -lc "
     inference.if_inference = true \
     inference.compute_metrics = true \
     inference.render_video = false \
-    inference.view_idx_file_path = \"./data/evaluation_index_objaverse_dense.json\" \
-    inference_out_dir = ./experiments/evaluation/test_dense_reconstruction
+    inference.view_idx_file_path = \"data/evaluation_index_objaverse_dense_samples.json\" \
+    inference_out_dir = experiments/evaluation/test_dense_reconstruction_samples
 "
