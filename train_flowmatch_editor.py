@@ -313,6 +313,8 @@ while cur_train_step <= total_train_steps:
             os.makedirs(vis_path, exist_ok=True)
             
             # Perform full inference using ODE solver
+            # Set model to eval mode for inference to avoid DDP issues
+            model.eval()
             with torch.no_grad():
                 # Use model.module since we are in DDP
                 # If single GPU, model is the module. If DDP, model.module is the module.
@@ -343,6 +345,7 @@ while cur_train_step <= total_train_steps:
             
             visualize_intermediate_results(vis_path, vis_dict)
             torch.cuda.empty_cache()
+            # Restore training mode after inference
             model.train()
 
             

@@ -441,10 +441,19 @@ class FlowMatchEditor(LatentSceneEditor):
     def flow_match_inference(self, data_batch, steps=8, method='heun'):
         """
         Perform flow matching inference (ODE integration).
+        Note: This method should be called with model.eval() to avoid DDP issues.
         """
         print("------Calling Flow Match Inference------")
         input, target = self.process_data(data_batch, has_target_image=False, target_has_input=self.config.training.target_has_input, compute_rays=True)
-        z, n_patches, d = self.reconstructor(input) # Start at z_A
+        # During inference, we need to avoid gradient checkpointing to prevent DDP issues
+        # Temporarily store original checkpoint setting and disable it
+        original_checkpoint_every = self.config.training.grad_checkpoint_every
+        self.config.training.grad_checkpoint_every = 999999  # Effectively disable checkpointing
+        try:
+            z, n_patches, d = self.reconstructor(input) # Start at z_A
+        finally:
+            # Restore original setting
+            self.config.training.grad_checkpoint_every = original_checkpoint_every
         
         # Prepare Env Tokens (Fixed for all steps)
         # ... (Same env processing as forward) ...
