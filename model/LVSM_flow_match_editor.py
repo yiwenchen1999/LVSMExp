@@ -438,13 +438,24 @@ class FlowMatchEditor(LatentSceneEditor):
         return result
 
     @torch.no_grad()
-    def flow_match_inference(self, data_batch, steps=8, method='heun'):
+    def flow_match_inference(self, data_batch, steps=8, method='heun', input=None, target=None):
         """
         Perform flow matching inference (ODE integration).
         Note: This method should be called with model.eval() to avoid DDP issues.
+        
+        Args:
+            data_batch: Raw data batch
+            steps: Number of integration steps
+            method: Integration method ('euler' or 'heun')
+            input: Optional pre-processed input dict (to reuse views from training step)
+            target: Optional pre-processed target dict (to reuse views from training step)
         """
         print("------Calling Flow Match Inference------")
-        input, target = self.process_data(data_batch, has_target_image=True, target_has_input=self.config.training.target_has_input, compute_rays=True)
+        
+        # Use provided input/target or process from batch
+        if input is None or target is None:
+            input, target = self.process_data(data_batch, has_target_image=False, target_has_input=self.config.training.target_has_input, compute_rays=True)
+            
         # During inference, we need to avoid gradient checkpointing to prevent DDP issues
         # Temporarily store original checkpoint setting and disable it
         original_checkpoint_every = self.config.training.grad_checkpoint_every

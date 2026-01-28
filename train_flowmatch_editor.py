@@ -332,7 +332,9 @@ while cur_train_step <= total_train_steps:
                     inference_ret = model_to_call.flow_match_inference(
                         batch, 
                         steps=inference_steps, 
-                        method=inference_method
+                        method=inference_method,
+                        input=ret_dict.input,
+                        target=ret_dict.target
                     )
                 
                 # Create visualization dict merging original data and new render
