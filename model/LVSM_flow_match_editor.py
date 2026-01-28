@@ -274,7 +274,6 @@ class FlowMatchEditor(LatentSceneEditor):
         return input_tokens
 
     def forward(self, data_batch, timestep=None, skip_renderer=True):
-        print("------Calling Flow Match Editor Forward------")
         #& Step 1: Data processing
         input, target = self.process_data(data_batch, has_target_image=True, target_has_input=self.config.training.target_has_input, compute_rays=True)
         
@@ -450,7 +449,6 @@ class FlowMatchEditor(LatentSceneEditor):
             input: Optional pre-processed input dict (to reuse views from training step)
             target: Optional pre-processed target dict (to reuse views from training step)
         """
-        print("------Calling Flow Match Inference------")
         
         # Use provided input/target or process from batch
         if input is None or target is None:
