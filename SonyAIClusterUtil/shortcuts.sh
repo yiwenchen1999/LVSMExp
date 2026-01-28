@@ -4,6 +4,11 @@ ssh mfml1
 cd /music-shared-disk/group/ct/yiwen/codes/FLUX_finetune
 # cd to the data root
 
+# sync data directly from neu to sony
+rsync -avh --partial --inplace --progress \
+  -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
+  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/LVSM_scene_encoder_decoder \
+  .
 
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=1

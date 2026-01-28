@@ -284,3 +284,4 @@ total_loss = render_loss + normalize(velocity_loss) * velocity_weight
 2. **正则化**：联合损失类似于 L1 + L2 正则化
 3. **GAN 训练**：虽然生成器和判别器交替训练，但每个都是联合损失（多个损失项）
 
+
