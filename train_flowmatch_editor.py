@@ -322,11 +322,16 @@ while cur_train_step <= total_train_steps:
                 inference_steps = config.training.get("flow_match", {}).get("inference_steps", 8)
                 inference_method = config.training.get("flow_match", {}).get("inference_method", 'heun')
                 
-                inference_ret = model_to_call.flow_match_inference(
-                    batch, 
-                    steps=inference_steps, 
-                    method=inference_method
-                )
+                with torch.autocast(
+                    enabled=config.training.use_amp,
+                    device_type="cuda",
+                    dtype=amp_dtype_mapping[config.training.amp_dtype],
+                ):
+                    inference_ret = model_to_call.flow_match_inference(
+                        batch, 
+                        steps=inference_steps, 
+                        method=inference_method
+                    )
                 
                 # Create visualization dict merging original data and new render
                 vis_dict = edict(
