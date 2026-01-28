@@ -110,7 +110,7 @@ if config.training.get("freeze_reconstructor_renderer", False):
     model.freeze_reconstructor_and_renderer()
     print(f"------2.0.1 frozen reconstructor and renderer, only editor layers trainable------")
 
-model = DDP(model, device_ids=[ddp_info.local_rank])
+model = DDP(model, device_ids=[ddp_info.local_rank], find_unused_parameters=True)
 print(f"------2.0 model initialized and wrapped with DDP------")
 
 optimizer, optimized_param_dict, all_param_dict = create_optimizer(
