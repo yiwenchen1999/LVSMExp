@@ -191,7 +191,9 @@ while cur_train_step <= total_train_steps:
         device_type="cuda",
         dtype=amp_dtype_mapping[config.training.amp_dtype],
     ):
-        ret_dict = model(batch)
+        # Get skip_renderer from config (default to False to enable reconstruction loss)
+        skip_renderer = config.training.get("skip_renderer", False)
+        ret_dict = model(batch, skip_renderer=skip_renderer)
 
     update_grads = (cur_train_step + 1) % grad_accum_steps == 0 or cur_train_step == total_train_steps
     if update_grads:

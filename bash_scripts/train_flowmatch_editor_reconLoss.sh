@@ -28,13 +28,13 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18636 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
     train_flowmatch_editor.py --config configs/LVSM_flow_match_editor.yaml \
     training.batch_size_per_gpu = 4 \
-    training.checkpoint_dir = ckpt/LVSM_flow_match_editor_dense_lr1e4_singleMap \
+    training.checkpoint_dir = ckpt/LVSM_flow_match_editor_dense_lr1e4_singleMap_wReconLoss \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
-    training.wandb_exp_name = LVSM_flowmatch_dense_lr1e4_singleMap \
+    training.wandb_exp_name = LVSM_flowmatch_dense_lr1e4_singleMap_wReconLoss \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
     training.single_env_map = true \
-    training.skip_renderer = true \
+    training.skip_renderer = false \
     training.flow_match.noise_scale = 0.0
 

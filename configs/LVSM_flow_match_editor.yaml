@@ -51,7 +51,8 @@ training:
   grad_clip_norm: 5.0
   l2_loss_weight: 1.0
   lpips_loss_weight: 0.0
-  perceptual_loss_weight: 0.5
+  perceptual_loss_weight: 1.0
+  flow_loss_weight: 1.0  # Weight for flow matching loss when combined with reconstruction loss
   reset_training_state: True
 
   lr: 0.0004
@@ -87,6 +88,9 @@ training:
     inference_steps: 8
     inference_method: heun # euler or heun
     noise_scale: 0.0 # sigma0 for noise injection: sigma(t) = sigma0 * t * (1-t)
+  
+  # Training options
+  skip_renderer: false  # If false, compute reconstruction loss and combine with flow loss
 
 
 # inference / evaluation

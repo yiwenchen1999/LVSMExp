@@ -9,6 +9,7 @@ from einops import repeat, rearrange
 
 from .LVSM_scene_encoder_decoder_wEditor import LatentSceneEditor
 from .transformer import QK_Norm_SelfAttention, MLP, init_weights
+from .loss import LossComputer
 from utils import camera_utils, data_utils
 
 class TimeEmbedding(nn.Module):
@@ -130,6 +131,9 @@ class FlowMatchEditor(LatentSceneEditor):
         
         # Initialize time embedding
         self.time_embedder = TimeEmbedding(config.model.transformer.d)
+        
+        # Initialize loss computer for reconstruction loss
+        self.loss_computer = LossComputer(config)
         
         # Re-initialize transformer_editor with AdaLN blocks
         self._reinit_editor_with_adaln()
@@ -403,34 +407,62 @@ class FlowMatchEditor(LatentSceneEditor):
 
         loss_flow = F.mse_loss(pred_velocity, target_velocity)
         
-        # Combine losses
-        loss_metrics = edict({'loss': loss_flow, 'flow_loss': loss_flow})
+        # Initialize loss metrics with flow loss
+        loss_metrics = edict({'flow_loss': loss_flow})
 
-        # Render for visualization/metrics
+        # Render for visualization/metrics and compute reconstruction loss
         rendered_images = None
+        reconstruction_loss_metrics = None
         
         if not skip_renderer:
-            # Let's estimate z_B_pred for visualization
-            z_B_pred = z_A + pred_velocity # This is valid if t=0. If t>0, v should be constant.
-            # Actually, v = z_B - z_A. So z_A + v = z_B. 
-            # So pred_velocity approximates the vector from A to B.
+            # Compute z_B_pred from z_t using predicted velocity
+            # For constant velocity field v = z_B - z_A:
+            #   z_t = (1-t) * z_A + t * z_B
+            #   z_B = z_t + (1-t) * v
+            # This works for all t, not just t=0
+            t_expand_for_pred = t.view(-1, 1, 1)
+            z_B_pred = z_t + (1.0 - t_expand_for_pred) * pred_velocity
             
             # Render z_B_pred
             rendered_images = self.renderer(z_B_pred, target, n_patches, d)
             
-            # If we want to monitor image loss too:
+            # Compute reconstruction loss using the same loss computer as LVSM_scene_encoder_decoder
             if hasattr(target, 'relit_images'):
-                img_loss = F.mse_loss(rendered_images, target.relit_images)
-                loss_metrics.img_loss = img_loss
-                # loss_metrics.loss += img_loss * 0.1 # Optional aux loss
+                reconstruction_loss_metrics = self.loss_computer(
+                    rendering=rendered_images,
+                    target=target.relit_images
+                )
+                
+                # Combine flow loss and reconstruction loss
+                # Get weights from config (default to 1.0 if not specified)
+                flow_loss_weight = self.config.training.get("flow_loss_weight", 1.0)
+                reconstruction_loss_weight = 1.0  # Reconstruction loss already has internal weights
+                
+                total_loss = (
+                    flow_loss_weight * loss_flow + 
+                    reconstruction_loss_weight * reconstruction_loss_metrics.loss
+                )
+                
+                # Update loss_metrics with all components
+                loss_metrics.loss = total_loss
+                loss_metrics.reconstruction_loss = reconstruction_loss_metrics.loss
+                loss_metrics.l2_loss = reconstruction_loss_metrics.l2_loss
+                loss_metrics.lpips_loss = reconstruction_loss_metrics.lpips_loss
+                loss_metrics.perceptual_loss = reconstruction_loss_metrics.perceptual_loss
+                loss_metrics.psnr = reconstruction_loss_metrics.psnr
+            else:
+                # If no relit_images, only use flow loss
+                loss_metrics.loss = loss_flow
+                loss_metrics.reconstruction_loss = torch.tensor(0.0, device=loss_flow.device)
         else:
-             # Return dummy render if skipped to satisfy pipeline
-             # Use a tiny tensor or zeros
-             if hasattr(target, 'image'):
-                 rendered_images = torch.zeros_like(target.image)
-             else:
-                 rendered_images = None # Or handle accordingly in training loop
-             loss_metrics.img_loss = torch.tensor(0.0, device=loss_flow.device)
+            # Return dummy render if skipped to satisfy pipeline
+            if hasattr(target, 'image'):
+                rendered_images = torch.zeros_like(target.image)
+            else:
+                rendered_images = None
+            # Only flow loss when rendering is skipped
+            loss_metrics.loss = loss_flow
+            loss_metrics.reconstruction_loss = torch.tensor(0.0, device=loss_flow.device)
 
         result = edict(
             input=input,
