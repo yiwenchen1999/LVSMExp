@@ -70,7 +70,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29507 \
     train_flowmatch_editor.py --config configs/LVSM_flow_match_editor.yaml \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 32 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_flowmatch_dense_lr1e4_singleMap \

@@ -3,7 +3,6 @@
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
 #SBATCH --gres=gpu:4
 #SBATCH --time=168:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
@@ -74,11 +73,11 @@ srun singularity exec --nv $BIND $SIF bash -lc "
   cd $PROJ
 
   torchrun --nproc_per_node 4 --nnodes 1 \
-    --rdzv_id 18637 \
+    --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29507 \
     train_flowmatch_editor.py --config configs/LVSM_flow_match_editor.yaml \
-    training.batch_size_per_gpu = 8 \
+    training.batch_size_per_gpu = 32 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_flowmatch_dense_lr1e4_singleMap \
