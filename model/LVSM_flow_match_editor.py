@@ -393,10 +393,13 @@ class FlowMatchEditor(LatentSceneEditor):
         )
         
         #& Step 8: Compute Loss
+        # target_velocity = z_B - z_A
+        def rms(x): return (x.float().pow(2).mean().sqrt()).item()
+
+        print("rms z_A", rms(z_A), "rms z_B", rms(z_B))
         target_velocity = z_B - z_A
-        print("z_A", z_A.shape, "z_B", z_B.shape, "z_t", z_t.shape)
-        print("env_tokens", env_tokens.shape, "editor_in", editor_input_tokens.shape)
-        print("n_latent_vectors cfg", n_latent_vectors)
+        print("rms v*", rms(target_velocity), "max|v*|", target_velocity.abs().max().item())
+        print("rms pred_v", rms(pred_velocity))
 
         loss_flow = F.mse_loss(pred_velocity, target_velocity)
         
