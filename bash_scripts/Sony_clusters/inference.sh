@@ -21,9 +21,9 @@ singularity exec --nv $BIND $SIF bash -lc "
   cd $PROJ
 
   python3 preprocess_scripts/update_paths.py \
-  --old-path "/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/data_samples" \
-  --new-path "/music-shared-disk/group/ct/yiwen/codes/LVSMExp/data_samples" \
-  --root-dir ./data_samples/objaverse_processed_with_envmaps/test \
+  --old-path "/projects/vig/Datasets/objaverse/hf-objaverse-v1" \
+  --new-path "/music-shared-disk/group/ct/yiwen/data/objaverse" \
+  --root-dir /music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/test \
   --extensions json txt \
   --backup
 "

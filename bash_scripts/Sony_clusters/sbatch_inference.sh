@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
-#SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
+#SBATCH --error=bash_scripts/Sony_clusters/sbatch_inference.sh%x.%N.%j.err
 
 set -euo pipefail
 
