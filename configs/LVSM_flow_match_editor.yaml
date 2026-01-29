@@ -37,7 +37,7 @@ training:
   batch_size_per_gpu: 8
   beta1: 0.9
   beta2: 0.95
-  allowed_gradnorm_factor: 5
+  allowed_gradnorm_factor: 200
   center_crop: true
   scene_scale_factor: 1.35
   LVSM_checkpoint_dir: ckpt/LVSM_object_encoder_decoder
@@ -48,7 +48,7 @@ training:
   dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt
   grad_accum_steps: 1
   grad_checkpoint_every: 1
-  grad_clip_norm: 1.0
+  grad_clip_norm: 5.0
   l2_loss_weight: 1.0
   lpips_loss_weight: 0.0
   perceptual_loss_weight: 0.5
