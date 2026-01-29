@@ -326,9 +326,7 @@ class FlowMatchEditor(LatentSceneEditor):
         # Broadcast t for interpolation
         t_expand = t.view(-1, 1, 1)
         z_t = (1 - t_expand) * z_A + t_expand * z_B + noise
-        
-        #& Step 6: Prepare Env Conditioning
-        
+                
         #& Step 6: Prepare Env Conditioning
         # Process environment maps (LDR, HDR, Dir)
         
@@ -369,6 +367,8 @@ class FlowMatchEditor(LatentSceneEditor):
         else:
             # Handle case where env is missing?
             env_tokens = torch.zeros(z_A.shape[0], 0, d, device=z_A.device)
+            print("Warning: Env tokens are missing. Using zeros.")
+            raise AssertionError("Env tokens are missing. Stopping process.")
 
         #& Step 7: Predict Velocity
         # Concatenate: [z_t, env_tokens]
@@ -394,6 +394,10 @@ class FlowMatchEditor(LatentSceneEditor):
         
         #& Step 8: Compute Loss
         target_velocity = z_B - z_A
+        print("z_A", z_A.shape, "z_B", z_B.shape, "z_t", z_t.shape)
+        print("env_tokens", env_tokens.shape, "editor_in", editor_input_tokens.shape)
+        print("n_latent_vectors cfg", n_latent_vectors)
+
         loss_flow = F.mse_loss(pred_velocity, target_velocity)
         
         # Combine losses
