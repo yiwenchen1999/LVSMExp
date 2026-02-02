@@ -23,9 +23,9 @@ python preprocess_scripts/create_evaluation_index.py \
     --seed 42
 
 python preprocess_scripts/preprocess_objaverse.py \
-    --input data_samples/sample_objaverse \
-    --output data_samples/objaverse_processed \
-    --split train
+    --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
+    --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
+    --split test
 python preprocess_scripts/create_evaluation_index.py \
     --full-list data_samples/objaverse_processed/test/full_list.txt \
     --output data/evaluation_index_objaverse_test_4i3o.json \
@@ -35,11 +35,10 @@ python preprocess_scripts/create_evaluation_index.py \
 
 # preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \
-  --input data_samples/sample_objaverse \
-  --output data_samples/objaverse_processed_with_envmaps \
+  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
+  --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
   --split test \
-  --hdri-dir data_samples/hdirs \
-  --max-objects 100
+  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs 
 
   # preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \

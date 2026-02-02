@@ -186,10 +186,9 @@ def visualize_intermediate_results(out_dir, result):
     input, target = result.input, result.target
 
     if result.render is not None:
-        # For supervision images, we want: unlitGT|gt|pred
-        # unlitGT = target.image (original unlit image)
-        # gt = target.relit_images (relit image, or target.image if not available)
-        # pred = rendered_image (predicted image)
+        # For supervision images, we want different layouts based on available data:
+        # - If albedo exists: target.image | [target.relit_images] | rendered_images | target.albedo | rendered_albedo
+        # - Otherwise: target.image | [target.relit_images] | rendered_images
         
         rendered_image = result.render
         b, v, _, h, w = rendered_image.size()
@@ -198,15 +197,32 @@ def visualize_intermediate_results(out_dir, result):
         # unlitGT: original unlit image
         unlitGT = target.image.reshape(b * v, -1, h, w)
         
-        # gt: relit image (or fallback to original image if not available)
+        # Check if albedo data exists
+        has_albedo = (hasattr(result, 'render_albedo') and result.render_albedo is not None and
+                     hasattr(target, 'albedos') and target.albedos is not None)
+        
+        # Build visualization components
+        components = [unlitGT]  # Start with target.image
+        
+        # Add relit_images if available
         if hasattr(target, 'relit_images') and target.relit_images is not None:
             gt_image = target.relit_images.reshape(b * v, -1, h, w)
-        else:
-            gt_image = target.image.reshape(b * v, -1, h, w)
+            components.append(gt_image)
         
-        # Concatenate: unlitGT | gt | pred
-        visualized_image = torch.cat((unlitGT, gt_image, rendered_image), dim=3).detach().cpu()
-        visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=3)
+        # Add rendered images
+        components.append(rendered_image)
+        
+        # Add albedo if available
+        if has_albedo:
+            target_albedo = target.albedos.reshape(b * v, -1, h, w)
+            rendered_albedo = result.render_albedo.reshape(b * v, -1, h, w)
+            components.append(target_albedo)
+            components.append(rendered_albedo)
+        
+        # Concatenate all components horizontally
+        m = len(components)
+        visualized_image = torch.cat(components, dim=3).detach().cpu()
+        visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=m)
         visualized_image = (visualized_image.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
         
         # Use scene_name for filename
@@ -244,30 +260,41 @@ def _save_images(result, batch_idx, out_dir):
     Image.fromarray(input_img).save(os.path.join(out_dir, "input.png"))
 
     # Save GT vs prediction comparison
-    # If relit_images is present, show three rows: prelit_target | target_image | predicted
-    # Otherwise, show two columns: target | predicted
+    # Layout depends on available data:
+    # - If albedo exists: target.image | [target.relit_images] | rendered_images | target.albedo | rendered_albedo
+    # - Otherwise: target.image | [target.relit_images] | rendered_images
+    
+    # Check if albedo data exists
+    has_albedo = (hasattr(result, 'render_albedo') and result.render_albedo is not None and
+                 hasattr(result.target, 'albedos') and result.target.albedos is not None)
+    
+    # Build comparison components
+    components = []
+    
+    # Add target.image
+    target_img = result.target.image[batch_idx]  # [v, c, h, w]
+    components.append(target_img)
+    
+    # Add relit_images if available
     if hasattr(result.target, 'relit_images') and result.target.relit_images is not None:
-        # Three rows: prelit_target (target.image) | target_image (relit_images) | predicted
-        prelit_target = result.target.image[batch_idx]  # [v, c, h, w]
-        target_image = result.target.relit_images[batch_idx]  # [v, c, h, w]
-        predicted = result.render[batch_idx]  # [v, c, h, w]
-        
-        # Stack vertically: [3*v, c, h, w] -> [h, (3*v)*w, c]
-        comparison = torch.cat(
-            (prelit_target, target_image, predicted), 
-            dim=0  # Stack along view dimension
-        ).detach().cpu()
-        comparison = rearrange(comparison, "(n v) c h w -> (n h) (v w) c", v=prelit_target.shape[0])
-        comparison = (comparison.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-    else:
-        # Two columns: target | predicted (original behavior)
-        target_img = result.target.image[batch_idx]
-        comparison = torch.cat(
-            (target_img, result.render[batch_idx]), 
-            dim=2  # Concatenate horizontally
-        ).detach().cpu()
-        comparison = rearrange(comparison, "v c h w -> h (v w) c")
-        comparison = (comparison.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+        relit_img = result.target.relit_images[batch_idx]  # [v, c, h, w]
+        components.append(relit_img)
+    
+    # Add rendered images
+    rendered_img = result.render[batch_idx]  # [v, c, h, w]
+    components.append(rendered_img)
+    
+    # Add albedo if available
+    if has_albedo:
+        target_albedo = result.target.albedos[batch_idx]  # [v, c, h, w]
+        rendered_albedo = result.render_albedo[batch_idx]  # [v, c, h, w]
+        components.append(target_albedo)
+        components.append(rendered_albedo)
+    
+    # Concatenate all components horizontally
+    comparison = torch.cat(components, dim=2).detach().cpu()  # [v, c, h, total_w]
+    comparison = rearrange(comparison, "v c h w -> h (v w) c")
+    comparison = (comparison.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
     
     Image.fromarray(comparison).save(os.path.join(out_dir, "gt_vs_pred.png"))
     
