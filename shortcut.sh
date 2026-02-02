@@ -35,10 +35,10 @@ python preprocess_scripts/create_evaluation_index.py \
 
 # preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \
-  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_test_split \
-  --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_test_split \
+  --input data_samples/sample_objaverse \
+  --output data_samples/objaverse_processed_with_envmaps \
   --split test \
-  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
+  --hdri-dir data_samples/hdirs \
   --max-objects 100
 
   # preprocess objaverse with envmaps

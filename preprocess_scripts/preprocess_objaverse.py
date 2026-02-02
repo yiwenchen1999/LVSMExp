@@ -351,6 +351,82 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         print(f"Warning: No env folders found in {split_path}, skipping {object_id}")
         return
     
+    # Process albedo folder (shared across all scenes with the same object_id)
+    # First, get the number of frames from the first env folder to check if albedo is complete
+    first_env_path = os.path.join(split_path, sorted(env_folders)[0])
+    first_env_image_files = [f for f in os.listdir(first_env_path) 
+                            if f.startswith('gt_') and f.endswith('.png')]
+    first_env_image_files_with_idx = []
+    for image_file in first_env_image_files:
+        idx_str = image_file.replace('gt_', '').replace('.png', '')
+        try:
+            frame_idx = int(idx_str)
+            first_env_image_files_with_idx.append(frame_idx)
+        except ValueError:
+            continue
+    
+    num_frames = len(first_env_image_files_with_idx) if first_env_image_files_with_idx else 0
+    
+    # Check and process albedo folder
+    output_albedos_dir = os.path.join(output_root, split, 'albedos', object_id)
+    source_albedo_dir = os.path.join(split_path, 'albedo')
+    
+    should_process_albedo = False
+    if not os.path.exists(output_albedos_dir):
+        should_process_albedo = True
+        print(f"Albedo folder for {object_id} does not exist, will process")
+    elif not os.path.exists(source_albedo_dir):
+        print(f"Warning: Source albedo directory {source_albedo_dir} does not exist, skipping albedo processing")
+    else:
+        # Check if albedo folder is fully populated
+        # Get the expected number of albedo files from source directory
+        if os.path.exists(source_albedo_dir):
+            source_albedo_files = [f for f in os.listdir(source_albedo_dir) 
+                                 if f.endswith('.png') and f.startswith('albedo_cam_')]
+            expected_num_albedos = len(source_albedo_files)
+        else:
+            expected_num_albedos = num_frames
+        
+        # Check existing files in output directory (should be in 00000.png format)
+        existing_albedo_files = [f for f in os.listdir(output_albedos_dir) 
+                                 if f.endswith('.png') and len(f) == 9 and f[:5].isdigit()]
+        if len(existing_albedo_files) < expected_num_albedos:
+            should_process_albedo = True
+            print(f"Albedo folder for {object_id} is not fully populated ({len(existing_albedo_files)}/{expected_num_albedos} files), will process")
+        else:
+            print(f"Albedo folder for {object_id} already exists and is fully populated, skipping")
+    
+    # Process albedo if needed
+    if should_process_albedo and os.path.exists(source_albedo_dir):
+        os.makedirs(output_albedos_dir, exist_ok=True)
+        source_albedo_files = sorted([f for f in os.listdir(source_albedo_dir) 
+                                     if f.endswith('.png')])
+        
+        # Copy all albedo files with renamed format (albedo_cam_0.png -> 00000.png)
+        copied_count = 0
+        for albedo_file in source_albedo_files:
+            # Extract camera index from filename (e.g., albedo_cam_0.png -> 0)
+            if albedo_file.startswith('albedo_cam_'):
+                # Extract the index part
+                idx_str = albedo_file.replace('albedo_cam_', '').replace('.png', '')
+                try:
+                    cam_idx = int(idx_str)
+                    # Convert to zero-padded format (5 digits) to match images format
+                    output_albedo_name = f"{cam_idx:05d}.png"
+                    source_albedo_path = os.path.join(source_albedo_dir, albedo_file)
+                    output_albedo_path = os.path.join(output_albedos_dir, output_albedo_name)
+                    try:
+                        shutil.copy2(source_albedo_path, output_albedo_path)
+                        copied_count += 1
+                    except Exception as e:
+                        print(f"Warning: Failed to copy albedo file {albedo_file}: {e}")
+                except ValueError:
+                    print(f"Warning: Could not extract camera index from {albedo_file}, skipping")
+            else:
+                print(f"Warning: Unexpected albedo filename format: {albedo_file}, skipping")
+        
+        print(f"Processed albedo folder for {object_id}: copied {copied_count} files")
+    
     # Process each env folder as a separate scene
     processed_scene_names = []  # Track all processed scene names (including skipped ones)
     for env_folder in sorted(env_folders):
