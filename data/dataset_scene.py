@@ -329,11 +329,13 @@ class Dataset(Dataset):
                 object_id = scene_name_parts[0]
                 current_env_name = scene_name_parts[1]
             
+            # Extract base directory from scene_path (e.g., ".../train/metadata/...")
+            # This is needed for both relit images and albedo loading
+            scene_path_dir = os.path.dirname(scene_path)
+            base_dir = os.path.dirname(scene_path_dir)  # Go up from metadata to train/test
+            
             # Load relit images and environment maps only if configured
             if self.use_relit_images:
-                # Extract base directory from scene_path (e.g., ".../train/metadata/...")
-                scene_path_dir = os.path.dirname(scene_path)
-                base_dir = os.path.dirname(scene_path_dir)  # Go up from metadata to train/test
                 
                 # Find all scenes with the same object_id but different env_name
                 metadata_dir = os.path.join(base_dir, 'metadata')
