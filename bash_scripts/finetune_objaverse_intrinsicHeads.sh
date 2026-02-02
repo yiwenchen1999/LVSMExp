@@ -20,9 +20,6 @@ export XDG_CACHE_HOME=/scratch/chen.yiwe/.cache
 export XDG_CONFIG_HOME=/scratch/chen.yiwe/.config
 export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 
-cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp
-conda activate /projects/vig/yiwenc/all_env/rayzer
-
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
     train.py --config configs/LVSM_scene_encoder_decoder_wIntrinsicDecoder.yaml \
