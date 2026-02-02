@@ -33,7 +33,7 @@ training:
   checkpoint_dir: ckpt/LVSM_object_encoder_decoder_intrinsicHead
   checkpoint_every: 2000
   dataset_name: data.dataset_scene.Dataset
-  dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/train/full_list.txt
+  dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt
   grad_accum_steps: 1
   grad_checkpoint_every: 1
   grad_clip_norm: 1.0
