@@ -30,7 +30,7 @@ training:
   allowed_gradnorm_factor: 5
   center_crop: true
   scene_scale_factor: 1.35
-  checkpoint_dir: ckpt/LVSM_object_encoder_decoder_intrinsicHeads
+  checkpoint_dir: ckpt/LVSM_object_encoder_decoder_intrinsicHead
   checkpoint_every: 2000
   dataset_name: data.dataset_scene.Dataset
   dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/train/full_list.txt
