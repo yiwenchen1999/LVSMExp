@@ -60,6 +60,7 @@ training:
   target_has_input: true
   use_amp: true
   use_rel_pose: false
+  use_relit_images: false  # Whether to load/sample relit images and environment maps
   use_tf32: true
   view_selector:
     max_frame_dist: 180
