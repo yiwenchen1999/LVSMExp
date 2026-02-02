@@ -605,6 +605,7 @@ class Images2LatentScene(nn.Module):
 
     @torch.no_grad()
     def load_ckpt(self, load_path):
+        print(f"--------calling load_ckpt--------")
         if os.path.isdir(load_path):
             ckpt_names = [file_name for file_name in os.listdir(load_path) if file_name.endswith(".pt")]
             ckpt_names = sorted(ckpt_names, key=lambda x: x)
@@ -627,7 +628,7 @@ class Images2LatentScene(nn.Module):
         
         # If we need albedo decoder but it doesn't exist in checkpoint, initialize from transformer_decoder
         if self.use_albedo_decoder and not has_albedo_decoder_in_ckpt:
-            print("transformer_decoder_albedo not found in checkpoint, initializing from transformer_decoder weights")
+            print("!!!transformer_decoder_albedo not found in checkpoint, initializing from transformer_decoder weights")
             # Copy weights from transformer_decoder to transformer_decoder_albedo
             for i in range(len(self.transformer_decoder)):
                 # Copy each transformer block
