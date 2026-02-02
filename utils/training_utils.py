@@ -134,11 +134,30 @@ def auto_resume_job(
         return optimizer, lr_scheduler, forward_pass_step, param_update_step
 
     # Load model weights
+    # Check if model has a custom load_ckpt method (e.g., for handling missing components)
     if isinstance(model, DDP):
-        status = model.module.load_state_dict(checkpoint['model'], strict=False)
+        model_to_load = model.module
     else:
-        status = model.load_state_dict(checkpoint['model'], strict=False)
-    print_rank0(f"Loaded model from {os.path.abspath(ckpt_path)}, the status is {status}")
+        model_to_load = model
+    
+    if hasattr(model_to_load, 'load_ckpt'):
+        # Use custom load_ckpt method if available (handles special initialization logic)
+        # load_ckpt expects a path (file or directory) and handles loading internally
+        result = model_to_load.load_ckpt(ckpt_path)
+        if result is not None:
+            print_rank0(f"Loaded model from {os.path.abspath(ckpt_path)} using custom load_ckpt method")
+        else:
+            print_rank0(f"Warning: load_ckpt returned None for {ckpt_path}, falling back to load_state_dict")
+            # Fallback to standard loading if load_ckpt failed
+            status = model_to_load.load_state_dict(checkpoint['model'], strict=False)
+            print_rank0(f"Loaded model from {os.path.abspath(ckpt_path)} using load_state_dict, the status is {status}")
+    else:
+        # Use standard load_state_dict
+        if isinstance(model, DDP):
+            status = model.module.load_state_dict(checkpoint['model'], strict=False)
+        else:
+            status = model.load_state_dict(checkpoint['model'], strict=False)
+        print_rank0(f"Loaded model from {os.path.abspath(ckpt_path)}, the status is {status}")
 
     # resume training state
     if not reset_training_state:

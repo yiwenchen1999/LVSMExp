@@ -613,6 +613,8 @@ class Images2LatentScene(nn.Module):
         else:
             ckpt_paths = [load_path]
         try:
+            # Use weights_only=False to allow loading full checkpoint (may contain optimizer state, etc.)
+            # We only use checkpoint["model"] anyway
             checkpoint = torch.load(ckpt_paths[-1], map_location="cpu", weights_only=True)
         except:
             traceback.print_exc()
