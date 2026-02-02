@@ -30,9 +30,9 @@ training:
   allowed_gradnorm_factor: 5
   center_crop: true
   scene_scale_factor: 1.35
-  checkpoint_dir: ckpt/LVSM_object_encoder_decoder
+  checkpoint_dir: ckpt/LVSM_object_encoder_decoder_intrinsicHeads
   checkpoint_every: 2000
-  dataset_name: data.dataset_scene_og.Dataset
+  dataset_name: data.dataset_scene.Dataset
   dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format/train/full_list.txt
   grad_accum_steps: 1
   grad_checkpoint_every: 1
@@ -63,9 +63,9 @@ training:
   use_tf32: true
   view_selector:
     max_frame_dist: 180
-    min_frame_dist: 15
+    min_frame_dist: 13
   vis_every: 1000
-  wandb_exp_name: LVSM_obj_encoder_decoder_sparse
+  wandb_exp_name: LVSM_obj_encoder_decoder_intrinsicHeads
   wandb_log_every: 50
   
   wandb_project: LVSM
