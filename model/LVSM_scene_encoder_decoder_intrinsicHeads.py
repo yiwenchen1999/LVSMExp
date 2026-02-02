@@ -632,6 +632,8 @@ class Images2LatentScene(nn.Module):
         if self.use_albedo_decoder and not has_albedo_decoder_in_ckpt:
             print("!!!transformer_decoder_albedo not found in checkpoint, initializing from transformer_decoder weights")
             # Copy weights from transformer_decoder to transformer_decoder_albedo
+            # First collect all keys to copy (to avoid mutating dict during iteration)
+            keys_to_copy = {}
             for i in range(len(self.transformer_decoder)):
                 # Copy each transformer block
                 src_prefix = f"transformer_decoder.{i}."
@@ -640,7 +642,10 @@ class Images2LatentScene(nn.Module):
                 for key, value in checkpoint_state_dict.items():
                     if key.startswith(src_prefix):
                         new_key = key.replace(src_prefix, tgt_prefix)
-                        checkpoint_state_dict[new_key] = value.clone()
+                        keys_to_copy[new_key] = value.clone()
+            
+            # Now add all collected keys to the state dict
+            checkpoint_state_dict.update(keys_to_copy)
             
             # Also copy the layernorm if it exists (though we use the same one)
             # The transformer_input_layernorm_decoder is shared, so no need to copy
