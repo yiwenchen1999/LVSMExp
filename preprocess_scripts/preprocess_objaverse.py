@@ -27,6 +27,7 @@ import cv2
 import tarfile
 import stat
 import subprocess
+import gc
 try:
     import pyexr
     HAS_PYEXR = True
@@ -580,8 +581,8 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
         # Get image dimensions from first image
         first_image_path = os.path.join(env_path, image_files_with_idx[0][1])
         try:
-            img = Image.open(first_image_path)
-            image_width, image_height = img.size
+            with Image.open(first_image_path) as img:
+                image_width, image_height = img.size
         except Exception as e:
             print(f"Error reading image {first_image_path}: {e}, skipping")
             continue
@@ -864,6 +865,9 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                 create_tar_from_directory(env_path, env_tar_path)
                 # Delete original folder after successful compression
                 try:
+                    # Force garbage collection to close any lingering file handles
+                    gc.collect()
+                    
                     # Use ignore_errors to handle any remaining files
                     shutil.rmtree(env_path, ignore_errors=True)
                     # If directory still exists, try to remove it again with force
@@ -921,6 +925,9 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             create_tar_from_directory(source_albedo_dir, albedo_tar_path)
             # Delete original folder after successful compression
             try:
+                # Force garbage collection to close any lingering file handles
+                gc.collect()
+                
                 # Use ignore_errors to handle any remaining files
                 shutil.rmtree(source_albedo_dir, ignore_errors=True)
                 # If directory still exists, try to remove it again with force
