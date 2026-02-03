@@ -778,6 +778,37 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             envmaps_tar_path = os.path.join(output_tar_root, split, 'envmaps', f"{scene_name}.tar")
             if not os.path.exists(envmaps_tar_path):
                 create_tar_from_directory(output_envmaps_dir, envmaps_tar_path)
+            
+            # Create metadata JSON for location B with updated image paths
+            output_metadata_dir_b = os.path.join(output_tar_root, split, 'metadata')
+            os.makedirs(output_metadata_dir_b, exist_ok=True)
+            output_json_path_b = os.path.join(output_metadata_dir_b, f"{scene_name}.json")
+            
+            # Create a copy of scene_data with updated image paths pointing to location B
+            scene_data_b = {
+                "scene_name": scene_name,
+                "frames": []
+            }
+            
+            # Get absolute path for images tar file
+            images_tar_abs_path = os.path.abspath(images_tar_path)
+            
+            # Update image paths in frames to point to location B (tar file path + internal path)
+            for frame in frames:
+                frame_b = frame.copy()
+                # Extract the frame filename from the original image_path
+                original_image_path = frame['image_path']
+                frame_filename = os.path.basename(original_image_path)
+                # Create path pointing to tar file with internal path
+                # The tar file contains files directly (not in a subdirectory), so internal path is just the filename
+                # Format: {tar_absolute_path}::{internal_path}
+                frame_b['image_path'] = f"{images_tar_abs_path}::{frame_filename}"
+                scene_data_b['frames'].append(frame_b)
+            
+            # Save metadata JSON for location B
+            with open(output_json_path_b, 'w') as f:
+                json.dump(scene_data_b, f, indent=2)
+            print(f"Created metadata JSON for location B: {output_json_path_b}")
         
         # Compress and delete original env folder after processing
         if os.path.exists(env_path) and os.path.isdir(env_path):
@@ -946,6 +977,39 @@ def main():
                         os.makedirs(os.path.dirname(metadata_json), exist_ok=True)
                         with open(metadata_json, 'w') as f:
                             json.dump(scene_data, f, indent=2)
+                    
+                    # Ensure metadata JSON exists in location B with updated paths
+                    if output_tar_root:
+                        metadata_json_b = os.path.join(output_tar_root, args.split, 'metadata', f"{scene_name}.json")
+                        if not os.path.exists(metadata_json_b):
+                            # Load metadata from location A if it exists
+                            if os.path.exists(metadata_json):
+                                with open(metadata_json, 'r') as f:
+                                    scene_data_a = json.load(f)
+                            else:
+                                scene_data_a = {"scene_name": scene_name, "frames": []}
+                            
+                            # Create metadata for location B with updated image paths
+                            images_tar_path = os.path.join(output_tar_root, args.split, 'images', f"{scene_name}.tar")
+                            images_tar_abs_path = os.path.abspath(images_tar_path)
+                            
+                            scene_data_b = {
+                                "scene_name": scene_name,
+                                "frames": []
+                            }
+                            
+                            for frame in scene_data_a.get('frames', []):
+                                frame_b = frame.copy()
+                                original_image_path = frame.get('image_path', '')
+                                frame_filename = os.path.basename(original_image_path)
+                                # Update path to point to location B tar file
+                                frame_b['image_path'] = f"{images_tar_abs_path}::{frame_filename}"
+                                scene_data_b['frames'].append(frame_b)
+                            
+                            os.makedirs(os.path.dirname(metadata_json_b), exist_ok=True)
+                            with open(metadata_json_b, 'w') as f:
+                                json.dump(scene_data_b, f, indent=2)
+                            print(f"Created metadata JSON for location B: {metadata_json_b}")
         
         try:
             result = process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root,
@@ -991,13 +1055,9 @@ def main():
     
     # Also create full_list.txt in location B if it exists
     if output_tar_root:
-        # Copy full_list.txt to location B
-        source_full_list = os.path.join(output_root, args.split, 'full_list.txt')
-        target_full_list = os.path.join(output_tar_root, args.split, 'full_list.txt')
-        if os.path.exists(source_full_list):
-            os.makedirs(os.path.dirname(target_full_list), exist_ok=True)
-            shutil.copy2(source_full_list, target_full_list)
-            print(f"Copied full_list.txt to {target_full_list}")
+        # Create full_list.txt for location B pointing to location B's metadata JSON files
+        create_full_list(output_tar_root, split=args.split, broken_scenes=broken_scenes)
+        print(f"Created full_list.txt for location B")
     
     # Save broken scenes list to a file
     if broken_scenes:
