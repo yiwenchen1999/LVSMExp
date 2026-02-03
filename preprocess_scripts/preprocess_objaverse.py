@@ -25,6 +25,7 @@ import torch
 import torch.nn.functional as F
 import cv2
 import tarfile
+import stat
 try:
     import pyexr
     HAS_PYEXR = True
@@ -817,8 +818,24 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                 print(f"Compressing original env folder: {env_folder}")
                 create_tar_from_directory(env_path, env_tar_path)
                 # Delete original folder after successful compression
-                shutil.rmtree(env_path)
-                print(f"Deleted original folder: {env_path}")
+                try:
+                    # Use ignore_errors to handle any remaining files
+                    shutil.rmtree(env_path, ignore_errors=True)
+                    # If directory still exists, try to remove it again with force
+                    if os.path.exists(env_path):
+                        # Remove read-only flags and try again
+                        for root, dirs, files in os.walk(env_path):
+                            for d in dirs:
+                                os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                            for f in files:
+                                os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                        shutil.rmtree(env_path, ignore_errors=True)
+                    if not os.path.exists(env_path):
+                        print(f"Deleted original folder: {env_path}")
+                    else:
+                        print(f"Warning: Could not fully delete {env_path}, but tar file was created successfully")
+                except Exception as e:
+                    print(f"Warning: Error deleting {env_path}: {e}, but tar file was created successfully")
     
     # Create tar for albedos folder (shared across all scenes with same object_id)
     # Only create once after processing all scenes for this object
@@ -834,8 +851,24 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             print(f"Compressing original albedo folder")
             create_tar_from_directory(source_albedo_dir, albedo_tar_path)
             # Delete original folder after successful compression
-            shutil.rmtree(source_albedo_dir)
-            print(f"Deleted original albedo folder: {source_albedo_dir}")
+            try:
+                # Use ignore_errors to handle any remaining files
+                shutil.rmtree(source_albedo_dir, ignore_errors=True)
+                # If directory still exists, try to remove it again with force
+                if os.path.exists(source_albedo_dir):
+                    # Remove read-only flags and try again
+                    for root, dirs, files in os.walk(source_albedo_dir):
+                        for d in dirs:
+                            os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                        for f in files:
+                            os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                    shutil.rmtree(source_albedo_dir, ignore_errors=True)
+                if not os.path.exists(source_albedo_dir):
+                    print(f"Deleted original albedo folder: {source_albedo_dir}")
+                else:
+                    print(f"Warning: Could not fully delete {source_albedo_dir}, but tar file was created successfully")
+            except Exception as e:
+                print(f"Warning: Error deleting {source_albedo_dir}: {e}, but tar file was created successfully")
     
     # Return list of all processed scene names (including skipped ones)
     # If no scenes were processed, return None
