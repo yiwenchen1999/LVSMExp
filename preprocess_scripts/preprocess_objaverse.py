@@ -26,6 +26,7 @@ import torch.nn.functional as F
 import cv2
 import tarfile
 import stat
+import subprocess
 try:
     import pyexr
     HAS_PYEXR = True
@@ -321,6 +322,26 @@ def create_tar_from_directory(source_dir, tar_path):
     if not os.path.exists(source_dir):
         print(f"Warning: Source directory {source_dir} does not exist, skipping tar creation")
         return
+    
+    # Check if there's a directory with the same name as the tar file (without .tar extension)
+    # If it exists and is empty or only contains the same files, remove it
+    tar_dir_name = tar_path.replace('.tar', '')
+    if os.path.exists(tar_dir_name) and os.path.isdir(tar_dir_name):
+        # Check if directory is empty or contains only the same files
+        try:
+            dir_contents = os.listdir(tar_dir_name)
+            if len(dir_contents) == 0:
+                # Empty directory, remove it
+                print(f"Removing empty directory: {tar_dir_name}")
+                try:
+                    shutil.rmtree(tar_dir_name, ignore_errors=True)
+                    if os.path.exists(tar_dir_name):
+                        # Try using rm -rf if shutil fails
+                        subprocess.run(['rm', '-rf', tar_dir_name], check=False)
+                except Exception as e:
+                    print(f"Warning: Could not remove directory {tar_dir_name}: {e}")
+        except Exception as e:
+            print(f"Warning: Could not check directory contents {tar_dir_name}: {e}")
     
     os.makedirs(os.path.dirname(tar_path), exist_ok=True)
     with tarfile.open(tar_path, 'w') as tar:
@@ -772,11 +793,35 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
         if output_tar_root is not None and not skip_file_processing:
             # Create tar for images folder
             images_tar_path = os.path.join(output_tar_root, split, 'images', f"{scene_name}.tar")
+            images_tar_dir = images_tar_path.replace('.tar', '')
+            # Check if there's an empty directory with the same name (without .tar)
+            if os.path.exists(images_tar_dir) and os.path.isdir(images_tar_dir):
+                try:
+                    if len(os.listdir(images_tar_dir)) == 0:
+                        # Empty directory, remove it
+                        print(f"Removing empty directory: {images_tar_dir}")
+                        shutil.rmtree(images_tar_dir, ignore_errors=True)
+                        if os.path.exists(images_tar_dir):
+                            subprocess.run(['rm', '-rf', images_tar_dir], check=False)
+                except Exception:
+                    pass
             if not os.path.exists(images_tar_path):
                 create_tar_from_directory(output_images_dir, images_tar_path)
             
             # Create tar for envmaps folder
             envmaps_tar_path = os.path.join(output_tar_root, split, 'envmaps', f"{scene_name}.tar")
+            envmaps_tar_dir = envmaps_tar_path.replace('.tar', '')
+            # Check if there's an empty directory with the same name (without .tar)
+            if os.path.exists(envmaps_tar_dir) and os.path.isdir(envmaps_tar_dir):
+                try:
+                    if len(os.listdir(envmaps_tar_dir)) == 0:
+                        # Empty directory, remove it
+                        print(f"Removing empty directory: {envmaps_tar_dir}")
+                        shutil.rmtree(envmaps_tar_dir, ignore_errors=True)
+                        if os.path.exists(envmaps_tar_dir):
+                            subprocess.run(['rm', '-rf', envmaps_tar_dir], check=False)
+                except Exception:
+                    pass
             if not os.path.exists(envmaps_tar_path):
                 create_tar_from_directory(output_envmaps_dir, envmaps_tar_path)
             
@@ -830,17 +875,41 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                             for f in files:
                                 os.chmod(os.path.join(root, f), stat.S_IRWXU)
                         shutil.rmtree(env_path, ignore_errors=True)
+                    # If still exists, try using rm -rf command
+                    if os.path.exists(env_path):
+                        print(f"Trying rm -rf to delete {env_path}")
+                        subprocess.run(['rm', '-rf', env_path], check=False)
                     if not os.path.exists(env_path):
                         print(f"Deleted original folder: {env_path}")
                     else:
                         print(f"Warning: Could not fully delete {env_path}, but tar file was created successfully")
                 except Exception as e:
-                    print(f"Warning: Error deleting {env_path}: {e}, but tar file was created successfully")
+                    print(f"Warning: Error deleting {env_path}: {e}, trying rm -rf")
+                    try:
+                        subprocess.run(['rm', '-rf', env_path], check=False)
+                        if not os.path.exists(env_path):
+                            print(f"Deleted original folder using rm -rf: {env_path}")
+                        else:
+                            print(f"Warning: Could not delete {env_path} even with rm -rf, but tar file was created successfully")
+                    except Exception as e2:
+                        print(f"Warning: Error with rm -rf {env_path}: {e2}, but tar file was created successfully")
     
     # Create tar for albedos folder (shared across all scenes with same object_id)
     # Only create once after processing all scenes for this object
     if output_tar_root is not None and output_albedos_dir and os.path.exists(output_albedos_dir):
         albedos_tar_path = os.path.join(output_tar_root, split, 'albedos', f"{object_id}.tar")
+        albedos_tar_dir = albedos_tar_path.replace('.tar', '')
+        # Check if there's an empty directory with the same name (without .tar)
+        if os.path.exists(albedos_tar_dir) and os.path.isdir(albedos_tar_dir):
+            try:
+                if len(os.listdir(albedos_tar_dir)) == 0:
+                    # Empty directory, remove it
+                    print(f"Removing empty directory: {albedos_tar_dir}")
+                    shutil.rmtree(albedos_tar_dir, ignore_errors=True)
+                    if os.path.exists(albedos_tar_dir):
+                        subprocess.run(['rm', '-rf', albedos_tar_dir], check=False)
+            except Exception:
+                pass
         if not os.path.exists(albedos_tar_path):
             create_tar_from_directory(output_albedos_dir, albedos_tar_path)
     
@@ -863,12 +932,24 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                         for f in files:
                             os.chmod(os.path.join(root, f), stat.S_IRWXU)
                     shutil.rmtree(source_albedo_dir, ignore_errors=True)
+                # If still exists, try using rm -rf command
+                if os.path.exists(source_albedo_dir):
+                    print(f"Trying rm -rf to delete {source_albedo_dir}")
+                    subprocess.run(['rm', '-rf', source_albedo_dir], check=False)
                 if not os.path.exists(source_albedo_dir):
                     print(f"Deleted original albedo folder: {source_albedo_dir}")
                 else:
                     print(f"Warning: Could not fully delete {source_albedo_dir}, but tar file was created successfully")
             except Exception as e:
-                print(f"Warning: Error deleting {source_albedo_dir}: {e}, but tar file was created successfully")
+                print(f"Warning: Error deleting {source_albedo_dir}: {e}, trying rm -rf")
+                try:
+                    subprocess.run(['rm', '-rf', source_albedo_dir], check=False)
+                    if not os.path.exists(source_albedo_dir):
+                        print(f"Deleted original albedo folder using rm -rf: {source_albedo_dir}")
+                    else:
+                        print(f"Warning: Could not delete {source_albedo_dir} even with rm -rf, but tar file was created successfully")
+                except Exception as e2:
+                    print(f"Warning: Error with rm -rf {source_albedo_dir}: {e2}, but tar file was created successfully")
     
     # Return list of all processed scene names (including skipped ones)
     # If no scenes were processed, return None
