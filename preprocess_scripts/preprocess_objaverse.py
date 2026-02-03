@@ -24,6 +24,7 @@ import shutil
 import torch
 import torch.nn.functional as F
 import cv2
+import tarfile
 try:
     import pyexr
     HAS_PYEXR = True
@@ -307,7 +308,68 @@ def rotate_and_preprocess_envir_map(envir_map, camera_pose, euler_rotation=None,
         return None, None, None
 
 
-def process_objaverse_scene(objaverse_root, object_id, output_root, split='test', hdri_dir=None):
+def create_tar_from_directory(source_dir, tar_path):
+    """
+    Create a tar archive from a directory.
+    The tar file will contain all files from the directory, preserving the directory structure.
+    
+    Args:
+        source_dir: Source directory to compress
+        tar_path: Path to the output tar file
+    """
+    if not os.path.exists(source_dir):
+        print(f"Warning: Source directory {source_dir} does not exist, skipping tar creation")
+        return
+    
+    os.makedirs(os.path.dirname(tar_path), exist_ok=True)
+    with tarfile.open(tar_path, 'w') as tar:
+        # Add all files in the directory, preserving relative paths
+        for root, dirs, files in os.walk(source_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Get relative path from source_dir
+                arcname = os.path.relpath(file_path, source_dir)
+                tar.add(file_path, arcname=arcname)
+    print(f"Created tar archive: {tar_path}")
+
+
+def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split):
+    """
+    Check if a scene already exists in both output locations (A and B).
+    
+    Args:
+        scene_name: Scene name to check
+        output_root: Location A (uncompressed)
+        output_tar_root: Location B (compressed, can be None)
+        split: 'train' or 'test'
+        
+    Returns:
+        bool: True if scene exists in both locations (or only location A if output_tar_root is None), False otherwise
+    """
+    # Check location A: metadata JSON file should exist
+    metadata_json = os.path.join(output_root, split, 'metadata', f"{scene_name}.json")
+    exists_in_a = os.path.exists(metadata_json)
+    
+    # If output_tar_root is None, only check location A
+    if output_tar_root is None:
+        return exists_in_a
+    
+    # Check location B: tar files should exist in images, envmaps, and albedos folders
+    images_tar = os.path.join(output_tar_root, split, 'images', f"{scene_name}.tar")
+    envmaps_tar = os.path.join(output_tar_root, split, 'envmaps', f"{scene_name}.tar")
+    
+    # For albedos, we need to check if the object_id tar exists
+    object_id = scene_name.split('_')[0]  # Extract object_id from scene_name
+    albedos_tar = os.path.join(output_tar_root, split, 'albedos', f"{object_id}.tar")
+    
+    exists_in_b = (os.path.exists(images_tar) and 
+                   os.path.exists(envmaps_tar) and 
+                   os.path.exists(albedos_tar))
+    
+    return exists_in_a and exists_in_b
+
+
+def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root, split='test', hdri_dir=None):
     """
     Process a single Objaverse object and convert all env scenes to re10k format.
     
@@ -343,13 +405,33 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         cameras_data = json.load(f)
     
     # Find all env folders (env_0, env_1, ..., env_4, white_env_0, etc.)
-    env_folders = [d for d in os.listdir(split_path) 
-                   if os.path.isdir(os.path.join(split_path, d)) 
-                   and (d.startswith('env_') or d.startswith('white_env_'))]
+    # Only process directory folders (not tar files, as those indicate already processed scenes)
+    env_folders = []
+    env_tar_files = []
+    
+    for item in os.listdir(split_path):
+        item_path = os.path.join(split_path, item)
+        if os.path.isdir(item_path) and (item.startswith('env_') or item.startswith('white_env_')):
+            env_folders.append(item)
+        elif item.endswith('.tar') and (item.startswith('env_') or item.startswith('white_env_')):
+            # Extract folder name from tar filename (e.g., env_0.tar -> env_0)
+            env_folder_name = item.replace('.tar', '')
+            env_tar_files.append(env_folder_name)
     
     if not env_folders:
+        # All folders are already compressed
+        if env_tar_files:
+            print(f"All env folders for {object_id} are already compressed")
+            # Check if scenes from tar files are already in outputs, if so, return their names
+            scene_names_from_tar = []
+            for env_folder_name in env_tar_files:
+                scene_name = f"{object_id}_{env_folder_name}"
+                if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split):
+                    scene_names_from_tar.append(scene_name)
+            if scene_names_from_tar:
+                return scene_names_from_tar
         print(f"Warning: No env folders found in {split_path}, skipping {object_id}")
-        return
+        return None
     
     # Process albedo folder (shared across all scenes with the same object_id)
     # First, get the number of frames from the first env folder to check if albedo is complete
@@ -370,11 +452,28 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
     # Check and process albedo folder
     output_albedos_dir = os.path.join(output_root, split, 'albedos', object_id)
     source_albedo_dir = os.path.join(split_path, 'albedo')
+    source_albedo_tar = os.path.join(split_path, 'albedo.tar')
+    
+    # Check if source is a tar file (already compressed)
+    source_is_tar = os.path.exists(source_albedo_tar) and not os.path.exists(source_albedo_dir)
     
     should_process_albedo = False
     if not os.path.exists(output_albedos_dir):
-        should_process_albedo = True
-        print(f"Albedo folder for {object_id} does not exist, will process")
+        if source_is_tar:
+            # If source is tar and output doesn't exist, check if tar exists in output_tar_root
+            if output_tar_root:
+                albedos_tar_path = os.path.join(output_tar_root, split, 'albedos', f"{object_id}.tar")
+                if os.path.exists(albedos_tar_path):
+                    print(f"Albedo tar for {object_id} already exists in location B, skipping")
+                else:
+                    print(f"Warning: Source albedo is tar but output doesn't exist, need to extract first")
+            else:
+                print(f"Warning: Source albedo is tar but no output_tar_root specified")
+        else:
+            should_process_albedo = True
+            print(f"Albedo folder for {object_id} does not exist, will process")
+    elif source_is_tar:
+        print(f"Source albedo is already compressed as tar, output exists, skipping albedo processing")
     elif not os.path.exists(source_albedo_dir):
         print(f"Warning: Source albedo directory {source_albedo_dir} does not exist, skipping albedo processing")
     else:
@@ -667,6 +766,45 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         else:
             print(f"Processed {scene_name}: {len(frames)} frames")
         processed_scene_names.append(scene_name)  # Add to processed list
+        
+        # Create tar archives for location B after processing each scene
+        if output_tar_root is not None and not skip_file_processing:
+            # Create tar for images folder
+            images_tar_path = os.path.join(output_tar_root, split, 'images', f"{scene_name}.tar")
+            if not os.path.exists(images_tar_path):
+                create_tar_from_directory(output_images_dir, images_tar_path)
+            
+            # Create tar for envmaps folder
+            envmaps_tar_path = os.path.join(output_tar_root, split, 'envmaps', f"{scene_name}.tar")
+            if not os.path.exists(envmaps_tar_path):
+                create_tar_from_directory(output_envmaps_dir, envmaps_tar_path)
+        
+        # Compress and delete original env folder after processing
+        if os.path.exists(env_path) and os.path.isdir(env_path):
+            env_tar_path = os.path.join(split_path, f"{env_folder}.tar")
+            if not os.path.exists(env_tar_path):
+                print(f"Compressing original env folder: {env_folder}")
+                create_tar_from_directory(env_path, env_tar_path)
+                # Delete original folder after successful compression
+                shutil.rmtree(env_path)
+                print(f"Deleted original folder: {env_path}")
+    
+    # Create tar for albedos folder (shared across all scenes with same object_id)
+    # Only create once after processing all scenes for this object
+    if output_tar_root is not None and output_albedos_dir and os.path.exists(output_albedos_dir):
+        albedos_tar_path = os.path.join(output_tar_root, split, 'albedos', f"{object_id}.tar")
+        if not os.path.exists(albedos_tar_path):
+            create_tar_from_directory(output_albedos_dir, albedos_tar_path)
+    
+    # Compress and delete albedo folder after processing all scenes
+    if os.path.exists(source_albedo_dir) and os.path.isdir(source_albedo_dir):
+        albedo_tar_path = os.path.join(split_path, 'albedo.tar')
+        if not os.path.exists(albedo_tar_path):
+            print(f"Compressing original albedo folder")
+            create_tar_from_directory(source_albedo_dir, albedo_tar_path)
+            # Delete original folder after successful compression
+            shutil.rmtree(source_albedo_dir)
+            print(f"Deleted original albedo folder: {source_albedo_dir}")
     
     # Return list of all processed scene names (including skipped ones)
     # If no scenes were processed, return None
@@ -718,6 +856,8 @@ def main():
                        help='Input directory containing objaverse data (e.g., data_samples/sample_objaverse)')
     parser.add_argument('--output', '-o', required=True,
                        help='Output directory for processed data (e.g., data_samples/objaverse_processed)')
+    parser.add_argument('--output-tar', type=str, default=None,
+                       help='Output directory for tar archives (location B). If None, tar archiving is skipped.')
     parser.add_argument('--split', '-s', default='test', choices=['train', 'test'],
                        help='Split to process (default: test)')
     parser.add_argument('--object-id', type=str, default=None,
@@ -733,6 +873,7 @@ def main():
     
     objaverse_root = args.input
     output_root = args.output
+    output_tar_root = args.output_tar
     
     if not os.path.exists(objaverse_root):
         print(f"Error: Input directory {objaverse_root} does not exist")
@@ -744,6 +885,17 @@ def main():
     else:
         object_ids = [d for d in os.listdir(objaverse_root) 
                      if os.path.isdir(os.path.join(objaverse_root, d))]
+    
+    # Filter out objects without done.txt
+    filtered_object_ids = []
+    for object_id in object_ids:
+        object_path = os.path.join(objaverse_root, object_id)
+        done_file = os.path.join(object_path, 'done.txt')
+        if not os.path.exists(done_file):
+            print(f"Skipping {object_id}: done.txt not found")
+            continue
+        filtered_object_ids.append(object_id)
+    object_ids = filtered_object_ids
     
     # Apply test run or max objects limit
     original_count = len(object_ids)
@@ -760,11 +912,43 @@ def main():
     broken_scenes = []
     processed_scenes = []
     skipped_scenes = []  # Scenes that were skipped because files already exist
+    scenes_from_tar = []  # Scenes found in existing tar files
     
     for object_id in sorted(object_ids):
         print(f"\nProcessing object: {object_id}")
+        object_path = os.path.join(objaverse_root, object_id)
+        split_path = os.path.join(object_path, args.split)
+        
+        # Check for existing tar files in the input directory
+        if os.path.exists(split_path):
+            # Find tar files for env folders
+            tar_files = [f for f in os.listdir(split_path) 
+                        if f.endswith('.tar') and (f.startswith('env_') or f.startswith('white_env_'))]
+            
+            # For each tar file, check if corresponding scene exists in both output locations
+            for tar_file in tar_files:
+                # Extract env folder name from tar filename (e.g., env_0.tar -> env_0)
+                env_folder = tar_file.replace('.tar', '')
+                scene_name = f"{object_id}_{env_folder}"
+                
+                # Check if scene exists in both locations (or just location A if output_tar_root is None)
+                if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, args.split):
+                    if output_tar_root:
+                        print(f"Scene {scene_name} already exists in both locations, adding to full_list")
+                    else:
+                        print(f"Scene {scene_name} already exists in location A, adding to full_list")
+                    scenes_from_tar.append(scene_name)
+                    # Ensure metadata JSON exists in location A
+                    metadata_json = os.path.join(output_root, args.split, 'metadata', f"{scene_name}.json")
+                    if not os.path.exists(metadata_json):
+                        # Create a minimal JSON file if it doesn't exist
+                        scene_data = {"scene_name": scene_name, "frames": []}
+                        os.makedirs(os.path.dirname(metadata_json), exist_ok=True)
+                        with open(metadata_json, 'w') as f:
+                            json.dump(scene_data, f, indent=2)
+        
         try:
-            result = process_objaverse_scene(objaverse_root, object_id, output_root, 
+            result = process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root,
                                             split=args.split, hdri_dir=args.hdri_dir)
             if result == "broken":
                 # Find all scenes for this object and mark them as broken
@@ -797,10 +981,23 @@ def main():
             import traceback
             traceback.print_exc()
     
+    # Add scenes from tar files to processed_scenes
+    processed_scenes.extend(scenes_from_tar)
+    
     # Create full_list.txt (excluding broken scenes)
     # Note: Skipped scenes are already in the metadata directory, so they will be included automatically
     print(f"\nCreating full_list.txt for {args.split} split...")
     create_full_list(output_root, split=args.split, broken_scenes=broken_scenes)
+    
+    # Also create full_list.txt in location B if it exists
+    if output_tar_root:
+        # Copy full_list.txt to location B
+        source_full_list = os.path.join(output_root, args.split, 'full_list.txt')
+        target_full_list = os.path.join(output_tar_root, args.split, 'full_list.txt')
+        if os.path.exists(source_full_list):
+            os.makedirs(os.path.dirname(target_full_list), exist_ok=True)
+            shutil.copy2(source_full_list, target_full_list)
+            print(f"Copied full_list.txt to {target_full_list}")
     
     # Save broken scenes list to a file
     if broken_scenes:

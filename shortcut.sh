@@ -37,6 +37,7 @@ python preprocess_scripts/create_evaluation_index.py \
 python preprocess_scripts/preprocess_objaverse.py \
   --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
   --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
+  --output-tar /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_tar \
   --split test \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs 
 
@@ -44,8 +45,9 @@ python preprocess_scripts/preprocess_objaverse.py \
 python preprocess_scripts/preprocess_objaverse.py \
   --input data_samples/sample_objaverse \
   --output data_samples/objaverse_processed_with_envmaps \
+  --output-tar data_samples/objaverse_processed_with_envmaps_tar \
   --split test \
-  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
+  --hdri-dir data_samples/hdirs \
   --max-objects 10
 
 # preview the scenes:

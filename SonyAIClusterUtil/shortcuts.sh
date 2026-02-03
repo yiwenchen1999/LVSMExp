@@ -5,10 +5,12 @@ cd /music-shared-disk/group/ct/yiwen/codes/FLUX_finetune
 # cd to the data root
 
 # sync data directly from neu to sony
+# Note: This will resume partial transfers and skip already-transferred files
+cd /music-shared-disk/group/ct/yiwen/data/objaverse
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
-  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/LVSM_scene_encoder_decoder \
-  .
+  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/ \
+  lvsm_with_envmaps/
 
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=1
