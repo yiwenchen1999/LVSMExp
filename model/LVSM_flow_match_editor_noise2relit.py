@@ -435,6 +435,9 @@ class FlowMatchEditor(LatentSceneEditor):
             t_expand_for_pred = t.view(-1, 1, 1)
             z_B_pred = z_t + (1.0 - t_expand_for_pred) * pred_velocity
             
+            # Scale back to original space before rendering (renderer expects unscaled latents)
+            z_B_pred = z_B_pred / latent_scale
+            
             # Render z_B_pred
             rendered_images = self.renderer(z_B_pred, target, n_patches, d)
             
@@ -504,6 +507,9 @@ class FlowMatchEditor(LatentSceneEditor):
         # Use provided input/target or process from batch
         if input is None or target is None:
             input, target = self.process_data(data_batch, has_target_image=False, target_has_input=self.config.training.target_has_input, compute_rays=True)
+        
+        # Apply same latent scaling as in training
+        latent_scale = 0.136
             
         # During inference, we need to avoid gradient checkpointing to prevent DDP issues
         # Temporarily store original checkpoint setting and disable it
@@ -511,8 +517,10 @@ class FlowMatchEditor(LatentSceneEditor):
         self.config.training.grad_checkpoint_every = 999999  # Effectively disable checkpointing
         try:
             z_A, n_patches, d = self.reconstructor(input) 
-            # Start at random noise scaled by EMA
-            z = torch.randn_like(z_A)
+            # Scale z_A to match training
+            z_A = z_A * latent_scale
+            # Start at random noise (standard Gaussian, will be in scaled space after interpolation)
+            z = torch.randn_like(z_A)  # Standard Gaussian noise
         finally:
             # Restore original setting
             self.config.training.grad_checkpoint_every = original_checkpoint_every
@@ -584,6 +592,9 @@ class FlowMatchEditor(LatentSceneEditor):
                 
                 z = z + 0.5 * dt * (v_pred + v_pred_next)
 
+        # Scale back to original space before rendering (renderer expects unscaled latents)
+        z = z / latent_scale
+        
         # Render final z
         rendered_images = self.renderer(z, target, n_patches, d)
         
