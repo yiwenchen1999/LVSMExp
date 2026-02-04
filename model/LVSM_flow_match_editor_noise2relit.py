@@ -319,14 +319,14 @@ class FlowMatchEditor(LatentSceneEditor):
         # z_t = (1 - t) * z_0 + t * z_B
         
         # Update EMA of noise scale using z_B (target distribution)
-        if self.training:
-            with torch.no_grad():
-                current_scale = z_B.std()
-                ema_momentum = 0.99
-                self.noise_scale_ema.mul_(ema_momentum).add_(current_scale * (1 - ema_momentum))
+        # if self.training:
+        #     with torch.no_grad():
+        #         current_scale = z_B.std()
+        #         ema_momentum = 0.99
+        #         self.noise_scale_ema.mul_(ema_momentum).add_(current_scale * (1 - ema_momentum))
         
         # Sample z_0 from Gaussian Noise scaled by EMA
-        z_0 = torch.randn_like(z_A) * self.noise_scale_ema
+        z_0 = torch.randn_like(z_A)
         
         # Target z_1 is z_B
         z_1 = z_B
@@ -503,7 +503,7 @@ class FlowMatchEditor(LatentSceneEditor):
         try:
             z_A, n_patches, d = self.reconstructor(input) 
             # Start at random noise scaled by EMA
-            z = torch.randn_like(z_A) * self.noise_scale_ema
+            z = torch.randn_like(z_A)
         finally:
             # Restore original setting
             self.config.training.grad_checkpoint_every = original_checkpoint_every
