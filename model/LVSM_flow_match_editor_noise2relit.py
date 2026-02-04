@@ -324,12 +324,15 @@ class FlowMatchEditor(LatentSceneEditor):
         #         current_scale = z_B.std()
         #         ema_momentum = 0.99
         #         self.noise_scale_ema.mul_(ema_momentum).add_(current_scale * (1 - ema_momentum))
-        
-        # Sample z_0 from Gaussian Noise scaled by EMA
-        z_0 = torch.randn_like(z_A)
-        
-        # Target z_1 is z_B
-        z_1 = z_B
+        latent_scale = 0.136 
+
+        # Scale your inputs and targets
+        z_A = z_A * latent_scale
+        z_B = z_B.detach() * latent_scale
+
+        # Use Standard Gaussian Noise
+        z_0 = torch.randn_like(z_A) # Mean 0, Std 1
+        z_1 = z_B 
         
         # Broadcast t for interpolation
         t_expand = t.view(-1, 1, 1)
