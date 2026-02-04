@@ -336,7 +336,10 @@ class FlowMatchEditor(LatentSceneEditor):
         
         # Interpolate z_t
         z_t = (1 - t_expand) * z_0 + t_expand * z_1
-                
+        # Add this check in forward:
+        print(f"--- Latent Statistics ---")
+        print(f"z_A (Source) | Mean: {z_A.mean().item():.4f} | Std: {z_A.std().item():.4f} | Max: {z_A.max().item():.4f}")
+        print(f"z_B (Target) | Mean: {z_B.mean().item():.4f} | Std: {z_B.std().item():.4f} | Max: {z_B.max().item():.4f}")                
         #& Step 6: Prepare Env Conditioning
         # Process environment maps (LDR, HDR, Dir)
         
@@ -409,6 +412,9 @@ class FlowMatchEditor(LatentSceneEditor):
         # print("rms pred_v", rms(pred_velocity))
 
         loss_flow = F.mse_loss(pred_velocity, target_velocity)
+        target_v_norm = target_velocity.norm(p=2, dim=-1).mean().item()
+        pred_v_norm = pred_velocity.norm(p=2, dim=-1).mean().item()
+        print(f"Target V Norm: {target_v_norm:.4f} | Pred V Norm: {pred_v_norm:.4f}")
         
         # Initialize loss metrics with flow loss
         loss_metrics = edict({'flow_loss': loss_flow})
