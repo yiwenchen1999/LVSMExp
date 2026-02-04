@@ -10,7 +10,8 @@
 
 
 python preprocess_scripts/preprocess_objaverse.py \
-  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
-  --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
+  --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense_lightPlus \
+  --output /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse \
+  --output-tar /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsmPlus_objaverse_tar \
   --split test \
   --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs 
