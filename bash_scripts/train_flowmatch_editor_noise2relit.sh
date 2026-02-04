@@ -34,7 +34,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.dataset_path = data_samples/objaverse_processed_with_envmaps/test/full_list.txt \
     training.warmup = 3000 \
     training.vis_every = 1000 \
-    training.lr = 0.0001 \
+    training.lr = 0.00001 \
     training.single_env_map = true \
     training.skip_renderer = true \
     training.flow_match.noise_scale = 0.0
