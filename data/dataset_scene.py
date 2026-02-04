@@ -571,7 +571,8 @@ class Dataset(Dataset):
                 result_dict["relit_images"] = relit_images
                 result_dict["env_ldr"] = env_ldr
                 result_dict["env_hdr"] = env_hdr
-            result_dict["albedos"] = albedos
+            if self.use_albedos:
+                result_dict["albedos"] = albedos
             
             return result_dict
         except (ValueError, IndexError, KeyError, FileNotFoundError, RuntimeError, 
