@@ -66,6 +66,9 @@ class Dataset(Dataset):
         
         # Check if we should load albedo images
         self.use_albedos = self.config.training.get("use_albedos", False)
+        
+        # Check if we should use white_env_0 scene images as albedo instead of loading from albedos folder
+        self.white_env_as_albedo = self.config.training.get("white_env_as_albedo", False)
 
 
     def __len__(self):
@@ -474,80 +477,121 @@ class Dataset(Dataset):
                 env_ldr = None
                 env_hdr = None
 
-            # Load albedo images from albedos folder (shared across all scenes with same object_id)
+            # Load albedo images
             # Only load if configured to do so
             if self.use_albedos:
-                albedos_dir = os.path.join(base_dir, 'albedos', object_id)
-                if os.path.exists(albedos_dir):
-                    albedo_list = []
-                    for ic in image_indices:
-                        albedo_path = os.path.join(albedos_dir, f"{ic:05d}.png")
-                        
-                        if not os.path.exists(albedo_path):
-                            error_msg = f"Albedo file not found: {albedo_path}"
-                            print(f"Error: {error_msg}")
-                            raise FileNotFoundError(error_msg)
-                        
-                        try:
-                            albedo_img = PIL.Image.open(albedo_path)
-                            albedo_img.load()
-                            
-                            # Apply same preprocessing as input images (resize, crop, etc.)
-                            # Get original dimensions
-                            original_albedo_w, original_albedo_h = albedo_img.size
-                            resize_h = self.config.model.image_tokenizer.image_size
-                            patch_size = self.config.model.image_tokenizer.patch_size
-                            square_crop = self.config.training.get("square_crop", False)
-                            
-                            resize_w = int(resize_h / original_albedo_h * original_albedo_w)
-                            resize_w = int(round(resize_w / patch_size) * patch_size)
-                            
-                            # Resize albedo to match input image size
-                            albedo_img = albedo_img.resize((resize_w, resize_h), resample=PIL.Image.LANCZOS)
-                            if square_crop:
-                                min_size = min(resize_h, resize_w)
-                                start_h = (resize_h - min_size) // 2
-                                start_w = (resize_w - min_size) // 2
-                                albedo_img = albedo_img.crop((start_w, start_h, start_w + min_size, start_h + min_size))
-                            
-                            # Convert to numpy array
-                            albedo_array = np.array(albedo_img) / 255.0
-                            
-                            # Handle different image formats
-                            if len(albedo_array.shape) == 2:
-                                # Grayscale: convert to RGB
-                                albedo_array = np.stack([albedo_array, albedo_array, albedo_array], axis=2)
-                            elif albedo_array.shape[2] == 4:
-                                # RGBA: alpha blend with white background
-                                rgb = albedo_array[:, :, :3]
-                                alpha = albedo_array[:, :, 3:4]
-                                albedo_array = rgb * alpha + (1.0 - alpha) * 1.0
-                            elif albedo_array.shape[2] == 3:
-                                # RGB: use as is
-                                pass
-                            else:
-                                # More than 4 channels: take first 3
-                                albedo_array = albedo_array[:, :, :3]
-                            
-                            albedo_tensor = torch.from_numpy(albedo_array).permute(2, 0, 1).float()
-                            albedo_list.append(albedo_tensor)
-                        except Exception as e:
-                            error_msg = f"Failed to load albedo for frame {ic} in object_id '{object_id}': {type(e).__name__}: {str(e)}"
-                            print(f"Error: {error_msg}")
-                            traceback.print_exc()
-                            raise RuntimeError(error_msg) from e
-                    
-                    if len(albedo_list) != len(image_indices):
-                        error_msg = f"Mismatch in albedo count: expected {len(image_indices)}, got {len(albedo_list)}"
+                if self.white_env_as_albedo:
+                    # Load albedo from white_env_0 scene instead of albedos folder
+                    white_env_scene_name = object_id + '_white_env_0'
+                    metadata_dir = os.path.join(base_dir, 'metadata')
+                    if not os.path.exists(metadata_dir):
+                        error_msg = f"Metadata directory not found: {metadata_dir}"
                         print(f"Error: {error_msg}")
-                        raise ValueError(error_msg)
+                        raise FileNotFoundError(error_msg)
                     
-                    albedos = torch.stack(albedo_list, dim=0)  # [v, 3, h, w]
+                    white_env_scene_path = os.path.join(metadata_dir, white_env_scene_name + '.json')
+                    if not os.path.exists(white_env_scene_path):
+                        error_msg = f"White env scene JSON not found: {white_env_scene_path}"
+                        print(f"Error: {error_msg}")
+                        raise FileNotFoundError(error_msg)
+                    
+                    # Load white env scene JSON
+                    with open(white_env_scene_path, 'r') as f:
+                        white_env_data_json = json.load(f)
+                    white_env_frames = white_env_data_json.get("frames", [])
+                    
+                    # Check if white env scene has enough frames
+                    if len(white_env_frames) <= max(image_indices):
+                        error_msg = f"White env scene '{white_env_scene_name}' has only {len(white_env_frames)} frames, but need frame index {max(image_indices)}"
+                        print(f"Error: {error_msg}")
+                        raise IndexError(error_msg)
+                    
+                    # Load white env images with same indices
+                    white_env_image_paths = [white_env_frames[ic]["image_path"] for ic in image_indices]
+                    white_env_frames_chosen = [white_env_frames[ic] for ic in image_indices]
+                    
+                    # Check if all white env image paths exist
+                    missing_images = [img_path for img_path in white_env_image_paths if not os.path.exists(img_path)]
+                    if missing_images:
+                        error_msg = f"Missing white env image files for scene '{white_env_scene_name}': {missing_images[:3]}..." if len(missing_images) > 3 else f"Missing white env image files: {missing_images}"
+                        print(f"Error: {error_msg}")
+                        raise FileNotFoundError(error_msg)
+                    
+                    # Load and preprocess white env images as albedo (using same preprocessing as input images)
+                    albedos, _, _ = self.preprocess_frames(white_env_frames_chosen, white_env_image_paths)
                 else:
-                    # Albedo directory doesn't exist, set to None
-                    error_msg = f"Albedo directory not found: {albedos_dir}"
-                    print(f"Error: {error_msg}")
-                    raise FileNotFoundError(error_msg)
+                    # Load albedo images from albedos folder (shared across all scenes with same object_id)
+                    albedos_dir = os.path.join(base_dir, 'albedos', object_id)
+                    if os.path.exists(albedos_dir):
+                        albedo_list = []
+                        for ic in image_indices:
+                            albedo_path = os.path.join(albedos_dir, f"{ic:05d}.png")
+                            
+                            if not os.path.exists(albedo_path):
+                                error_msg = f"Albedo file not found: {albedo_path}"
+                                print(f"Error: {error_msg}")
+                                raise FileNotFoundError(error_msg)
+                            
+                            try:
+                                albedo_img = PIL.Image.open(albedo_path)
+                                albedo_img.load()
+                                
+                                # Apply same preprocessing as input images (resize, crop, etc.)
+                                # Get original dimensions
+                                original_albedo_w, original_albedo_h = albedo_img.size
+                                resize_h = self.config.model.image_tokenizer.image_size
+                                patch_size = self.config.model.image_tokenizer.patch_size
+                                square_crop = self.config.training.get("square_crop", False)
+                                
+                                resize_w = int(resize_h / original_albedo_h * original_albedo_w)
+                                resize_w = int(round(resize_w / patch_size) * patch_size)
+                                
+                                # Resize albedo to match input image size
+                                albedo_img = albedo_img.resize((resize_w, resize_h), resample=PIL.Image.LANCZOS)
+                                if square_crop:
+                                    min_size = min(resize_h, resize_w)
+                                    start_h = (resize_h - min_size) // 2
+                                    start_w = (resize_w - min_size) // 2
+                                    albedo_img = albedo_img.crop((start_w, start_h, start_w + min_size, start_h + min_size))
+                                
+                                # Convert to numpy array
+                                albedo_array = np.array(albedo_img) / 255.0
+                                
+                                # Handle different image formats
+                                if len(albedo_array.shape) == 2:
+                                    # Grayscale: convert to RGB
+                                    albedo_array = np.stack([albedo_array, albedo_array, albedo_array], axis=2)
+                                elif albedo_array.shape[2] == 4:
+                                    # RGBA: alpha blend with white background
+                                    rgb = albedo_array[:, :, :3]
+                                    alpha = albedo_array[:, :, 3:4]
+                                    albedo_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                elif albedo_array.shape[2] == 3:
+                                    # RGB: use as is
+                                    pass
+                                else:
+                                    # More than 4 channels: take first 3
+                                    albedo_array = albedo_array[:, :, :3]
+                                
+                                albedo_tensor = torch.from_numpy(albedo_array).permute(2, 0, 1).float()
+                                albedo_list.append(albedo_tensor)
+                            except Exception as e:
+                                error_msg = f"Failed to load albedo for frame {ic} in object_id '{object_id}': {type(e).__name__}: {str(e)}"
+                                print(f"Error: {error_msg}")
+                                traceback.print_exc()
+                                raise RuntimeError(error_msg) from e
+                        
+                        if len(albedo_list) != len(image_indices):
+                            error_msg = f"Mismatch in albedo count: expected {len(image_indices)}, got {len(albedo_list)}"
+                            print(f"Error: {error_msg}")
+                            raise ValueError(error_msg)
+                        
+                        albedos = torch.stack(albedo_list, dim=0)  # [v, 3, h, w]
+                    else:
+                        # Albedo directory doesn't exist, set to None
+                        error_msg = f"Albedo directory not found: {albedos_dir}"
+                        print(f"Error: {error_msg}")
+                        raise FileNotFoundError(error_msg)
             else:
                 # Skip loading albedo if not configured
                 albedos = None
