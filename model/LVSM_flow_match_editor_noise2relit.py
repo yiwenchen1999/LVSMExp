@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Haian Jin. Created for the LVSM project (ICLR 2025).
 
 import math
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -137,6 +138,9 @@ class FlowMatchEditor(LatentSceneEditor):
         
         # Re-initialize transformer_editor with AdaLN blocks
         self._reinit_editor_with_adaln()
+
+        # Add EMA for noise scale
+        self.register_buffer('noise_scale_ema', torch.tensor(1.0))
         
     def _reinit_editor_with_adaln(self):
         config = self.config.model.transformer
@@ -311,25 +315,27 @@ class FlowMatchEditor(LatentSceneEditor):
             t = torch.ones((z_A.shape[0],), device=z_A.device) * timestep
             
         #& Step 5: Interpolate z_t
-        # Linear interpolation: z_t = (1 - t) * z_A + t * z_B
-        # Optional: Add noise sigma(t) * epsilon
-        # User prompt mentions: z_t = (1 - t) z_A + t z_B + σ(t) ε
+        # Flow Matching from Gaussian Noise (z_0) to Data (z_B)
+        # z_t = (1 - t) * z_0 + t * z_B
         
-        # Get noise scale from config
-        noise_scale = self.config.training.get("flow_match", {}).get("noise_scale", 0.0)
+        # Update EMA of noise scale using z_B (target distribution)
+        if self.training:
+            with torch.no_grad():
+                current_scale = z_B.std()
+                ema_momentum = 0.99
+                self.noise_scale_ema.mul_(ema_momentum).add_(current_scale * (1 - ema_momentum))
         
-        if noise_scale > 0:
-            # sigma(t) = sigma_0 * t * (1-t) (simple bell curve peaking at 0.5)
-            # Or constant sigma? Guide says "sigma(t) = sigma0 * t * (1-t)"
-            sigma_t = noise_scale * t * (1 - t)
-            epsilon = torch.randn_like(z_A)
-            noise = sigma_t.view(-1, 1, 1) * epsilon
-        else:
-            noise = 0.0
-            
+        # Sample z_0 from Gaussian Noise scaled by EMA
+        z_0 = torch.randn_like(z_A) * self.noise_scale_ema
+        
+        # Target z_1 is z_B
+        z_1 = z_B
+        
         # Broadcast t for interpolation
         t_expand = t.view(-1, 1, 1)
-        z_t = (1 - t_expand) * z_A + t_expand * z_B + noise
+        
+        # Interpolate z_t
+        z_t = (1 - t_expand) * z_0 + t_expand * z_1
                 
         #& Step 6: Prepare Env Conditioning
         # Process environment maps (LDR, HDR, Dir)
@@ -375,8 +381,9 @@ class FlowMatchEditor(LatentSceneEditor):
             raise AssertionError("Env tokens are missing. Stopping process.")
 
         #& Step 7: Predict Velocity
-        # Concatenate: [z_t, env_tokens]
-        editor_input_tokens = torch.cat([z_t, env_tokens], dim=1)
+        # Concatenate: [z_t, z_A, env_tokens]
+        # Condition on both current state z_t and source latent z_A (plus environment)
+        editor_input_tokens = torch.cat([z_t, z_A, env_tokens], dim=1)
         
         # Time Embedding
         t_emb = self.time_embedder(t) # [b, d]
@@ -392,16 +399,12 @@ class FlowMatchEditor(LatentSceneEditor):
         
         # Extract predicted velocity (corresponding to z_t part)
         n_latent_vectors = self.config.model.transformer.n_latent_vectors
-        pred_velocity, _ = editor_output_tokens.split(
-            [n_latent_vectors, env_tokens.shape[1]], dim=1
-        )
+        pred_velocity = editor_output_tokens[:, :n_latent_vectors, :]
         
         #& Step 8: Compute Loss
-        # target_velocity = z_B - z_A
-        # def rms(x): return (x.float().pow(2).mean().sqrt()).item()
-
-        # print("rms z_A", rms(z_A), "rms z_B", rms(z_B))
-        target_velocity = z_B - z_A
+        # target_velocity = z_1 - z_0 = z_B - z_0
+        # flow matching objective: v_t = z_1 - z_0
+        target_velocity = z_1 - z_0
         # print("rms v*", rms(target_velocity), "max|v*|", target_velocity.abs().max().item())
         # print("rms pred_v", rms(pred_velocity))
 
@@ -416,10 +419,10 @@ class FlowMatchEditor(LatentSceneEditor):
         
         if not skip_renderer:
             # Compute z_B_pred from z_t using predicted velocity
-            # For constant velocity field v = z_B - z_A:
-            #   z_t = (1-t) * z_A + t * z_B
-            #   z_B = z_t + (1-t) * v
-            # This works for all t, not just t=0
+            # z_t = (1-t) * z_0 + t * z_B
+            # z_B = z_1 = z_0 + v
+            # z_t = z_1 - (1-t)v
+            # z_B_pred = z_t + (1-t) * pred_velocity
             t_expand_for_pred = t.view(-1, 1, 1)
             z_B_pred = z_t + (1.0 - t_expand_for_pred) * pred_velocity
             
@@ -498,7 +501,9 @@ class FlowMatchEditor(LatentSceneEditor):
         original_checkpoint_every = self.config.training.grad_checkpoint_every
         self.config.training.grad_checkpoint_every = 999999  # Effectively disable checkpointing
         try:
-            z, n_patches, d = self.reconstructor(input) # Start at z_A
+            z_A, n_patches, d = self.reconstructor(input) 
+            # Start at random noise scaled by EMA
+            z = torch.randn_like(z_A) * self.noise_scale_ema
         finally:
             # Restore original setting
             self.config.training.grad_checkpoint_every = original_checkpoint_every
@@ -542,7 +547,8 @@ class FlowMatchEditor(LatentSceneEditor):
             t = torch.ones((z.shape[0],), device=z.device) * t_val
             
             # Predict velocity
-            editor_input = torch.cat([z, env_tokens], dim=1)
+            # Input: [z_t, z_A, env_tokens]
+            editor_input = torch.cat([z, z_A, env_tokens], dim=1)
             t_emb = self.time_embedder(t)
             
             out = self.pass_editor_layers(editor_input, t_emb)
@@ -562,7 +568,7 @@ class FlowMatchEditor(LatentSceneEditor):
                 z_guess = z + v_pred * dt
                 
                 t_next = torch.ones_like(t) * (t_val + dt)
-                editor_input_next = torch.cat([z_guess, env_tokens], dim=1)
+                editor_input_next = torch.cat([z_guess, z_A, env_tokens], dim=1)
                 t_emb_next = self.time_embedder(t_next)
                 out_next = self.pass_editor_layers(editor_input_next, t_emb_next)
                 v_pred_next = out_next[:, :self.config.model.transformer.n_latent_vectors, :]
