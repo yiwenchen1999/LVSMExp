@@ -72,6 +72,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.use_albedos = true \
     training.grad_accum_steps = 1 \
+    training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\"
 "
 
