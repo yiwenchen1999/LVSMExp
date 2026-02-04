@@ -28,9 +28,9 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18637 --rdzv_backend c10d --rdzv_endpoint localhost:29503 \
     train_flowmatch_editor.py --config configs/LVSM_flow_match_editor_noise2relit.yaml \
     training.batch_size_per_gpu = 4 \
-    training.checkpoint_dir = ckpt/LVSM_flow_match_editor_noise2relit \
+    training.checkpoint_dir = ckpt/LVSM_flow_match_editor_noise2relit_lr1e5 \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
-    training.wandb_exp_name = LVSM_flowmatch_noise2relit_dense_lr1e4_singleMap \
+    training.wandb_exp_name = LVSM_flowmatch_noise2relit_dense_lr1e5_singleMap \
     training.dataset_path = data_samples/objaverse_processed_with_envmaps/test/full_list.txt \
     training.warmup = 3000 \
     training.vis_every = 1000 \
