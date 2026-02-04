@@ -31,6 +31,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.checkpoint_dir = ckpt/LVSM_flow_match_editor_noise2relit_dense_lr1e4_singleMap \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_flowmatch_noise2relit_dense_lr1e4_singleMap \
+    training.dataset_path = data_samples/objaverse_processed_with_envmaps/test/full_list.txt \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
