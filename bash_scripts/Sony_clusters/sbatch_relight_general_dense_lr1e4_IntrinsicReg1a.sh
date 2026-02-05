@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=relight_dense_intrinsic_reg1a
-#SBATCH --partition=sharedp
+#SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
