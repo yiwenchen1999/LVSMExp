@@ -333,7 +333,7 @@ class FlowMatchEditor(LatentSceneEditor):
         # Use Standard Gaussian Noise
         z_0 = torch.randn_like(z_A) # Mean 0, Std 1
         z_1 = z_B 
-        
+            
         # Broadcast t for interpolation
         t_expand = t.view(-1, 1, 1)
         
@@ -594,7 +594,7 @@ class FlowMatchEditor(LatentSceneEditor):
 
         # Scale back to original space before rendering (renderer expects unscaled latents)
         z = z / latent_scale
-        
+
         # Render final z
         rendered_images = self.renderer(z, target, n_patches, d)
         
