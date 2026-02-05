@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=8
 #SBATCH --mem=32G
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --job-name=rm_rayzer_format
 #SBATCH --output=rm_rayzer_format.out
 #SBATCH --error=rm_rayzer_format.err
@@ -20,7 +20,9 @@
 # 6210 : ./rendered_previews
 # 18638 : ./rendered_test_split
 # Remove the rayzer_format directory
-target_dir="gaffer_render_postprocessed_obj"
+target_dir="/projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense"
+# first create a zip file of the directory
+zip -r "$target_dir.zip" "$target_dir"
 find "$target_dir" -type f -delete
 find "$target_dir" -type d -empty -delete
 rmdir "$target_dir"
