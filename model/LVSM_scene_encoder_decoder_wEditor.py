@@ -610,11 +610,9 @@ class LatentSceneEditor(nn.Module):
         
         #& Step 4.5: Process albedo decoder if enabled
         rendered_albedos = None
-        print(f"use_albedo_decoder: {self.use_albedo_decoder}")
         if self.use_albedo_decoder:
             rendered_albedos = self.renderer_albedo(latent_tokens, target, n_patches, d)
         
-        print(f"rendered_albedos: {rendered_albedos.shape}")
         
         #& Step 5: Compute loss (if target images are provided)
         # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
