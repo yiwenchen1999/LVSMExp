@@ -334,8 +334,9 @@ class FlowMatchEditor(LatentSceneEditor):
 
         # Use Standard Gaussian Noise with fixed seed for controlled environment
         noise_seed = self.config.training.get("noise_seed", 42)
+        # Set random seed for reproducible noise generation
         generator = torch.Generator(device=z_A.device).manual_seed(noise_seed)
-        z_0 = torch.randn_like(z_A, generator=generator) # Mean 0, Std 1, fixed seed
+        z_0 = torch.randn(z_A.shape, device=z_A.device, dtype=z_A.dtype, generator=generator) # Mean 0, Std 1, fixed seed
         z_1 = z_B 
             
         # Broadcast t for interpolation
@@ -533,7 +534,7 @@ class FlowMatchEditor(LatentSceneEditor):
             # Use fixed seed for controlled environment
             noise_seed = self.config.training.get("noise_seed", 42)
             generator = torch.Generator(device=z_A.device).manual_seed(noise_seed)
-            z = torch.randn_like(z_A, generator=generator)  # Standard Gaussian noise with fixed seed
+            z = torch.randn(z_A.shape, device=z_A.device, dtype=z_A.dtype, generator=generator)  # Standard Gaussian noise with fixed seed
         finally:
             # Restore original setting
             self.config.training.grad_checkpoint_every = original_checkpoint_every
