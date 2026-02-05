@@ -287,3 +287,4 @@ total_loss = render_loss + normalize(velocity_loss) * velocity_weight
 
 
 
+
