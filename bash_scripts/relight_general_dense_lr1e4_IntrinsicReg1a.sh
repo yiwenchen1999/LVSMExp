@@ -30,7 +30,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
-    training.transformer.use_albedo_decoder = true \
+    training.model.transformer.use_albedo_decoder = true \
     training.use_albedos = true \
     training.white_env_as_albedo = false \
     training.use_relit_images = true

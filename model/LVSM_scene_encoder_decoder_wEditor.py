@@ -119,6 +119,7 @@ class LatentSceneEditor(nn.Module):
         
         # Initialize albedo decoder if configured
         self.use_albedo_decoder = config.get("use_albedo_decoder", False)
+        print(f"use_albedo_decoder: {self.use_albedo_decoder}")
         if self.use_albedo_decoder:
             self.transformer_decoder_albedo = [
                 QK_Norm_TransformerBlock(
