@@ -609,8 +609,11 @@ class LatentSceneEditor(nn.Module):
         
         #& Step 4.5: Process albedo decoder if enabled
         rendered_albedos = None
+        print(f"use_albedo_decoder: {self.use_albedo_decoder}")
         if self.use_albedo_decoder:
             rendered_albedos = self.renderer_albedo(latent_tokens, target, n_patches, d)
+        
+        print(f"rendered_albedos: {rendered_albedos.shape}")
         
         #& Step 5: Compute loss (if target images are provided)
         # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
@@ -639,7 +642,7 @@ class LatentSceneEditor(nn.Module):
                 # Sum all loss values
                 combined_loss = image_loss_metrics.loss + albedo_loss_metrics.loss
                 
-                # Create combined loss metrics
+                # Create combined loss metrics with both image and albedo losses
                 loss_metrics = edict(
                     loss=combined_loss,
                     image_loss=image_loss_metrics.loss,
@@ -652,6 +655,8 @@ class LatentSceneEditor(nn.Module):
                     norm_lpips_loss=image_loss_metrics.norm_lpips_loss + albedo_loss_metrics.norm_lpips_loss,
                 )
             else:
+                # If albedo decoder is enabled but no target albedos, still use image loss only
+                # (albedo decoder will still generate albedos, but no loss is computed)
                 loss_metrics = image_loss_metrics
         else:
             loss_metrics = None
