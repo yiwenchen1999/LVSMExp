@@ -117,6 +117,15 @@ class LatentSceneEditor(nn.Module):
             ) for _ in range(config.decoder_n_layer)
         ]
         
+        # Initialize albedo decoder if configured
+        self.use_albedo_decoder = config.get("use_albedo_decoder", False)
+        if self.use_albedo_decoder:
+            self.transformer_decoder_albedo = [
+                QK_Norm_TransformerBlock(
+                    config.d, config.d_head, use_qk_norm=use_qk_norm
+                ) for _ in range(config.decoder_n_layer)
+            ]
+        
         # Apply special initialization if configured
         if config.get("special_init", False):
             # Encoder
@@ -133,7 +142,16 @@ class LatentSceneEditor(nn.Module):
                     weight_init_std = 0.02 / (2 * (idx + 1)) ** 0.5
                 else:
                     weight_init_std = 0.02 / (2 * config.decoder_n_layer) ** 0.5
-                block.apply(lambda module: init_weights(module, weight_init_std))  
+                block.apply(lambda module: init_weights(module, weight_init_std))
+            
+            # Albedo decoder (if enabled)
+            if self.use_albedo_decoder:
+                for idx, block in enumerate(self.transformer_decoder_albedo):
+                    if config.get("depth_init", False):
+                        weight_init_std = 0.02 / (2 * (idx + 1)) ** 0.5
+                    else:
+                        weight_init_std = 0.02 / (2 * config.decoder_n_layer) ** 0.5
+                    block.apply(lambda module: init_weights(module, weight_init_std))
         else:
             # Encoder
             for block in self.transformer_encoder:
@@ -142,10 +160,17 @@ class LatentSceneEditor(nn.Module):
             # Decoder
             for block in self.transformer_decoder:
                 block.apply(init_weights)
+            
+            # Albedo decoder (if enabled)
+            if self.use_albedo_decoder:
+                for block in self.transformer_decoder_albedo:
+                    block.apply(init_weights)
 
                 
         self.transformer_encoder = nn.ModuleList(self.transformer_encoder)
         self.transformer_decoder = nn.ModuleList(self.transformer_decoder)
+        if self.use_albedo_decoder:
+            self.transformer_decoder_albedo = nn.ModuleList(self.transformer_decoder_albedo)
         self.transformer_input_layernorm_decoder = nn.LayerNorm(config.d, bias=False)
         
         # Transformer editor block (for editing latent tokens)
@@ -215,6 +240,11 @@ class LatentSceneEditor(nn.Module):
             param.requires_grad = False
         for param in self.image_token_decoder.parameters():
             param.requires_grad = False
+        
+        # Freeze albedo decoder if it exists
+        if self.use_albedo_decoder:
+            for param in self.transformer_decoder_albedo.parameters():
+                param.requires_grad = False
         
         # Keep editor layers trainable
         for param in self.env_tokenizer.parameters():
@@ -413,6 +443,64 @@ class LatentSceneEditor(nn.Module):
         
         return rendered_images
 
+    def renderer_albedo(self, latent_tokens, target, n_patches, d, checkpoint_every=None):
+        """
+        从场景 latent_tokens 和目标 ray maps 解码渲染 albedo 结果
+        
+        Args:
+            latent_tokens: [b, n_latent_vectors, d] - 场景潜在表示
+            target: 包含 target.ray_o, target.ray_d, target.image_h_w 的 edict
+            n_patches: int - 每个视图的 patch 数量
+            d: int - token 维度
+            checkpoint_every: 梯度检查点间隔，如果为 None 则使用 config 中的值
+            
+        Returns:
+            rendered_albedos: [b, v_target, 3, h, w] - 渲染的 albedo 图像
+        """
+        if checkpoint_every is None:
+            checkpoint_every = self.config.training.grad_checkpoint_every
+        n_latent_vectors = self.config.model.transformer.n_latent_vectors
+        
+        #& Step 1: Build target pose conditioning - Only use pose info (no RGB image)
+        target_pose_cond= self.get_posed_input(ray_o=target.ray_o, ray_d=target.ray_d)
+        b, v_target, c, h, w = target_pose_cond.size()
+        
+        #& Step 2: Replicate latent tokens for each target view
+        repeated_latent_tokens = repeat(
+                                latent_tokens,
+                                'b nl d -> (b v_target) nl d', 
+                                v_target=v_target) 
+
+        #& Step 3: Target pose tokenization - Convert target pose conditioning to tokens
+        target_pose_tokens = self.target_pose_tokenizer(target_pose_cond) # [b*v_target, n_patches, d]
+        
+        #& Step 4: Put target pose tokens and latent tokens through albedo decoder transformer
+        decoder_input_tokens = torch.cat((target_pose_tokens, repeated_latent_tokens), dim=1) # [b*v_target, n_latent_vectors + n_patches, d]
+        decoder_input_tokens = self.transformer_input_layernorm_decoder(decoder_input_tokens)
+
+        transformer_albedo_output_tokens = self.pass_layers(self.transformer_decoder_albedo, decoder_input_tokens, gradient_checkpoint=True, checkpoint_every=checkpoint_every)
+        target_albedo_tokens, _ = transformer_albedo_output_tokens.split(
+            [n_patches, n_latent_vectors], dim=1
+        ) # [b*v_target, n_patches, d], [b*v_target, n_latent_vectors, d]
+
+        #& Step 5: Image token decoding - Decode tokens to RGB pixel values (albedo)
+        rendered_albedos = self.image_token_decoder(target_albedo_tokens)
+        
+        height, width = target.image_h_w
+
+        patch_size = self.config.model.target_pose_tokenizer.patch_size
+        rendered_albedos = rearrange(
+            rendered_albedos, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
+            v=v_target,
+            h=height // patch_size, 
+            w=width // patch_size, 
+            p1=patch_size, 
+            p2=patch_size, 
+            c=3
+        )
+        
+        return rendered_albedos
+
     def forward(self, data_batch, has_target_image=True):
         #& Step 1: Data preprocessing - Extract input and target data from data_batch, compute rays
         # input.image: [b, v_input, 3, h, w] - Input RGB images (v_input=2 views)
@@ -519,6 +607,11 @@ class LatentSceneEditor(nn.Module):
         #& Step 4: Renderer - Decode results from target ray maps
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)
         
+        #& Step 4.5: Process albedo decoder if enabled
+        rendered_albedos = None
+        if self.use_albedo_decoder:
+            rendered_albedos = self.renderer_albedo(latent_tokens, target, n_patches, d)
+        
         #& Step 5: Compute loss (if target images are provided)
         # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
         # Use relit_images target split if available, otherwise fall back to original image
@@ -529,10 +622,37 @@ class LatentSceneEditor(nn.Module):
             else:
                 target_images = target.image
             
-            loss_metrics = self.loss_computer(
+            # Compute image loss
+            image_loss_metrics = self.loss_computer(
                 rendered_images,
                 target_images
             )
+            
+            # Compute albedo loss if albedo decoder is enabled and target albedos are available
+            if self.use_albedo_decoder and hasattr(target, 'albedos') and target.albedos is not None:
+                albedo_loss_metrics = self.loss_computer(
+                    rendered_albedos,
+                    target.albedos
+                )
+                
+                # Combine losses: add image loss and albedo loss
+                # Sum all loss values
+                combined_loss = image_loss_metrics.loss + albedo_loss_metrics.loss
+                
+                # Create combined loss metrics
+                loss_metrics = edict(
+                    loss=combined_loss,
+                    image_loss=image_loss_metrics.loss,
+                    albedo_loss=albedo_loss_metrics.loss,
+                    l2_loss=image_loss_metrics.l2_loss + albedo_loss_metrics.l2_loss,
+                    lpips_loss=image_loss_metrics.lpips_loss + albedo_loss_metrics.lpips_loss,
+                    perceptual_loss=image_loss_metrics.perceptual_loss + albedo_loss_metrics.perceptual_loss,
+                    psnr=image_loss_metrics.psnr,  # Keep image PSNR
+                    norm_perceptual_loss=image_loss_metrics.norm_perceptual_loss + albedo_loss_metrics.norm_perceptual_loss,
+                    norm_lpips_loss=image_loss_metrics.norm_lpips_loss + albedo_loss_metrics.norm_lpips_loss,
+                )
+            else:
+                loss_metrics = image_loss_metrics
         else:
             loss_metrics = None
 
@@ -543,6 +663,9 @@ class LatentSceneEditor(nn.Module):
             loss_metrics=loss_metrics,
             render=rendered_images        
             )
+        
+        if rendered_albedos is not None:
+            result.render_albedo = rendered_albedos
         
         return result
 
@@ -803,7 +926,33 @@ class LatentSceneEditor(nn.Module):
             print(f"Failed to load {ckpt_paths[-1]}: {e}")
             return None
         
-        self.load_state_dict(checkpoint["model"], strict=False)
+        checkpoint_state_dict = checkpoint["model"]
+        
+        # Check if transformer_decoder_albedo exists in checkpoint
+        has_albedo_decoder_in_ckpt = any(
+            key.startswith("transformer_decoder_albedo") for key in checkpoint_state_dict.keys()
+        )
+        
+        # If we need albedo decoder but it doesn't exist in checkpoint, initialize from transformer_decoder
+        if self.use_albedo_decoder and not has_albedo_decoder_in_ckpt:
+            print("!!!transformer_decoder_albedo not found in checkpoint, initializing from transformer_decoder weights")
+            # Copy weights from transformer_decoder to transformer_decoder_albedo
+            # First collect all keys to copy (to avoid mutating dict during iteration)
+            keys_to_copy = {}
+            for i in range(len(self.transformer_decoder)):
+                # Copy each transformer block
+                src_prefix = f"transformer_decoder.{i}."
+                tgt_prefix = f"transformer_decoder_albedo.{i}."
+                
+                for key, value in checkpoint_state_dict.items():
+                    if key.startswith(src_prefix):
+                        new_key = key.replace(src_prefix, tgt_prefix)
+                        keys_to_copy[new_key] = value.clone()
+            
+            # Now add all collected keys to the state dict
+            checkpoint_state_dict.update(keys_to_copy)
+        
+        self.load_state_dict(checkpoint_state_dict, strict=False)
         return 0
 
     @torch.no_grad()
@@ -835,25 +984,56 @@ class LatentSceneEditor(nn.Module):
             print(f"Failed to load LVSM checkpoint from {ckpt_paths[-1]}")
             return None
         
-        # Create Images2LatentScene model and load weights
-        lvsm_model = Images2LatentScene(self.config)
-        lvsm_model.load_state_dict(checkpoint["model"], strict=False)
-        
-        # Get state dicts
-        lvsm_state_dict = lvsm_model.state_dict()
+        # Get state dicts directly from checkpoint
+        checkpoint_state_dict = checkpoint["model"]
         editor_state_dict = self.state_dict()
         
-        # Copy matching weights from Images2LatentScene to LatentSceneEditor
+        # Copy matching weights from checkpoint to LatentSceneEditor
         matched_keys = []
         unmatched_keys = []
+        ignored_keys = []
+        
+        # Handle albedo decoder weights from checkpoint
+        # If we don't use albedo decoder but checkpoint has it, ignore those weights
+        # If we use albedo decoder but checkpoint doesn't have it, we'll initialize from decoder later
+        if not self.use_albedo_decoder:
+            # Ignore albedo decoder weights if they exist in checkpoint
+            for key in list(checkpoint_state_dict.keys()):
+                if key.startswith("transformer_decoder_albedo"):
+                    ignored_keys.append(key)
+        else:
+            # We use albedo decoder - check if checkpoint has it
+            has_albedo_decoder_in_ckpt = any(
+                key.startswith("transformer_decoder_albedo") for key in checkpoint_state_dict.keys()
+            )
+            
+            if not has_albedo_decoder_in_ckpt:
+                # Checkpoint doesn't have albedo decoder, initialize from transformer_decoder
+                print("transformer_decoder_albedo not found in checkpoint, initializing from transformer_decoder weights")
+                # Copy weights from transformer_decoder to transformer_decoder_albedo
+                keys_to_copy = {}
+                for i in range(len(self.transformer_decoder)):
+                    # Copy each transformer block
+                    src_prefix = f"transformer_decoder.{i}."
+                    tgt_prefix = f"transformer_decoder_albedo.{i}."
+                    
+                    for key, value in checkpoint_state_dict.items():
+                        if key.startswith(src_prefix):
+                            new_key = key.replace(src_prefix, tgt_prefix)
+                            keys_to_copy[new_key] = value.clone()
+                
+                # Add copied keys to checkpoint_state_dict for matching
+                checkpoint_state_dict.update(keys_to_copy)
+        
+        # Now match all keys
         for key in editor_state_dict.keys():
-            if key in lvsm_state_dict:
+            if key in checkpoint_state_dict:
                 # Check if shapes match
-                if editor_state_dict[key].shape == lvsm_state_dict[key].shape:
-                    editor_state_dict[key] = lvsm_state_dict[key]
+                if editor_state_dict[key].shape == checkpoint_state_dict[key].shape:
+                    editor_state_dict[key] = checkpoint_state_dict[key]
                     matched_keys.append(key)
                 else:
-                    print(f"Warning: Shape mismatch for {key}: {editor_state_dict[key].shape} vs {lvsm_state_dict[key].shape}")
+                    print(f"Warning: Shape mismatch for {key}: {editor_state_dict[key].shape} vs {checkpoint_state_dict[key].shape}")
                     unmatched_keys.append(key)
             else:
                 unmatched_keys.append(key)
@@ -889,6 +1069,8 @@ class LatentSceneEditor(nn.Module):
         print(f"Initialized LatentSceneEditor from Images2LatentScene:")
         print(f"  - Matched keys: {len(matched_keys)}")
         print(f"  - Unmatched keys (using new weights): {len(unmatched_keys)}")
+        if ignored_keys:
+            print(f"  - Ignored keys (not used in this model): {len(ignored_keys)}")
         if unmatched_keys:
             print(f"  - New components: {', '.join(unmatched_keys)}")
         
