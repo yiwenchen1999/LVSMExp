@@ -73,7 +73,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29508 \
     train.py --config configs/LVSM_scene_encoder_decoder_wIntrinsicDecoder.yaml \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 8 \
     training.white_env_as_albedo = true \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.use_albedos = true \
