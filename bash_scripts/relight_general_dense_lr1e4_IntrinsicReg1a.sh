@@ -33,4 +33,5 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     model.transformer.use_albedo_decoder = true \
     training.use_albedos = true \
     training.white_env_as_albedo = false \
-    training.use_relit_images = true
+    training.use_relit_images = true \
+    training.single_env_map = true
