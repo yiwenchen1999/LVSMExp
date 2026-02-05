@@ -25,7 +25,7 @@ export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 SINGLE_STEP_CKPT="ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4_singleMap"
 
 torchrun --nproc_per_node 1 --nnodes 1 \
-    --rdzv_id 18637 --rdzv_backend c10d --rdzv_endpoint localhost:29503 \
+    --rdzv_id 18637 --rdzv_backend c10d --rdzv_endpoint localhost:29507 \
     train_flowmatch_editor.py --config configs/LVSM_flow_match_editor_noise2relit.yaml \
     model.class_name = model.LVSM_flow_match_editor_noise2relit_overfit.FlowMatchEditor \
     training.batch_size_per_gpu = 4 \
