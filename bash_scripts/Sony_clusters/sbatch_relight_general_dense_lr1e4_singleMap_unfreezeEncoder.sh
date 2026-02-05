@@ -4,7 +4,7 @@
 #SBATCH --account=ct
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
