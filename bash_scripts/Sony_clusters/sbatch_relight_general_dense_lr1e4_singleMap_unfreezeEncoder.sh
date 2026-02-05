@@ -81,7 +81,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     training.vis_every = 1000 \
     training.lr = 0.0001 \
     training.single_env_map = true \
-    training.freeze_reconstructor_renderer = false \
+    training.freeze_reconstructor_renderer = true \
     training.dataset_path = \"$DATA_LIST\"
 "
 
