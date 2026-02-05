@@ -226,6 +226,7 @@ class LatentSceneEditor(nn.Module):
         - transformer_editor
         """
         # Freeze reconstructor layers
+        print("**********Freezing reconstructor layers...**********")
         for param in self.image_tokenizer.parameters():
             param.requires_grad = False
         self.n_light_field_latent.requires_grad = False
