@@ -20,7 +20,7 @@
 # 6210 : ./rendered_previews
 # 18638 : ./rendered_test_split
 # Remove the rayzer_format directory
-target_dir="/projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense"
+target_dir="/projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered"
 # first create a zip file of the directory
 zip -r "$target_dir.zip" "$target_dir"
 find "$target_dir" -type f -delete
