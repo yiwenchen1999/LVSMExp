@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=relight_dense_intrinsic_reg1a
+#SBATCH --job-name=relight_dense_intrinsic_reg3b
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
@@ -35,7 +35,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/test/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_editor_general_dense_lr1e4_IntrinsicReg1b"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_editor_general_dense_lr1e4_IntrinsicReg3b"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wIntrinsicDecoder_whiteEnvAsAlbedo"
 
 ############################
@@ -76,12 +76,12 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     training.batch_size_per_gpu = 16 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
-    training.wandb_exp_name = LVSM_edit_dense_general_lr1e4_IntrinsicReg1b \
+    training.wandb_exp_name = LVSM_edit_dense_general_lr1e4_IntrinsicReg3b \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
-    model.transformer.use_albedo_decoder = false \
-    training.use_albedos = false \
+    model.transformer.use_albedo_decoder = true \
+    training.use_albedos = true \
     training.white_env_as_albedo = true \
     training.use_relit_images = true \
     training.single_env_map = false \
