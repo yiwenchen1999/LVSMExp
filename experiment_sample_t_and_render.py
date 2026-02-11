@@ -183,7 +183,7 @@ with torch.no_grad(), torch.autocast(
                 img_tensor = rendered_image[0, 0].cpu().clamp(0, 1)  # [3, h, w]
                 
                 # Convert to numpy: [3, h, w] -> [h, w, 3]
-                img_np = img_tensor.permute(1, 2, 0).numpy()
+                img_np = img_tensor.permute(1, 2, 0).to(torch.float32).numpy()
                 
                 # Convert to uint8
                 img_np = (img_np * 255).astype(np.uint8)
