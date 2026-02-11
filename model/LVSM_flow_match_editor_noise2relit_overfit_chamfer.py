@@ -91,8 +91,9 @@ def chamfer_distance(v_gt, v_pred, chunk_size=64):
             
             # Explicitly delete intermediate tensors to free memory
             del diff, dist_chunk, min_dist_to_gt_chunk, v_gt_chunk
-        
+
         min_dist_pred_to_gt_list.append(min_dist_chunk)
+        print(f"Appended chunk, current length: {len(min_dist_pred_to_gt_list)}")
         del v_pred_chunk, min_dist_chunk
     
     min_dist_pred_to_gt = torch.cat(min_dist_pred_to_gt_list, dim=1)  # [batch, n_pred]
