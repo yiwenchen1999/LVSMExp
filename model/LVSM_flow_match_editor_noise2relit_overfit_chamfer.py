@@ -57,12 +57,14 @@ def chamfer_distance(v_gt, v_pred, chunk_size=64):
     # Use double chunking: chunk both v_pred and v_gt to minimize memory
     min_dist_pred_to_gt_list = []
     for i in range(0, n_pred, chunk_size):
+        print(f"Processing chunk {i} of {n_pred}")
         chunk_end_pred = min(i + chunk_size, n_pred)
         v_pred_chunk = v_pred[:, i:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
         
         # For each chunk of v_pred, compute min distance to all chunks of v_gt
         min_dists_for_pred_chunk = []
         for j in range(0, n_gt, chunk_size):
+            print(f"Processing chunk {j} of {n_gt}")
             chunk_end_gt = min(j + chunk_size, n_gt)
             v_gt_chunk = v_gt[:, j:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
             
