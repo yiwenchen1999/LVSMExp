@@ -13,7 +13,7 @@ from .transformer import QK_Norm_SelfAttention, MLP, init_weights
 from .loss import LossComputer
 from utils import camera_utils, data_utils
 
-def chamfer_distance(v_gt, v_pred, chunk_size=256):
+def chamfer_distance(v_gt, v_pred, chunk_size=64):
     """
     Compute Chamfer distance between two sets of vectors (memory-efficient version with double chunking).
     
