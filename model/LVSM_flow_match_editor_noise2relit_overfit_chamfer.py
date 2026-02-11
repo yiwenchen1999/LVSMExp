@@ -13,31 +13,70 @@ from .transformer import QK_Norm_SelfAttention, MLP, init_weights
 from .loss import LossComputer
 from utils import camera_utils, data_utils
 
-def chamfer_distance(v_gt, v_pred):
+def chamfer_distance(v_gt, v_pred, chunk_size=256):
     """
-    Compute Chamfer distance between two sets of vectors.
+    Compute Chamfer distance between two sets of vectors (memory-efficient version with double chunking).
     
     Args:
         v_gt: Ground truth vectors, shape [batch, n_vectors, d]
         v_pred: Predicted vectors, shape [batch, n_vectors, d]
+        chunk_size: Size of chunks for memory-efficient computation (default 256 for large tensors)
     
     Returns:
         Chamfer distance, scalar tensor
     """
-    # Compute pairwise distances: [batch, n_vectors, n_vectors]
-    # v_gt: [batch, n_vectors, d], v_pred: [batch, n_vectors, d]
-    # Expand for broadcasting: v_gt[:, :, None, :] - v_pred[:, None, :, :]
-    # Result: [batch, n_vectors_gt, n_vectors_pred]
-    diff = v_gt.unsqueeze(2) - v_pred.unsqueeze(1)  # [batch, n_gt, n_pred, d]
-    dist_matrix = torch.norm(diff, p=2, dim=-1)  # [batch, n_gt, n_pred]
+    batch_size, n_gt, d = v_gt.shape
+    n_pred = v_pred.shape[1]
     
-    # For each point in v_gt, find minimum distance to v_pred
-    min_dist_gt_to_pred = dist_matrix.min(dim=2)[0]  # [batch, n_gt]
-    chamfer_gt_to_pred = min_dist_gt_to_pred.mean(dim=1).mean()  # Average over batch and vectors
+    # Compute chamfer_gt_to_pred: for each point in v_gt, find minimum distance to v_pred
+    # Use double chunking: chunk both v_gt and v_pred to minimize memory
+    min_dist_gt_to_pred_list = []
+    for i in range(0, n_gt, chunk_size):
+        chunk_end_gt = min(i + chunk_size, n_gt)
+        v_gt_chunk = v_gt[:, i:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
+        
+        # For each chunk of v_gt, compute min distance to all chunks of v_pred
+        min_dists_for_gt_chunk = []
+        for j in range(0, n_pred, chunk_size):
+            chunk_end_pred = min(j + chunk_size, n_pred)
+            v_pred_chunk = v_pred[:, j:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
+            
+            # Compute distances: [batch, chunk_size_gt, chunk_size_pred, d]
+            diff = v_gt_chunk.unsqueeze(2) - v_pred_chunk.unsqueeze(1)
+            dist_chunk = torch.norm(diff, p=2, dim=-1)  # [batch, chunk_size_gt, chunk_size_pred]
+            min_dists_for_gt_chunk.append(dist_chunk.min(dim=2)[0])  # [batch, chunk_size_gt]
+        
+        # Take minimum across all v_pred chunks for each v_gt point
+        min_dist_chunk = torch.stack(min_dists_for_gt_chunk, dim=0).min(dim=0)[0]  # [batch, chunk_size_gt]
+        min_dist_gt_to_pred_list.append(min_dist_chunk)
     
-    # For each point in v_pred, find minimum distance to v_gt
-    min_dist_pred_to_gt = dist_matrix.min(dim=1)[0]  # [batch, n_pred]
-    chamfer_pred_to_gt = min_dist_pred_to_gt.mean(dim=1).mean()  # Average over batch and vectors
+    min_dist_gt_to_pred = torch.cat(min_dist_gt_to_pred_list, dim=1)  # [batch, n_gt]
+    chamfer_gt_to_pred = min_dist_gt_to_pred.mean()
+    
+    # Compute chamfer_pred_to_gt: for each point in v_pred, find minimum distance to v_gt
+    # Use double chunking: chunk both v_pred and v_gt to minimize memory
+    min_dist_pred_to_gt_list = []
+    for i in range(0, n_pred, chunk_size):
+        chunk_end_pred = min(i + chunk_size, n_pred)
+        v_pred_chunk = v_pred[:, i:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
+        
+        # For each chunk of v_pred, compute min distance to all chunks of v_gt
+        min_dists_for_pred_chunk = []
+        for j in range(0, n_gt, chunk_size):
+            chunk_end_gt = min(j + chunk_size, n_gt)
+            v_gt_chunk = v_gt[:, j:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
+            
+            # Compute distances: [batch, chunk_size_pred, chunk_size_gt, d]
+            diff = v_pred_chunk.unsqueeze(2) - v_gt_chunk.unsqueeze(1)
+            dist_chunk = torch.norm(diff, p=2, dim=-1)  # [batch, chunk_size_pred, chunk_size_gt]
+            min_dists_for_pred_chunk.append(dist_chunk.min(dim=2)[0])  # [batch, chunk_size_pred]
+        
+        # Take minimum across all v_gt chunks for each v_pred point
+        min_dist_chunk = torch.stack(min_dists_for_pred_chunk, dim=0).min(dim=0)[0]  # [batch, chunk_size_pred]
+        min_dist_pred_to_gt_list.append(min_dist_chunk)
+    
+    min_dist_pred_to_gt = torch.cat(min_dist_pred_to_gt_list, dim=1)  # [batch, n_pred]
+    chamfer_pred_to_gt = min_dist_pred_to_gt.mean()
     
     # Symmetric Chamfer distance
     chamfer_loss = chamfer_gt_to_pred + chamfer_pred_to_gt
