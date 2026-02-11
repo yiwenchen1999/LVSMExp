@@ -28,7 +28,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18637 --rdzv_backend c10d --rdzv_endpoint localhost:29503 \
     train_flowmatch_editor.py --config configs/LVSM_flow_match_editor_noise2relit.yaml \
     model.class_name = model.LVSM_flow_match_editor_noise2relit_overfit_chamfer.FlowMatchEditor \
-    training.batch_size_per_gpu = 4 \
+    training.batch_size_per_gpu = 1 \
     training.checkpoint_dir = ckpt/LVSM_flow_match_editor_noise2relit_overfit_chamfer_chamfer_flow_only \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_flowmatch_overfit_chamfer_chamfer_flow_only \
