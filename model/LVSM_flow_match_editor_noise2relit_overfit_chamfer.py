@@ -12,6 +12,7 @@ from .LVSM_scene_encoder_decoder_wEditor import LatentSceneEditor
 from .transformer import QK_Norm_SelfAttention, MLP, init_weights
 from .loss import LossComputer
 from utils import camera_utils, data_utils
+from scipy.optimize import linear_sum_assignment
 
 def chamfer_distance(v_gt, v_pred, chunk_size=256):
     """
@@ -131,6 +132,75 @@ def chamfer_distance(v_gt, v_pred, chunk_size=256):
     chamfer_loss = loss_gt_to_pred + loss_pred_to_gt
     
     return chamfer_loss
+
+def hungarian_matching_loss(v_gt, v_pred):
+    """
+    Compute Hungarian Matching loss between two sets of vectors.
+    Uses scipy.optimize.linear_sum_assignment for matching.
+    
+    Args:
+        v_gt: Ground truth vectors, shape [batch, n_vectors, d]
+        v_pred: Predicted vectors, shape [batch, n_vectors, d]
+        
+    Returns:
+        Hungarian matching loss (MSE scale)
+    """
+    b, n, d = v_gt.shape
+    
+    # Detach for matching calculation (scipy needs numpy)
+    v_gt_cpu = v_gt.detach().cpu().float()
+    v_pred_cpu = v_pred.detach().cpu().float()
+    
+    total_loss = 0.0
+    
+    for i in range(b):
+        # Compute cost matrix [n, n]
+        # Using L2 distance as cost for matching
+        # dist[i, j] = ||v_gt[i] - v_pred[j]||_2
+        gt_i = v_gt_cpu[i]
+        pred_i = v_pred_cpu[i]
+        
+        # Calculate pairwise distance matrix
+        # Expand for broadcasting: [n, 1, d] - [1, n, d] -> [n, n, d]
+        diff = gt_i.unsqueeze(1) - pred_i.unsqueeze(0)
+        cost_matrix = torch.norm(diff, p=2, dim=-1)
+        
+        # Convert to numpy for scipy
+        cost_matrix_np = cost_matrix.numpy()
+        
+        # Solve assignment problem
+        row_ind, col_ind = linear_sum_assignment(cost_matrix_np)
+        
+        # Calculate loss for matched pairs
+        # Re-compute loss with gradients using original tensors
+        # v_gt[i][row_ind] matches with v_pred[i][col_ind]
+        
+        # Gather matched predictions
+        # We want to reorder v_pred to match v_gt
+        # col_ind gives the index in v_pred that matches each index in v_gt (row_ind is 0..n-1)
+        # Sort by row_ind to ensure alignment
+        
+        # Note: linear_sum_assignment return indices such that cost_matrix[row_ind, col_ind].sum() is minimized
+        # row_ind is usually 0, 1, ..., n-1 but not guaranteed sorted, so we sort it
+        
+        # We want to match v_gt[i, k] with v_pred[i, match[k]]
+        # Sort the assignments by row index (GT index)
+        # zip and sort
+        matches = sorted(list(zip(row_ind, col_ind)), key=lambda x: x[0])
+        sorted_col_ind = [x[1] for x in matches]
+        
+        # Create indices for gathering
+        indices = torch.tensor(sorted_col_ind, device=v_pred.device, dtype=torch.long)
+        
+        # Reorder predictions to align with GT
+        v_pred_reordered = v_pred[i][indices]
+        
+        # Compute MSE loss between aligned vectors
+        # MSE = mean((v_gt - v_pred_reordered)^2)
+        loss = F.mse_loss(v_pred_reordered, v_gt[i])
+        total_loss += loss
+        
+    return total_loss / b
 
 class TimeEmbedding(nn.Module):
     def __init__(self, model_dim):
@@ -544,6 +614,9 @@ class FlowMatchEditor(LatentSceneEditor):
         # Compute chamfer flow loss
         loss_chamfer_flow = chamfer_distance(target_velocity, pred_velocity)
         
+        # Compute hungarian matching loss
+        loss_hungarian_flow = hungarian_matching_loss(target_velocity, pred_velocity)
+        
         target_v_norm = target_velocity.norm(p=2, dim=-1).mean().item()
         pred_v_norm = pred_velocity.norm(p=2, dim=-1).mean().item()
         print(f"Target V Norm: {target_v_norm:.4f} | Pred V Norm: {pred_v_norm:.4f}")
@@ -551,7 +624,8 @@ class FlowMatchEditor(LatentSceneEditor):
         # Initialize loss metrics with flow losses
         loss_metrics = edict({
             'flow_loss': loss_flow,
-            'chamfer_flow_loss': loss_chamfer_flow
+            'chamfer_flow_loss': loss_chamfer_flow,
+            'hungarian_flow_loss': loss_hungarian_flow
         })
 
         # Render for visualization/metrics and compute reconstruction loss
@@ -559,10 +633,11 @@ class FlowMatchEditor(LatentSceneEditor):
         reconstruction_loss_metrics = None
         
         # Controlled environment: training mode selection
-        # Options: 'chamfer_flow_only', 'flow_only', 'render_only'
+        # Options: 'chamfer_flow_only', 'flow_only', 'hungarian_flow_only', 'render_only'
         training_mode = self.config.training.get("training_mode", "flow_only")
         use_chamfer_flow_loss = training_mode == "chamfer_flow_only"
         use_flow_loss = training_mode == "flow_only"
+        use_hungarian_flow_loss = training_mode == "hungarian_flow_only"
         use_render_loss = training_mode == "render_only"
         
         # Always compute render loss for metrics, even if not used for training
@@ -618,20 +693,24 @@ class FlowMatchEditor(LatentSceneEditor):
         # All metrics are computed, but only the selected one is used for training
         if use_chamfer_flow_loss:
             total_loss = loss_chamfer_flow
-            # Add dummy dependency on loss_flow and reconstruction_loss to avoid DDP errors
-            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_metrics.reconstruction_loss
+            # Add dummy dependency on loss_flow, loss_hungarian_flow and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_hungarian_flow + 0.0 * loss_metrics.reconstruction_loss
         elif use_flow_loss:
             total_loss = loss_flow
-            # Add dummy dependency on loss_chamfer_flow and reconstruction_loss to avoid DDP errors
-            total_loss = total_loss + 0.0 * loss_chamfer_flow + 0.0 * loss_metrics.reconstruction_loss
+            # Add dummy dependency on loss_chamfer_flow, loss_hungarian_flow and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_chamfer_flow + 0.0 * loss_hungarian_flow + 0.0 * loss_metrics.reconstruction_loss
+        elif use_hungarian_flow_loss:
+            total_loss = loss_hungarian_flow
+            # Add dummy dependency on loss_flow, loss_chamfer_flow and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_chamfer_flow + 0.0 * loss_metrics.reconstruction_loss
         elif use_render_loss:
             total_loss = loss_metrics.reconstruction_loss
-            # Add dummy dependency on loss_flow and loss_chamfer_flow to avoid DDP errors
-            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_chamfer_flow
+            # Add dummy dependency on loss_flow, loss_chamfer_flow and loss_hungarian_flow to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_chamfer_flow + 0.0 * loss_hungarian_flow
         else:
             # Default to flow_loss if training_mode is invalid
             total_loss = loss_flow
-            total_loss = total_loss + 0.0 * loss_chamfer_flow + 0.0 * loss_metrics.reconstruction_loss
+            total_loss = total_loss + 0.0 * loss_chamfer_flow + 0.0 * loss_hungarian_flow + 0.0 * loss_metrics.reconstruction_loss
         
         loss_metrics.loss = total_loss
 
