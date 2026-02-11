@@ -109,15 +109,25 @@ def chamfer_distance(v_gt, v_pred, chunk_size=256):
     v_pred_selected = torch.gather(v_pred, 1, idx_expanded_gt) 
     
     # Compute L2 distance (mean over batch and points)
-    loss_gt_to_pred = torch.norm(v_gt - v_pred_selected, p=2, dim=-1).mean()
+    # loss_gt_to_pred = torch.norm(v_gt - v_pred_selected, p=2, dim=-1).mean()
+    # Use RMSE-like metric to be comparable with MSE (squared L2, mean over elements)
+    # Original Chamfer is L2 norm summed over D. MSE is squared L2 averaged over D.
+    # To make Chamfer comparable to MSE: Use Squared L2 distance, averaged over D.
+    
+    # Squared Euclidean distance [B, N]
+    dist_sq_gt_to_pred = torch.sum((v_gt - v_pred_selected)**2, dim=-1)
+    # Mean over points and batch, then divide by D to match MSE scale
+    loss_gt_to_pred = dist_sq_gt_to_pred.mean() / d
     
     # Pred to GT
     idx_expanded_pred = indices_pred_to_gt.unsqueeze(-1).expand(-1, -1, d)
     v_gt_selected = torch.gather(v_gt, 1, idx_expanded_pred)
     
-    loss_pred_to_gt = torch.norm(v_pred - v_gt_selected, p=2, dim=-1).mean()
+    # loss_pred_to_gt = torch.norm(v_pred - v_gt_selected, p=2, dim=-1).mean()
+    dist_sq_pred_to_gt = torch.sum((v_pred - v_gt_selected)**2, dim=-1)
+    loss_pred_to_gt = dist_sq_pred_to_gt.mean() / d
     
-    # Symmetric Chamfer distance
+    # Symmetric Chamfer distance (now in MSE scale)
     chamfer_loss = loss_gt_to_pred + loss_pred_to_gt
     
     return chamfer_loss
@@ -608,13 +618,20 @@ class FlowMatchEditor(LatentSceneEditor):
         # All metrics are computed, but only the selected one is used for training
         if use_chamfer_flow_loss:
             total_loss = loss_chamfer_flow
+            # Add dummy dependency on loss_flow and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_metrics.reconstruction_loss
         elif use_flow_loss:
             total_loss = loss_flow
+            # Add dummy dependency on loss_chamfer_flow and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_chamfer_flow + 0.0 * loss_metrics.reconstruction_loss
         elif use_render_loss:
             total_loss = loss_metrics.reconstruction_loss
+            # Add dummy dependency on loss_flow and loss_chamfer_flow to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_chamfer_flow
         else:
             # Default to flow_loss if training_mode is invalid
             total_loss = loss_flow
+            total_loss = total_loss + 0.0 * loss_chamfer_flow + 0.0 * loss_metrics.reconstruction_loss
         
         loss_metrics.loss = total_loss
 
