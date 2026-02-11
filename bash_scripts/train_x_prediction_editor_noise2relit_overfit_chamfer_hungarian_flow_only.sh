@@ -41,5 +41,6 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.training_mode = hungarian_flow_only \
     training.fixed_t = 0.0 \
     training.noise_seed = 42 \
+    training.compute_hungarian_loss = true \
     training.single_step_inference = true 
 

@@ -612,8 +612,14 @@ class XPredictionEditor(LatentSceneEditor):
         # Compute chamfer loss (on x)
         loss_chamfer = chamfer_distance(target_x, pred_x)
         
-        # Compute hungarian matching loss (on x)
-        loss_hungarian = hungarian_matching_loss(target_x, pred_x)
+        # Compute hungarian matching loss (on x) - only if specified
+        compute_hungarian = self.config.training.get("compute_hungarian_loss", False)
+        if compute_hungarian:
+            loss_hungarian = hungarian_matching_loss(target_x, pred_x)
+        else:
+            # Set to zero tensor with same device/dtype for compatibility
+            # Multiply by loss_mse * 0.0 to ensure it has correct requires_grad and device/dtype
+            loss_hungarian = loss_mse * 0.0
         
         target_x_norm = target_x.norm(p=2, dim=-1).mean().item()
         pred_x_norm = pred_x.norm(p=2, dim=-1).mean().item()
