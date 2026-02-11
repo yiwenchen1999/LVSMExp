@@ -16,11 +16,12 @@ from utils import camera_utils, data_utils
 def chamfer_distance(v_gt, v_pred, chunk_size=64):
     """
     Compute Chamfer distance between two sets of vectors (memory-efficient version with double chunking).
+    Uses running minimum to avoid accumulating intermediate results in memory.
     
     Args:
         v_gt: Ground truth vectors, shape [batch, n_vectors, d]
         v_pred: Predicted vectors, shape [batch, n_vectors, d]
-        chunk_size: Size of chunks for memory-efficient computation (default 256 for large tensors)
+        chunk_size: Size of chunks for memory-efficient computation (default 64 for very large tensors)
     
     Returns:
         Chamfer distance, scalar tensor
@@ -35,8 +36,8 @@ def chamfer_distance(v_gt, v_pred, chunk_size=64):
         chunk_end_gt = min(i + chunk_size, n_gt)
         v_gt_chunk = v_gt[:, i:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
         
-        # For each chunk of v_gt, compute min distance to all chunks of v_pred
-        min_dists_for_gt_chunk = []
+        # Use running minimum to avoid storing all intermediate results
+        min_dist_chunk = None
         for j in range(0, n_pred, chunk_size):
             chunk_end_pred = min(j + chunk_size, n_pred)
             v_pred_chunk = v_pred[:, j:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
@@ -44,41 +45,57 @@ def chamfer_distance(v_gt, v_pred, chunk_size=64):
             # Compute distances: [batch, chunk_size_gt, chunk_size_pred, d]
             diff = v_gt_chunk.unsqueeze(2) - v_pred_chunk.unsqueeze(1)
             dist_chunk = torch.norm(diff, p=2, dim=-1)  # [batch, chunk_size_gt, chunk_size_pred]
-            min_dists_for_gt_chunk.append(dist_chunk.min(dim=2)[0])  # [batch, chunk_size_gt]
+            min_dist_to_pred_chunk = dist_chunk.min(dim=2)[0]  # [batch, chunk_size_gt]
+            
+            # Update running minimum
+            if min_dist_chunk is None:
+                min_dist_chunk = min_dist_to_pred_chunk
+            else:
+                min_dist_chunk = torch.minimum(min_dist_chunk, min_dist_to_pred_chunk)
+            
+            # Explicitly delete intermediate tensors to free memory
+            del diff, dist_chunk, min_dist_to_pred_chunk, v_pred_chunk
         
-        # Take minimum across all v_pred chunks for each v_gt point
-        min_dist_chunk = torch.stack(min_dists_for_gt_chunk, dim=0).min(dim=0)[0]  # [batch, chunk_size_gt]
         min_dist_gt_to_pred_list.append(min_dist_chunk)
+        del v_gt_chunk, min_dist_chunk
     
     min_dist_gt_to_pred = torch.cat(min_dist_gt_to_pred_list, dim=1)  # [batch, n_gt]
     chamfer_gt_to_pred = min_dist_gt_to_pred.mean()
+    del min_dist_gt_to_pred_list, min_dist_gt_to_pred
     
     # Compute chamfer_pred_to_gt: for each point in v_pred, find minimum distance to v_gt
     # Use double chunking: chunk both v_pred and v_gt to minimize memory
     min_dist_pred_to_gt_list = []
     for i in range(0, n_pred, chunk_size):
-        print(f"Processing chunk {i} of {n_pred}")
         chunk_end_pred = min(i + chunk_size, n_pred)
         v_pred_chunk = v_pred[:, i:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
         
-        # For each chunk of v_pred, compute min distance to all chunks of v_gt
-        min_dists_for_pred_chunk = []
+        # Use running minimum to avoid storing all intermediate results
+        min_dist_chunk = None
         for j in range(0, n_gt, chunk_size):
-            print(f"Processing chunk {j} of {n_gt}")
             chunk_end_gt = min(j + chunk_size, n_gt)
             v_gt_chunk = v_gt[:, j:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
             
             # Compute distances: [batch, chunk_size_pred, chunk_size_gt, d]
             diff = v_pred_chunk.unsqueeze(2) - v_gt_chunk.unsqueeze(1)
             dist_chunk = torch.norm(diff, p=2, dim=-1)  # [batch, chunk_size_pred, chunk_size_gt]
-            min_dists_for_pred_chunk.append(dist_chunk.min(dim=2)[0])  # [batch, chunk_size_pred]
+            min_dist_to_gt_chunk = dist_chunk.min(dim=2)[0]  # [batch, chunk_size_pred]
+            
+            # Update running minimum
+            if min_dist_chunk is None:
+                min_dist_chunk = min_dist_to_gt_chunk
+            else:
+                min_dist_chunk = torch.minimum(min_dist_chunk, min_dist_to_gt_chunk)
+            
+            # Explicitly delete intermediate tensors to free memory
+            del diff, dist_chunk, min_dist_to_gt_chunk, v_gt_chunk
         
-        # Take minimum across all v_gt chunks for each v_pred point
-        min_dist_chunk = torch.stack(min_dists_for_pred_chunk, dim=0).min(dim=0)[0]  # [batch, chunk_size_pred]
         min_dist_pred_to_gt_list.append(min_dist_chunk)
+        del v_pred_chunk, min_dist_chunk
     
     min_dist_pred_to_gt = torch.cat(min_dist_pred_to_gt_list, dim=1)  # [batch, n_pred]
     chamfer_pred_to_gt = min_dist_pred_to_gt.mean()
+    del min_dist_pred_to_gt_list, min_dist_pred_to_gt
     
     # Symmetric Chamfer distance
     chamfer_loss = chamfer_gt_to_pred + chamfer_pred_to_gt
