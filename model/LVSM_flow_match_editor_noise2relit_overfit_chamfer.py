@@ -13,15 +13,20 @@ from .transformer import QK_Norm_SelfAttention, MLP, init_weights
 from .loss import LossComputer
 from utils import camera_utils, data_utils
 
-def chamfer_distance(v_gt, v_pred, chunk_size=64):
+def chamfer_distance(v_gt, v_pred, chunk_size=256):
     """
-    Compute Chamfer distance between two sets of vectors (memory-efficient version with double chunking).
-    Uses running minimum to avoid accumulating intermediate results in memory.
+    Compute Chamfer distance between two sets of vectors (memory-efficient version).
+    
+    Strategy:
+    1. Find indices of nearest neighbors using double chunking within torch.no_grad().
+       This avoids building a massive computation graph for the search process.
+    2. Gather the nearest neighbor vectors.
+    3. Compute the distance (L2) only for the selected pairs with gradients enabled.
     
     Args:
         v_gt: Ground truth vectors, shape [batch, n_vectors, d]
         v_pred: Predicted vectors, shape [batch, n_vectors, d]
-        chunk_size: Size of chunks for memory-efficient computation (default 64 for very large tensors)
+        chunk_size: Size of chunks for memory-efficient computation
     
     Returns:
         Chamfer distance, scalar tensor
@@ -29,82 +34,91 @@ def chamfer_distance(v_gt, v_pred, chunk_size=64):
     batch_size, n_gt, d = v_gt.shape
     n_pred = v_pred.shape[1]
     
-    # Compute chamfer_gt_to_pred: for each point in v_gt, find minimum distance to v_pred
-    # Use double chunking: chunk both v_gt and v_pred to minimize memory
-    # Directly accumulate sum instead of storing all results
-    chamfer_gt_to_pred_sum = torch.tensor(0.0, device=v_gt.device, dtype=v_gt.dtype, requires_grad=v_gt.requires_grad)
-    total_gt_points = 0
+    # 1. Find indices of nearest neighbors (NO GRADIENTS)
+    # We need to find for each i in n_gt, the j in n_pred that minimizes dist.
     
-    for i in range(0, n_gt, chunk_size):
-        chunk_end_gt = min(i + chunk_size, n_gt)
-        v_gt_chunk = v_gt[:, i:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
+    with torch.no_grad():
+        # GT to Pred indices
+        min_indices_gt_to_pred = []
+        for i in range(0, n_gt, chunk_size):
+            chunk_end_gt = min(i + chunk_size, n_gt)
+            v_gt_chunk = v_gt[:, i:chunk_end_gt, :] # [B, chunk, d]
+            
+            curr_min_dists = torch.full((batch_size, chunk_end_gt - i), float('inf'), device=v_gt.device, dtype=v_gt.dtype)
+            curr_min_indices = torch.zeros((batch_size, chunk_end_gt - i), dtype=torch.long, device=v_gt.device)
+            
+            for j in range(0, n_pred, chunk_size):
+                chunk_end_pred = min(j + chunk_size, n_pred)
+                v_pred_chunk = v_pred[:, j:chunk_end_pred, :] # [B, chunk_pred, d]
+                
+                # dist: [B, n_gt_chunk, n_pred_chunk]
+                # We use direct difference here as it is numerically stable and memory is fine inside no_grad
+                diff = v_gt_chunk.unsqueeze(2) - v_pred_chunk.unsqueeze(1)
+                dist_sq = torch.sum(diff**2, dim=-1) # Squared Euclidean for index search
+                
+                # min over pred chunk
+                min_dist, min_idx = dist_sq.min(dim=2) # [B, n_gt_chunk]
+                
+                # update global min
+                mask = min_dist < curr_min_dists
+                curr_min_dists[mask] = min_dist[mask]
+                curr_min_indices[mask] = min_idx[mask] + j # Global index
+                
+                del diff, dist_sq, min_dist, min_idx
+            
+            min_indices_gt_to_pred.append(curr_min_indices)
+            del v_gt_chunk, curr_min_dists, curr_min_indices
         
-        # Use running minimum to avoid storing all intermediate results
-        min_dist_chunk = None
-        for j in range(0, n_pred, chunk_size):
-            chunk_end_pred = min(j + chunk_size, n_pred)
-            v_pred_chunk = v_pred[:, j:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
+        indices_gt_to_pred = torch.cat(min_indices_gt_to_pred, dim=1) # [B, n_gt]
+
+        # Pred to GT indices
+        min_indices_pred_to_gt = []
+        for i in range(0, n_pred, chunk_size):
+            chunk_end_pred = min(i + chunk_size, n_pred)
+            v_pred_chunk = v_pred[:, i:chunk_end_pred, :]
             
-            # Compute distances: [batch, chunk_size_gt, chunk_size_pred, d]
-            diff = v_gt_chunk.unsqueeze(2) - v_pred_chunk.unsqueeze(1)
-            dist_chunk = torch.norm(diff, p=2, dim=-1)  # [batch, chunk_size_gt, chunk_size_pred]
-            min_dist_to_pred_chunk = dist_chunk.min(dim=2)[0]  # [batch, chunk_size_gt]
+            curr_min_dists = torch.full((batch_size, chunk_end_pred - i), float('inf'), device=v_gt.device, dtype=v_gt.dtype)
+            curr_min_indices = torch.zeros((batch_size, chunk_end_pred - i), dtype=torch.long, device=v_gt.device)
             
-            # Update running minimum
-            if min_dist_chunk is None:
-                min_dist_chunk = min_dist_to_pred_chunk
-            else:
-                min_dist_chunk = torch.minimum(min_dist_chunk, min_dist_to_pred_chunk)
+            for j in range(0, n_gt, chunk_size):
+                chunk_end_gt = min(j + chunk_size, n_gt)
+                v_gt_chunk = v_gt[:, j:chunk_end_gt, :]
+                
+                diff = v_pred_chunk.unsqueeze(2) - v_gt_chunk.unsqueeze(1)
+                dist_sq = torch.sum(diff**2, dim=-1)
+                
+                min_dist, min_idx = dist_sq.min(dim=2)
+                
+                mask = min_dist < curr_min_dists
+                curr_min_dists[mask] = min_dist[mask]
+                curr_min_indices[mask] = min_idx[mask] + j
+                
+                del diff, dist_sq, min_dist, min_idx
             
-            # Explicitly delete intermediate tensors to free memory
-            del diff, dist_chunk, min_dist_to_pred_chunk, v_pred_chunk
-        
-        # Accumulate sum directly instead of storing in list
-        chamfer_gt_to_pred_sum = chamfer_gt_to_pred_sum + min_dist_chunk.sum()
-        total_gt_points += min_dist_chunk.numel()  # batch * chunk_size_gt (or smaller for last chunk)
-        del v_gt_chunk, min_dist_chunk
+            min_indices_pred_to_gt.append(curr_min_indices)
+            del v_pred_chunk, curr_min_dists, curr_min_indices
+            
+        indices_pred_to_gt = torch.cat(min_indices_pred_to_gt, dim=1) # [B, n_pred]
+
+    # 2. Compute Loss (WITH GRADIENTS) using gathered vectors
+    # This part builds the graph, but only for O(N) elements, not O(N^2)
     
-    chamfer_gt_to_pred = chamfer_gt_to_pred_sum / total_gt_points
+    # GT to Pred
+    # indices_gt_to_pred: [B, n_gt] -> [B, n_gt, d]
+    idx_expanded_gt = indices_gt_to_pred.unsqueeze(-1).expand(-1, -1, d)
+    v_pred_selected = torch.gather(v_pred, 1, idx_expanded_gt) 
     
-    # Compute chamfer_pred_to_gt: for each point in v_pred, find minimum distance to v_gt
-    # Use double chunking: chunk both v_pred and v_gt to minimize memory
-    # Directly accumulate sum instead of storing all results
-    chamfer_pred_to_gt_sum = torch.tensor(0.0, device=v_gt.device, dtype=v_gt.dtype, requires_grad=v_gt.requires_grad)
-    total_pred_points = 0
+    # Compute L2 distance (mean over batch and points)
+    loss_gt_to_pred = torch.norm(v_gt - v_pred_selected, p=2, dim=-1).mean()
     
-    for i in range(0, n_pred, chunk_size):
-        chunk_end_pred = min(i + chunk_size, n_pred)
-        v_pred_chunk = v_pred[:, i:chunk_end_pred, :]  # [batch, chunk_size_pred, d]
-        
-        # Use running minimum to avoid storing all intermediate results
-        min_dist_chunk = None
-        for j in range(0, n_gt, chunk_size):
-            chunk_end_gt = min(j + chunk_size, n_gt)
-            v_gt_chunk = v_gt[:, j:chunk_end_gt, :]  # [batch, chunk_size_gt, d]
-            
-            # Compute distances: [batch, chunk_size_pred, chunk_size_gt, d]
-            diff = v_pred_chunk.unsqueeze(2) - v_gt_chunk.unsqueeze(1)
-            dist_chunk = torch.norm(diff, p=2, dim=-1)  # [batch, chunk_size_pred, chunk_size_gt]
-            min_dist_to_gt_chunk = dist_chunk.min(dim=2)[0]  # [batch, chunk_size_pred]
-            
-            # Update running minimum
-            if min_dist_chunk is None:
-                min_dist_chunk = min_dist_to_gt_chunk
-            else:
-                min_dist_chunk = torch.minimum(min_dist_chunk, min_dist_to_gt_chunk)
-            
-            # Explicitly delete intermediate tensors to free memory
-            del diff, dist_chunk, min_dist_to_gt_chunk, v_gt_chunk
-        
-        # Accumulate sum directly instead of storing in list
-        chamfer_pred_to_gt_sum = chamfer_pred_to_gt_sum + min_dist_chunk.sum()
-        total_pred_points += min_dist_chunk.numel()  # batch * chunk_size_pred (or smaller for last chunk)
-        del v_pred_chunk, min_dist_chunk
+    # Pred to GT
+    idx_expanded_pred = indices_pred_to_gt.unsqueeze(-1).expand(-1, -1, d)
+    v_gt_selected = torch.gather(v_gt, 1, idx_expanded_pred)
     
-    chamfer_pred_to_gt = chamfer_pred_to_gt_sum / total_pred_points
+    loss_pred_to_gt = torch.norm(v_pred - v_gt_selected, p=2, dim=-1).mean()
     
     # Symmetric Chamfer distance
-    chamfer_loss = chamfer_gt_to_pred + chamfer_pred_to_gt
+    chamfer_loss = loss_gt_to_pred + loss_pred_to_gt
     
     return chamfer_loss
 
