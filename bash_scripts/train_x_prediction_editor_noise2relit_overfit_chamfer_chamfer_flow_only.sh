@@ -34,7 +34,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.wandb_exp_name = LVSM_x_prediction_overfit_chamfer_chamfer_flow_only \
     training.dataset_path = data_samples/objaverse_processed_with_envmaps/test/full_list.txt \
     training.warmup = 3000 \
-    training.vis_every = 2 \
+    training.vis_every = 1000 \
     training.lr = 0.00001 \
     training.single_env_map = true \
     training.skip_renderer = false \
@@ -42,5 +42,6 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.fixed_t = 0.0 \
     training.noise_seed = 42 \
     training.compute_hungarian_loss = false \
+    training.freeze_reconstructor_renderer = true \
     training.single_step_inference = true 
 

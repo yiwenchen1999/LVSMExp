@@ -42,5 +42,6 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.fixed_t = 0.0 \
     training.noise_seed = 42 \
     training.compute_hungarian_loss = true \
+    training.freeze_reconstructor_renderer = true \
     training.single_step_inference = true 
 
