@@ -496,11 +496,18 @@ class XPredictionEditor(LatentSceneEditor):
             raise AssertionError("Target relit_images not found in batch during training; this must not happen in proper training. Stopping process.")
             
         #& Step 4: Sample Time t
-        # Controlled environment: always use t=0 for training
-        fixed_t = self.config.training.get("fixed_t", 0.0)
+        # Sample uniformly from {0, 0.1, 0.2, ..., 0.9}
         if timestep is None:
-            # Training: use fixed t (default 0.0) instead of random sampling
-            t = torch.ones((z_A.shape[0],), device=z_A.device) * fixed_t
+            # Training: sample uniformly from discrete time steps
+            if self.training:
+                # Discrete time steps: [0, 0.1, 0.2, ..., 0.9]
+                time_steps = torch.tensor([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], device=z_A.device)
+                # Randomly sample one time step for each sample in batch
+                indices = torch.randint(0, len(time_steps), (z_A.shape[0],), device=z_A.device)
+                t = time_steps[indices]
+            else:
+                # Eval mode: use first time step (0.0) as default
+                t = torch.zeros((z_A.shape[0],), device=z_A.device)
         else:
             # Inference: use provided t
             t = torch.ones((z_A.shape[0],), device=z_A.device) * timestep
@@ -606,28 +613,46 @@ class XPredictionEditor(LatentSceneEditor):
         # x-prediction objective: predict z_B directly
         target_x = z_1
         
-        # Compute MSE loss (previously flow loss)
+        # Ground truth velocity: v_gt = z_1 - z_0
+        v_gt = z_1 - z_0
+        
+        # Derive predicted velocity from x_pred: v_pred = (pred_x - z_t) / (1 - t)
+        # z_t = (1-t) * z_0 + t * z_1
+        # pred_x is prediction of z_1
+        # v_pred = (pred_x - z_t) / (1 - t)
+        t_expand_for_v = t.view(-1, 1, 1)
+        denom = 1.0 - t_expand_for_v
+        # Avoid division by zero (though t should be in [0, 0.9] so this shouldn't happen)
+        denom = torch.clamp(denom, min=1e-5)
+        v_pred = (pred_x - z_t) / denom
+        
+        # Compute flow loss: MSE between v_pred and v_gt
+        loss_flow = F.mse_loss(v_pred, v_gt)
+        
+        # Compute MSE loss on x (for other loss modes)
         loss_mse = F.mse_loss(pred_x, target_x)
         
-        # Compute chamfer loss (on x)
-        loss_chamfer = chamfer_distance(target_x, pred_x)
+        # Compute chamfer loss (on velocity v)
+        loss_chamfer = chamfer_distance(v_gt, v_pred)
         
-        # Compute hungarian matching loss (on x) - only if specified
+        # Compute hungarian matching loss (on velocity v) - only if specified
         compute_hungarian = self.config.training.get("compute_hungarian_loss", False)
         if compute_hungarian:
-            loss_hungarian = hungarian_matching_loss(target_x, pred_x)
+            loss_hungarian = hungarian_matching_loss(v_gt, v_pred)
         else:
             # Set to zero tensor with same device/dtype for compatibility
-            # Multiply by loss_mse * 0.0 to ensure it has correct requires_grad and device/dtype
-            loss_hungarian = loss_mse * 0.0
+            # Multiply by loss_flow * 0.0 to ensure it has correct requires_grad and device/dtype
+            loss_hungarian = loss_flow * 0.0
         
         target_x_norm = target_x.norm(p=2, dim=-1).mean().item()
         pred_x_norm = pred_x.norm(p=2, dim=-1).mean().item()
-        print(f"Target X Norm: {target_x_norm:.4f} | Pred X Norm: {pred_x_norm:.4f}")
+        v_gt_norm = v_gt.norm(p=2, dim=-1).mean().item()
+        v_pred_norm = v_pred.norm(p=2, dim=-1).mean().item()
+        print(f"t={t[0].item():.2f} | Target X Norm: {target_x_norm:.4f} | Pred X Norm: {pred_x_norm:.4f} | v_gt Norm: {v_gt_norm:.4f} | v_pred Norm: {v_pred_norm:.4f}")
         
         # Initialize loss metrics with flow losses (keeping keys for compatibility)
         loss_metrics = edict({
-            'flow_loss': loss_mse,
+            'flow_loss': loss_flow,  # Now based on velocity
             'chamfer_flow_loss': loss_chamfer,
             'hungarian_flow_loss': loss_hungarian
         })
@@ -693,23 +718,23 @@ class XPredictionEditor(LatentSceneEditor):
         # All metrics are computed, but only the selected one is used for training
         if use_chamfer_flow_loss:
             total_loss = loss_chamfer
-            # Add dummy dependency on loss_mse, loss_hungarian and reconstruction_loss to avoid DDP errors
-            total_loss = total_loss + 0.0 * loss_mse + 0.0 * loss_hungarian + 0.0 * loss_metrics.reconstruction_loss
+            # Add dummy dependency on loss_flow, loss_hungarian and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_hungarian + 0.0 * loss_metrics.reconstruction_loss
         elif use_flow_loss:
-            total_loss = loss_mse
+            total_loss = loss_flow  # Use velocity-based flow loss
             # Add dummy dependency on loss_chamfer, loss_hungarian and reconstruction_loss to avoid DDP errors
             total_loss = total_loss + 0.0 * loss_chamfer + 0.0 * loss_hungarian + 0.0 * loss_metrics.reconstruction_loss
         elif use_hungarian_flow_loss:
             total_loss = loss_hungarian
-            # Add dummy dependency on loss_mse, loss_chamfer and reconstruction_loss to avoid DDP errors
-            total_loss = total_loss + 0.0 * loss_mse + 0.0 * loss_chamfer + 0.0 * loss_metrics.reconstruction_loss
+            # Add dummy dependency on loss_flow, loss_chamfer and reconstruction_loss to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_chamfer + 0.0 * loss_metrics.reconstruction_loss
         elif use_render_loss:
             total_loss = loss_metrics.reconstruction_loss
-            # Add dummy dependency on loss_mse, loss_chamfer and loss_hungarian to avoid DDP errors
-            total_loss = total_loss + 0.0 * loss_mse + 0.0 * loss_chamfer + 0.0 * loss_hungarian
+            # Add dummy dependency on loss_flow, loss_chamfer and loss_hungarian to avoid DDP errors
+            total_loss = total_loss + 0.0 * loss_flow + 0.0 * loss_chamfer + 0.0 * loss_hungarian
         else:
-            # Default to flow_loss (MSE) if training_mode is invalid
-            total_loss = loss_mse
+            # Default to flow_loss (velocity-based) if training_mode is invalid
+            total_loss = loss_flow
             total_loss = total_loss + 0.0 * loss_chamfer + 0.0 * loss_hungarian + 0.0 * loss_metrics.reconstruction_loss
         
         loss_metrics.loss = total_loss
@@ -795,67 +820,96 @@ class XPredictionEditor(LatentSceneEditor):
             _, n_env_patches, _ = env_tokens.size()
             env_tokens = env_tokens.reshape(b, v_input * n_env_patches, d)
         
-        # Controlled environment: single step inference (t=0)
+        # Controlled environment: single step inference
         single_step_inference = self.config.training.get("single_step_inference", False)
         
+        # Discrete time steps: [0, 0.1, 0.2, ..., 0.9]
+        discrete_time_steps = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        
         if single_step_inference:
-            # Single step inference at t=0
-            t_val = 0.0
-            t = torch.ones((z.shape[0],), device=z.device) * t_val
-            
-            # Predict X
-            # Input: [z_t, z_A, env_tokens]
-            editor_input = torch.cat([z, z_A, env_tokens], dim=1)
-            t_emb = self.time_embedder(t)
-            
-            out = self.pass_editor_layers(editor_input, t_emb)
-            pred_x = out[:, :self.config.model.transformer.n_latent_vectors, :]
-            
-            # Single step: z_1 = pred_x directly
-            z = pred_x
-        else:
-            # ODE Integration (adjusted for X-prediction)
-            # v_t = (x_1 - x_t) / (1 - t)
-            dt = 1.0 / steps
-            for i in range(steps):
-                t_val = i / steps
+            # Single step inference: iterate through discrete time steps
+            # z starts as z_0 (noise)
+            for t_val in discrete_time_steps:
                 t = torch.ones((z.shape[0],), device=z.device) * t_val
+                
+                # Current state is z (which evolves from z_0)
+                z_t = z
+                
+                # Predict X (prediction of z_1)
+                # Input: [z_t, z_A, env_tokens]
+                editor_input = torch.cat([z_t, z_A, env_tokens], dim=1)
+                t_emb = self.time_embedder(t)
+                
+                out = self.pass_editor_layers(editor_input, t_emb)
+                pred_x = out[:, :self.config.model.transformer.n_latent_vectors, :]
+                
+                # Compute velocity: v = (pred_x - z_t) / (1 - t)
+                denom = 1.0 - t_val
+                if denom < 1e-5: denom = 1e-5
+                v_pred = (pred_x - z_t) / denom
+                
+                # Update z using velocity
+                if t_val < 0.9:
+                    dt = 0.1  # Step size between discrete time steps
+                    z = z_t + v_pred * dt
+                else:
+                    # At t=0.9, final step to t=1.0: z_1 = pred_x
+                    z = pred_x
+        else:
+            # ODE Integration (adjusted for X-prediction) using discrete time steps
+            # v_t = (x_1 - x_t) / (1 - t)
+            dt = 0.1  # Step size between discrete time steps
+            for i, t_val in enumerate(discrete_time_steps):
+                t = torch.ones((z.shape[0],), device=z.device) * t_val
+                z_t = z  # Current state
                 
                 # Predict X
                 # Input: [z_t, z_A, env_tokens]
-                editor_input = torch.cat([z, z_A, env_tokens], dim=1)
+                editor_input = torch.cat([z_t, z_A, env_tokens], dim=1)
                 t_emb = self.time_embedder(t)
                 
                 out = self.pass_editor_layers(editor_input, t_emb)
                 pred_x = out[:, :self.config.model.transformer.n_latent_vectors, :]
                 
                 # Compute velocity from pred_x
-                # v = (pred_x - z) / (1 - t)
+                # v = (pred_x - z_t) / (1 - t)
                 denom = 1.0 - t_val
                 if denom < 1e-5: denom = 1e-5 # Avoid division by zero
-                v_pred = (pred_x - z) / denom
+                v_pred = (pred_x - z_t) / denom
                 
                 if method == 'euler':
-                    z = z + v_pred * dt
+                    if t_val < 0.9:
+                        z = z_t + v_pred * dt
+                    else:
+                        # At t=0.9, final step to t=1.0
+                        z = pred_x
                 elif method == 'rk4':
-                    pass
+                    # RK4 not implemented for discrete steps
+                    if t_val < 0.9:
+                        z = z_t + v_pred * dt
+                    else:
+                        z = pred_x
                 elif method == 'heun':
                     # v1 = f(z, t)
                     # z_pred = z + v1 * dt
-                    z_guess = z + v_pred * dt
-                    
-                    t_next_val = t_val + dt
-                    t_next = torch.ones_like(t) * t_next_val
-                    editor_input_next = torch.cat([z_guess, z_A, env_tokens], dim=1)
-                    t_emb_next = self.time_embedder(t_next)
-                    out_next = self.pass_editor_layers(editor_input_next, t_emb_next)
-                    pred_x_next = out_next[:, :self.config.model.transformer.n_latent_vectors, :]
-                    
-                    denom_next = 1.0 - t_next_val
-                    if denom_next < 1e-5: denom_next = 1e-5
-                    v_pred_next = (pred_x_next - z_guess) / denom_next
-                    
-                    z = z + 0.5 * dt * (v_pred + v_pred_next)
+                    if t_val < 0.9:
+                        z_guess = z_t + v_pred * dt
+                        
+                        t_next_val = discrete_time_steps[i + 1] if i + 1 < len(discrete_time_steps) else 1.0
+                        t_next = torch.ones_like(t) * t_next_val
+                        editor_input_next = torch.cat([z_guess, z_A, env_tokens], dim=1)
+                        t_emb_next = self.time_embedder(t_next)
+                        out_next = self.pass_editor_layers(editor_input_next, t_emb_next)
+                        pred_x_next = out_next[:, :self.config.model.transformer.n_latent_vectors, :]
+                        
+                        denom_next = 1.0 - t_next_val
+                        if denom_next < 1e-5: denom_next = 1e-5
+                        v_pred_next = (pred_x_next - z_guess) / denom_next
+                        
+                        z = z_t + 0.5 * dt * (v_pred + v_pred_next)
+                    else:
+                        # At t=0.9, final step to t=1.0
+                        z = pred_x
 
         # Scale back to original space before rendering (renderer expects unscaled latents)
         z = z / latent_scale
