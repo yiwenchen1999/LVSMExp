@@ -648,7 +648,7 @@ class XPredictionEditor(LatentSceneEditor):
         if not skip_renderer:
             # Compute z_B_pred from z_t using predicted x
             # Since we predict x (z_B) directly:
-            z_B_pred = pred_x
+            z_B_pred = target_x
             
             # Scale back to original space before rendering (renderer expects unscaled latents)
             z_B_pred = z_B_pred / latent_scale
