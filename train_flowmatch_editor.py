@@ -310,9 +310,17 @@ while cur_train_step <= total_train_steps:
         
         # export intermediate visualization results
         if export_inter_results:
+            # (1) Save training iteration results (like train_editor.py)
+            print(f"Saving training iteration results...")
+            training_vis_path = os.path.join(config.training.checkpoint_dir, f"iter_{cur_train_step:08d}_training")
+            os.makedirs(training_vis_path, exist_ok=True)
+            visualize_intermediate_results(training_vis_path, ret_dict)
+            torch.cuda.empty_cache()
+            
+            # (2) Save flow_match_inference results
             print(f"Running Flow Matching Inference for Visualization...")
-            vis_path = os.path.join(config.training.checkpoint_dir, f"iter_{cur_train_step:08d}")
-            os.makedirs(vis_path, exist_ok=True)
+            inference_vis_path = os.path.join(config.training.checkpoint_dir, f"iter_{cur_train_step:08d}_inference")
+            os.makedirs(inference_vis_path, exist_ok=True)
             
             # Perform full inference using ODE solver
             # Set model to eval mode for inference to avoid DDP issues
@@ -347,7 +355,7 @@ while cur_train_step <= total_train_steps:
                     loss_metrics=ret_dict.loss_metrics
                 )
             
-            visualize_intermediate_results(vis_path, vis_dict)
+            visualize_intermediate_results(inference_vis_path, vis_dict)
             torch.cuda.empty_cache()
             # Restore training mode after inference
             model.train()
