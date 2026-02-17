@@ -20,6 +20,25 @@ export PREVIEW_OUTPUT="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/scene_pre
 export BROKEN_SCENE_FILE="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/scene_preview/broken_scene.txt"
 
 ############################
+# Step 1: Update paths (run first)
+############################
+echo "Updating paths (old -> new)..."
+singularity exec $BIND $SIF bash -lc "
+  set -euo pipefail
+  export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
+  cd $PROJ
+
+  python3 preprocess_scripts/update_paths.py \
+    --old-path \"/projects/vig/Datasets/objaverse/hf-objaverse-v1\" \
+    --new-path \"/music-shared-disk/group/ct/yiwen/data/objaverse\" \
+    --root-dir /music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test \
+    --extensions json txt \
+    --backup
+"
+echo "Path update done."
+echo ""
+
+############################
 # Menu
 ############################
 echo "========================================"
