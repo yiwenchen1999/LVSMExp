@@ -2,7 +2,7 @@ import requests
 import os
 
 # --- Configuration ---
-SAVE_DIR = "polyhaven_assets"
+SAVE_DIR = "/projects/vig/Datasets/Polyhaven"
 ASSET_TYPE = "hdris"  # Options: 'hdris', 'textures', 'models'
 RESOLUTION = "4k"      # Options: '1k', '2k', '4k', '8k'
 FILE_FORMAT = "exr"    # 'exr' or 'hdr' for HDRIs; 'png' or 'jpg' for textures
