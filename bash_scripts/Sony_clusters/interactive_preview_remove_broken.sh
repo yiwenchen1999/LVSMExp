@@ -14,8 +14,8 @@ export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
 export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
 
 # Sony cluster paths (map from shortcut.sh /projects/vig/...)
-export FULL_LIST_TEST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/test/full_list.txt"
-export FULL_LIST_TRAIN="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/train/full_list.txt"
+export FULL_LIST_TEST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
+export FULL_LIST_TRAIN="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/train/full_list.txt"
 export PREVIEW_OUTPUT="scene_preview/preview.png"
 export BROKEN_SCENE_FILE="scene_preview/broken_scene.txt"
 
