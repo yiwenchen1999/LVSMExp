@@ -199,6 +199,8 @@ def create_preview_grid(full_list_path, output_path_template, image_idx=64, grid
     
     # Determine output directory and base name
     output_dir = os.path.dirname(output_path_template) if os.path.dirname(output_path_template) else '.'
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     output_base = os.path.basename(output_path_template)
     # Remove extension if present
     if '.' in output_base:
