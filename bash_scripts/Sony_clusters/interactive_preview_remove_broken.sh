@@ -29,7 +29,7 @@ singularity exec $BIND $SIF bash -lc "
   cd $PROJ
 
   python3 preprocess_scripts/update_paths.py \
-    --old-path \"/projects/vig/Datasets/objaverse/hf-objaverse-v1\" \
+    --old-path \"/scratch/chen.yiwe/temp_objaverse\" \
     --new-path \"/music-shared-disk/group/ct/yiwen/data/objaverse\" \
     --root-dir /music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test \
     --extensions json txt \
