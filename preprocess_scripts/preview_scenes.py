@@ -53,7 +53,7 @@ def check_image_black_or_white(img, threshold=0.95, dark_threshold=5):
     return is_mostly_black, is_mostly_white, is_mostly_dark, black_ratio, white_ratio, dark_ratio
 
 
-def load_scene_image(scene_json_path, image_idx=64):
+def load_scene_image(scene_json_path, image_idx=30):
     """
     Load an image from a scene JSON file.
     
