@@ -20,12 +20,12 @@ export XDG_CACHE_HOME=/scratch/chen.yiwe/.cache
 export XDG_CONFIG_HOME=/scratch/chen.yiwe/.config
 export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 
-cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp
-conda activate /projects/vig/yiwenc/all_env/rayzer
+# cd /projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp
+# conda activate /projects/vig/yiwenc/all_env/rayzer
 
-torchrun --nproc_per_node 4 --nnodes 1 \
+torchrun --nproc_per_node 2 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-    train.py --config configs/LVSM_scene_encoder_decoder_512.yaml \
-    training.batch_size_per_gpu = 4 \
-    training.dataset_path = /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
+    train.py --config configs/LVSM_scene_encoder_decoder_sparse.yaml \
+    training.batch_size_per_gpu = 8 \
+    training.dataset_path = /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
     training.grad_accum_steps = 1

@@ -63,7 +63,7 @@ python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wE
 # delete broken scenes
 python preprocess_scripts/remove_broken_scenes.py \
     --broken-scene scene_preview/broken_scene.txt \
-    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/train/full_list.txt
+    --full-list /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/full_list.txt
 
 # create evaluation indices
 python preprocess_scripts/create_evaluation_index.py \
