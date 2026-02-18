@@ -11,8 +11,8 @@ python process_data.py --base_path re10k --output_dir re10k_processed --mode tes
 
 # objaverse
 python preprocess_scripts/preprocess_objaverse.py \
-    --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
-    --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_format \
+    --input data_samples/objaverse_with_pointLights \
+    --output data_samples/processed_objaverse_with_pointLights \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \

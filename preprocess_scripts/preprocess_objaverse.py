@@ -4,14 +4,17 @@ Preprocessing script to convert Objaverse data format to re10k format.
 
 The script processes Objaverse data where:
 - Each object has train/ and test/ folders
-- test/ contains env_0/, env_1/, ..., env_4/, white_env_0/ folders (different scenes with same trajectory)
-- Each env folder contains gt_{idx}.png images
+- Scenes can be lit by environment lights or point lights:
+  - Env lights: env_0/, env_1/, ..., white_env_0/ (lighting from env.json / white_env.json + HDRI)
+  - Point lights: rgb_pl_0/, white_pl_0/, ... (lighting from rgb_pl.json / white_pl.json; color (1,1,1) for white_pl)
+- Each scene folder contains gt_{idx}.png images
 - cameras.json contains camera parameters in Blender convention
 
 Output format matches re10k:
-- JSON files with scene_name and frames array
+- JSON files with scene_name and frames array (metadata/)
 - Each frame has: image_path, fxfycxcy, w2c
-- Images organized in images/{scene_name}/ folders
+- Images in images/{scene_name}/, envmaps in envmaps/{scene_name}/ (env-lit only)
+- Point-light rays in point_light_rays/{scene_name}.npy (point-lit only): [N, 10] = intensity(1) + color(3) + ray_o(3) + ray_d(3)
 """
 
 import os
@@ -93,6 +96,78 @@ def fov_to_fxfycxcy(fov_degrees, image_width, image_height):
     return [fx, fy, cx, cy]
 
 
+def is_pl_folder(name):
+    """Return True if folder name indicates point-light lighting (rgb_pl_* or white_pl_*)."""
+    return (name.startswith('rgb_pl_') or name.startswith('white_pl_'))
+
+
+def load_point_light_info(pl_folder_path):
+    """
+    Load point light position, color and power from rgb_pl.json or white_pl.json.
+    Returns (pos, color, power) or None if not found.
+    For white_pl, color is (1, 1, 1).
+    """
+    for name in ('rgb_pl.json', 'white_pl.json'):
+        path = os.path.join(pl_folder_path, name)
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                data = json.load(f)
+            pos = np.array(data['pos'], dtype=np.float64)
+            power = float(data['power'])
+            color = np.array(data.get('color', [1.0, 1.0, 1.0]), dtype=np.float64)
+            if color.size != 3:
+                color = np.array([1.0, 1.0, 1.0], dtype=np.float64)
+            return pos, color, power
+    return None
+
+
+def uniform_sphere_surface(N, center=(0, 0, 0), radius=0.5):
+    """Sample N points uniformly on the surface of a sphere (Fibonacci sphere)."""
+    center = np.asarray(center, dtype=np.float64)
+    indices = np.arange(N, dtype=np.float64)
+    phi = np.pi * (3.0 - np.sqrt(5.0))  # golden angle
+    y = 1.0 - (indices / max(N - 1, 1)) * 2.0  # y from 1 to -1
+    r_xy = np.sqrt(np.clip(1.0 - y * y, 0.0, None))
+    theta = phi * indices
+    x = np.cos(theta) * r_xy
+    z = np.sin(theta) * r_xy
+    points = np.stack([x, y, z], axis=1) * radius
+    return points + center
+
+
+# Point light power range; we normalize to [0,1] then apply HDR log. POWER_MIN=10 allows smaller intensities.
+POWER_MIN = 10.0
+POWER_MAX = 1500.0
+
+
+def build_point_light_rays_array(pos, color, power, N=8192):
+    """
+    Build ray array for a point light: rays from light origin to uniformly sampled points on sphere.
+    Sphere: center (0,0,0), radius 0.5. Intensity: power is normalized to [0,1] by the known
+    sampling range [POWER_MIN, POWER_MAX], then log-normalized like HDR (log1p(10*x)) so intensity
+    lies in [0, log1p(10)] ~ [0, 2.4], matching env map scale.
+    Shape: [N, 10] = 1 (intensity) + 3 (color) + 3 (ray_o) + 3 (ray_d), ray_d normalized.
+    """
+    pos = np.asarray(pos, dtype=np.float64).reshape(3)
+    color = np.asarray(color, dtype=np.float64).reshape(3)
+    points = uniform_sphere_surface(N, center=(0, 0, 0), radius=0.5)
+    # Ray origin is the point light position (same for all rays)
+    ray_o = np.broadcast_to(pos, (N, 3)).astype(np.float32)
+    # Direction from light to sphere point, then normalize
+    ray_d = points - pos
+    norms = np.linalg.norm(ray_d, axis=1, keepdims=True)
+    norms = np.where(norms > 1e-8, norms, 1.0)
+    ray_d = (ray_d / norms).astype(np.float32)
+    # Normalize power from [POWER_MIN, POWER_MAX] to [0,1], then HDR log (same scale as env maps)
+    power_clip = np.clip(power, POWER_MIN, POWER_MAX)
+    power_norm = (float(power_clip) - POWER_MIN) / (POWER_MAX - POWER_MIN)
+    intensity = np.log1p(10.0 * power_norm)
+    intensity = np.full((N, 1), intensity, dtype=np.float32)
+    color_broadcast = np.broadcast_to(color.astype(np.float32), (N, 3))
+    arr = np.concatenate([intensity, color_broadcast, ray_o, ray_d], axis=1)
+    return arr
+
+
 def check_scene_broken(split_path, object_id):
     """
     Check if a scene is broken (no materials) by checking albedo mask and RGB images.
@@ -130,14 +205,14 @@ def check_scene_broken(split_path, object_id):
                 cam_idx = albedo_files[0].replace('albedo_cam_', '').replace('.png', '')
                 try:
                     cam_idx_int = int(cam_idx)
-                    # Look for gt_{cam_idx}.png in any env folder
-                    env_folders = [d for d in os.listdir(split_path) 
-                                 if os.path.isdir(os.path.join(split_path, d)) 
-                                 and (d.startswith('env_') or d.startswith('white_env_'))]
-                    
-                    for env_folder in env_folders:
-                        env_path = os.path.join(split_path, env_folder)
-                        rgb_path = os.path.join(env_path, f'gt_{cam_idx_int}.png')
+                    # Look for gt_{cam_idx}.png in any env or point-light folder
+                    light_folders = [d for d in os.listdir(split_path)
+                                     if os.path.isdir(os.path.join(split_path, d))
+                                     and ((d.startswith('env_') or d.startswith('white_env_'))
+                                          or is_pl_folder(d))]
+                    for light_folder in light_folders:
+                        light_path = os.path.join(split_path, light_folder)
+                        rgb_path = os.path.join(light_path, f'gt_{cam_idx_int}.png')
                         if os.path.exists(rgb_path):
                             rgb_img = Image.open(rgb_path).convert('RGB')
                             rgb_array = np.array(rgb_img)
@@ -356,7 +431,7 @@ def create_tar_from_directory(source_dir, tar_path):
     print(f"Created tar archive: {tar_path}")
 
 
-def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split):
+def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split, is_point_light_scene=False):
     """
     Check if a scene already exists in both output locations (A and B).
     
@@ -365,6 +440,7 @@ def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, spli
         output_root: Location A (uncompressed)
         output_tar_root: Location B (compressed, can be None)
         split: 'train' or 'test'
+        is_point_light_scene: If True, check point_light_rays instead of envmaps.
         
     Returns:
         bool: True if scene exists in both locations (or only location A if output_tar_root is None), False otherwise
@@ -372,36 +448,38 @@ def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, spli
     # Check location A: metadata JSON file should exist
     metadata_json = os.path.join(output_root, split, 'metadata', f"{scene_name}.json")
     exists_in_a = os.path.exists(metadata_json)
-    
+    if is_point_light_scene:
+        pl_rays_path = os.path.join(output_root, split, 'point_light_rays', f"{scene_name}.npy")
+        exists_in_a = exists_in_a and os.path.exists(pl_rays_path)
     # If output_tar_root is None, only check location A
     if output_tar_root is None:
         return exists_in_a
-    
-    # Check location B: tar files should exist in images, envmaps, and albedos folders
+    # Check location B: tar files should exist in images, (envmaps or point_light_rays), and albedos folders
     images_tar = os.path.join(output_tar_root, split, 'images', f"{scene_name}.tar")
-    envmaps_tar = os.path.join(output_tar_root, split, 'envmaps', f"{scene_name}.tar")
-    
-    # For albedos, we need to check if the object_id tar exists
-    object_id = scene_name.split('_')[0]  # Extract object_id from scene_name
+    object_id = scene_name.split('_')[0]
     albedos_tar = os.path.join(output_tar_root, split, 'albedos', f"{object_id}.tar")
-    
-    exists_in_b = (os.path.exists(images_tar) and 
-                   os.path.exists(envmaps_tar) and 
-                   os.path.exists(albedos_tar))
-    
+    if is_point_light_scene:
+        pl_tar = os.path.join(output_tar_root, split, 'point_light_rays', f"{scene_name}.tar")
+        exists_in_b = (os.path.exists(images_tar) and os.path.exists(pl_tar) and os.path.exists(albedos_tar))
+    else:
+        envmaps_tar = os.path.join(output_tar_root, split, 'envmaps', f"{scene_name}.tar")
+        exists_in_b = (os.path.exists(images_tar) and
+                       os.path.exists(envmaps_tar) and
+                       os.path.exists(albedos_tar))
     return exists_in_a and exists_in_b
 
 
-def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root, split='test', hdri_dir=None):
+def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root, split='test', hdri_dir=None, point_light_rays_n=8192):
     """
-    Process a single Objaverse object and convert all env scenes to re10k format.
+    Process a single Objaverse object and convert all env/point-light scenes to re10k format.
     
     Args:
         objaverse_root: Root directory of objaverse data (e.g., data_samples/sample_objaverse)
         object_id: Object ID folder name
         output_root: Root directory for output (e.g., data_samples/objaverse_processed)
         split: 'train' or 'test'
-        hdri_dir: Directory containing HDR environment maps (optional)
+        hdri_dir: Directory containing HDR environment maps (optional, for env-lit scenes)
+        point_light_rays_n: Number of rays to sample per point-light scene (default 8192)
     """
     object_path = os.path.join(objaverse_root, object_id)
     split_path = os.path.join(object_path, split)
@@ -427,38 +505,47 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
     with open(cameras_json_path, 'r') as f:
         cameras_data = json.load(f)
     
-    # Find all env folders (env_0, env_1, ..., env_4, white_env_0, etc.)
+    # Find all env folders (env_0, white_env_0, ...) and point-light folders (rgb_pl_0, white_pl_0, ...)
     # Only process directory folders (not tar files, as those indicate already processed scenes)
     env_folders = []
     env_tar_files = []
-    
+    pl_folders = []
+    pl_tar_files = []
     for item in os.listdir(split_path):
         item_path = os.path.join(split_path, item)
-        if os.path.isdir(item_path) and (item.startswith('env_') or item.startswith('white_env_')):
-            env_folders.append(item)
-        elif item.endswith('.tar') and (item.startswith('env_') or item.startswith('white_env_')):
-            # Extract folder name from tar filename (e.g., env_0.tar -> env_0)
-            env_folder_name = item.replace('.tar', '')
-            env_tar_files.append(env_folder_name)
+        if os.path.isdir(item_path):
+            if item.startswith('env_') or item.startswith('white_env_'):
+                env_folders.append(item)
+            elif is_pl_folder(item):
+                pl_folders.append(item)
+        elif item.endswith('.tar'):
+            folder_name = item.replace('.tar', '')
+            if folder_name.startswith('env_') or folder_name.startswith('white_env_'):
+                env_tar_files.append(folder_name)
+            elif is_pl_folder(folder_name):
+                pl_tar_files.append(folder_name)
     
-    if not env_folders:
-        # All folders are already compressed
-        if env_tar_files:
-            print(f"All env folders for {object_id} are already compressed")
-            # Check if scenes from tar files are already in outputs, if so, return their names
-            scene_names_from_tar = []
-            for env_folder_name in env_tar_files:
-                scene_name = f"{object_id}_{env_folder_name}"
-                if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split):
-                    scene_names_from_tar.append(scene_name)
-            if scene_names_from_tar:
-                return scene_names_from_tar
-        print(f"Warning: No env folders found in {split_path}, skipping {object_id}")
+    all_light_folders = sorted(env_folders) + sorted(pl_folders)
+    if not all_light_folders:
+        # All folders are already compressed or none found; collect existing scenes from tar
+        scene_names_from_tar = []
+        for env_folder_name in env_tar_files:
+            scene_name = f"{object_id}_{env_folder_name}"
+            if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split, is_point_light_scene=False):
+                scene_names_from_tar.append(scene_name)
+        for pl_folder_name in pl_tar_files:
+            scene_name = f"{object_id}_{pl_folder_name}"
+            if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split, is_point_light_scene=True):
+                scene_names_from_tar.append(scene_name)
+        if scene_names_from_tar:
+            return scene_names_from_tar
+        print(f"Warning: No env or point-light folders found in {split_path}, skipping {object_id}")
         return None
     
     # Process albedo folder (shared across all scenes with the same object_id)
-    # First, get the number of frames from the first env folder to check if albedo is complete
-    first_env_path = os.path.join(split_path, sorted(env_folders)[0])
+    # First, get the number of frames from the first light folder (env or pl) to check if albedo is complete
+    first_light_folder = all_light_folders[0]
+    first_env_path = os.path.join(split_path, first_light_folder)
     first_env_image_files = [f for f in os.listdir(first_env_path) 
                             if f.startswith('gt_') and f.endswith('.png')]
     first_env_image_files_with_idx = []
@@ -898,6 +985,125 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                     except Exception as e2:
                         print(f"Warning: Error with rm -rf {env_path}: {e2}, but tar file was created successfully")
     
+    # Process each point-light folder as a separate scene (images + metadata + point_light_rays .npy)
+    for pl_folder in sorted(pl_folders):
+        pl_path = os.path.join(split_path, pl_folder)
+        all_image_files = [f for f in os.listdir(pl_path) if f.startswith('gt_') and f.endswith('.png')]
+        image_files_with_idx = []
+        for image_file in all_image_files:
+            idx_str = image_file.replace('gt_', '').replace('.png', '')
+            try:
+                frame_idx = int(idx_str)
+                image_files_with_idx.append((frame_idx, image_file))
+            except ValueError:
+                continue
+        if not image_files_with_idx:
+            print(f"Warning: No valid gt_*.png in {pl_path}, skipping")
+            continue
+        image_files_with_idx.sort(key=lambda x: x[0])
+        first_image_path = os.path.join(pl_path, image_files_with_idx[0][1])
+        try:
+            with Image.open(first_image_path) as img:
+                image_width, image_height = img.size
+        except Exception as e:
+            print(f"Error reading image {first_image_path}: {e}, skipping")
+            continue
+        scene_name = f"{object_id}_{pl_folder}"
+        output_metadata_dir = os.path.join(output_root, split, 'metadata')
+        output_images_dir = os.path.join(output_root, split, 'images', scene_name)
+        output_point_light_rays_dir = os.path.join(output_root, split, 'point_light_rays')
+        output_pl_rays_path = os.path.join(output_point_light_rays_dir, f"{scene_name}.npy")
+        os.makedirs(output_metadata_dir, exist_ok=True)
+        scene_exists = os.path.exists(output_images_dir) and os.path.exists(output_pl_rays_path)
+        skip_file_processing = False
+        if scene_exists:
+            all_files_exist = True
+            for frame_idx, image_file in image_files_with_idx:
+                output_image_path = os.path.join(output_images_dir, f"{frame_idx:05d}.png")
+                if not os.path.exists(output_image_path):
+                    all_files_exist = False
+                    break
+            if all_files_exist:
+                print(f"Skipping point-light processing for {scene_name}: all files already exist")
+                skip_file_processing = True
+        os.makedirs(output_images_dir, exist_ok=True)
+        os.makedirs(output_point_light_rays_dir, exist_ok=True)
+        pl_info = load_point_light_info(pl_path)
+        if pl_info is None and not skip_file_processing:
+            print(f"Warning: No rgb_pl.json or white_pl.json in {pl_path}, skipping point-light rays")
+        elif pl_info is not None:
+            pos, color, power = pl_info
+            if not skip_file_processing:
+                rays_arr = build_point_light_rays_array(pos, color, power, N=point_light_rays_n)
+                np.save(output_pl_rays_path, rays_arr)
+        frames = []
+        for frame_idx, image_file in image_files_with_idx:
+            if frame_idx >= len(cameras_data):
+                print(f"Warning: Frame {frame_idx} not in cameras.json, skipping")
+                continue
+            camera_info = cameras_data[frame_idx]
+            c2w_blender = np.array(camera_info['c2w'])
+            c2w_opencv = blender_to_opencv_c2w(c2w_blender)
+            w2c = np.linalg.inv(c2w_opencv)
+            fov = camera_info.get('fov', 30.0)
+            fxfycxcy = fov_to_fxfycxcy(fov, image_width, image_height)
+            output_image_name = f"{frame_idx:05d}.png"
+            output_image_path = os.path.join(output_images_dir, output_image_name)
+            if not skip_file_processing:
+                shutil.copy2(os.path.join(pl_path, image_file), output_image_path)
+            absolute_image_path = os.path.abspath(output_image_path)
+            frames.append({
+                "image_path": absolute_image_path,
+                "fxfycxcy": fxfycxcy,
+                "w2c": w2c.tolist()
+            })
+        scene_data = {"scene_name": scene_name, "frames": frames}
+        output_json_path = os.path.join(output_metadata_dir, f"{scene_name}.json")
+        with open(output_json_path, 'w') as f:
+            json.dump(scene_data, f, indent=2)
+        print(f"Processed point-light scene {scene_name}: {len(frames)} frames")
+        processed_scene_names.append(scene_name)
+        if output_tar_root is not None and not skip_file_processing:
+            images_tar_path = os.path.join(output_tar_root, split, 'images', f"{scene_name}.tar")
+            if not os.path.exists(images_tar_path):
+                create_tar_from_directory(output_images_dir, images_tar_path)
+            pl_tar_path = os.path.join(output_tar_root, split, 'point_light_rays', f"{scene_name}.tar")
+            os.makedirs(os.path.dirname(pl_tar_path), exist_ok=True)
+            if not os.path.exists(pl_tar_path):
+                with tarfile.open(pl_tar_path, 'w') as tar:
+                    tar.add(output_pl_rays_path, arcname=os.path.basename(output_pl_rays_path))
+                print(f"Created point_light_rays tar: {pl_tar_path}")
+            output_metadata_dir_b = os.path.join(output_tar_root, split, 'metadata')
+            os.makedirs(output_metadata_dir_b, exist_ok=True)
+            output_json_path_b = os.path.join(output_metadata_dir_b, f"{scene_name}.json")
+            scene_data_b = {"scene_name": scene_name, "frames": []}
+            images_tar_abs_path = os.path.abspath(images_tar_path)
+            for frame in frames:
+                frame_b = frame.copy()
+                frame_b['image_path'] = f"{images_tar_abs_path}::{os.path.basename(frame['image_path'])}"
+                scene_data_b['frames'].append(frame_b)
+            with open(output_json_path_b, 'w') as f:
+                json.dump(scene_data_b, f, indent=2)
+        if os.path.exists(pl_path) and os.path.isdir(pl_path):
+            pl_tar_path_src = os.path.join(split_path, f"{pl_folder}.tar")
+            if not os.path.exists(pl_tar_path_src):
+                print(f"Compressing original point-light folder: {pl_folder}")
+                create_tar_from_directory(pl_path, pl_tar_path_src)
+                try:
+                    gc.collect()
+                    shutil.rmtree(pl_path, ignore_errors=True)
+                    if os.path.exists(pl_path):
+                        for root, dirs, files in os.walk(pl_path):
+                            for d in dirs:
+                                os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                            for f in files:
+                                os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                        shutil.rmtree(pl_path, ignore_errors=True)
+                    if os.path.exists(pl_path):
+                        subprocess.run(['rm', '-rf', pl_path], check=False)
+                except Exception as e:
+                    print(f"Warning: Error deleting {pl_path}: {e}")
+    
     # Create tar for albedos folder (shared across all scenes with same object_id)
     # Only create once after processing all scenes for this object
     if output_tar_root is not None and output_albedos_dir and os.path.exists(output_albedos_dir):
@@ -1020,6 +1226,8 @@ def main():
                        help='Test run: only process first 5 objects (default: False)')
     parser.add_argument('--max-objects', type=int, default=None,
                        help='Maximum number of objects to process (overrides --test-run if specified)')
+    parser.add_argument('--point-light-rays-n', type=int, default=8192,
+                       help='Number of rays per point-light scene (default: 8192)')
     
     args = parser.parse_args()
     
@@ -1076,15 +1284,14 @@ def main():
             # Find tar files for env folders
             tar_files = [f for f in os.listdir(split_path) 
                         if f.endswith('.tar') and (f.startswith('env_') or f.startswith('white_env_'))]
+            pl_tar_files_main = [f for f in os.listdir(split_path)
+                                 if f.endswith('.tar') and is_pl_folder(f.replace('.tar', ''))]
             
-            # For each tar file, check if corresponding scene exists in both output locations
+            # For each env tar file, check if corresponding scene exists in both output locations
             for tar_file in tar_files:
-                # Extract env folder name from tar filename (e.g., env_0.tar -> env_0)
                 env_folder = tar_file.replace('.tar', '')
                 scene_name = f"{object_id}_{env_folder}"
-                
-                # Check if scene exists in both locations (or just location A if output_tar_root is None)
-                if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, args.split):
+                if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, args.split, is_point_light_scene=False):
                     if output_tar_root:
                         print(f"Scene {scene_name} already exists in both locations, adding to full_list")
                     else:
@@ -1131,20 +1338,56 @@ def main():
                             with open(metadata_json_b, 'w') as f:
                                 json.dump(scene_data_b, f, indent=2)
                             print(f"Created metadata JSON for location B: {metadata_json_b}")
+            
+            # For each point-light tar file, check if scene exists and ensure metadata
+            for tar_file in pl_tar_files_main:
+                pl_folder = tar_file.replace('.tar', '')
+                scene_name = f"{object_id}_{pl_folder}"
+                if check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, args.split, is_point_light_scene=True):
+                    if output_tar_root:
+                        print(f"Scene {scene_name} already exists in both locations, adding to full_list")
+                    else:
+                        print(f"Scene {scene_name} already exists in location A, adding to full_list")
+                    scenes_from_tar.append(scene_name)
+                    metadata_json = os.path.join(output_root, args.split, 'metadata', f"{scene_name}.json")
+                    if not os.path.exists(metadata_json):
+                        scene_data = {"scene_name": scene_name, "frames": []}
+                        os.makedirs(os.path.dirname(metadata_json), exist_ok=True)
+                        with open(metadata_json, 'w') as f:
+                            json.dump(scene_data, f, indent=2)
+                    if output_tar_root:
+                        metadata_json_b = os.path.join(output_tar_root, args.split, 'metadata', f"{scene_name}.json")
+                        if not os.path.exists(metadata_json_b):
+                            if os.path.exists(metadata_json):
+                                with open(metadata_json, 'r') as f:
+                                    scene_data_a = json.load(f)
+                            else:
+                                scene_data_a = {"scene_name": scene_name, "frames": []}
+                            images_tar_path = os.path.join(output_tar_root, args.split, 'images', f"{scene_name}.tar")
+                            images_tar_abs_path = os.path.abspath(images_tar_path)
+                            scene_data_b = {"scene_name": scene_name, "frames": []}
+                            for frame in scene_data_a.get('frames', []):
+                                frame_b = frame.copy()
+                                frame_b['image_path'] = f"{images_tar_abs_path}::{os.path.basename(frame.get('image_path', ''))}"
+                                scene_data_b['frames'].append(frame_b)
+                            os.makedirs(os.path.dirname(metadata_json_b), exist_ok=True)
+                            with open(metadata_json_b, 'w') as f:
+                                json.dump(scene_data_b, f, indent=2)
+                            print(f"Created metadata JSON for location B: {metadata_json_b}")
         
         try:
             result = process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root,
-                                            split=args.split, hdri_dir=args.hdri_dir)
+                                            split=args.split, hdri_dir=args.hdri_dir,
+                                            point_light_rays_n=args.point_light_rays_n)
             if result == "broken":
-                # Find all scenes for this object and mark them as broken
+                # Find all scenes for this object (env + point-light) and mark as broken
                 split_path = os.path.join(objaverse_root, object_id, args.split)
                 if os.path.exists(split_path):
-                    env_folders = [d for d in os.listdir(split_path) 
-                                 if os.path.isdir(os.path.join(split_path, d)) 
-                                 and (d.startswith('env_') or d.startswith('white_env_'))]
-                    for env_folder in env_folders:
-                        scene_name = f"{object_id}_{env_folder}"
-                        broken_scenes.append(scene_name)
+                    for d in os.listdir(split_path):
+                        item_path = os.path.join(split_path, d)
+                        if os.path.isdir(item_path):
+                            if d.startswith('env_') or d.startswith('white_env_') or is_pl_folder(d):
+                                broken_scenes.append(f"{object_id}_{d}")
             elif isinstance(result, list):
                 # result is a list of scene names (processed or skipped)
                 # We can't distinguish between processed and skipped from the return value alone
