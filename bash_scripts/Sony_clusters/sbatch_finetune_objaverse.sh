@@ -35,7 +35,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_lvsmPlus"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
 ############################
 # Logging
@@ -71,7 +71,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29501 \
     train.py --config configs/LVSM_scene_encoder_decoder.yaml \
-    training.batch_size_per_gpu = 4 \
+    training.batch_size_per_gpu = 8 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\" \
     training.grad_accum_steps = 1
