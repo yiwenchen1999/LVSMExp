@@ -29,5 +29,5 @@ torchrun --nproc_per_node 4 --nnodes 1 \
     training.wandb_exp_name = LVSM_edit_pointlight \
     training.dataset_path = /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt \
     training.whiteEnvInput = true \
-    training.vis_every = 2 \
+    training.vis_every = 1000 \
     training.lr = 0.0001
