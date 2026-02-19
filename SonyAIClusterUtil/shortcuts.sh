@@ -9,7 +9,7 @@ cd /music-shared-disk/group/ct/yiwen/codes/FLUX_finetune
 cd /music-shared-disk/group/ct/yiwen/data/objaverse
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
-  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse \
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/ \
   lvsmPlus_objaverse/
 
 # env creation:

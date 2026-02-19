@@ -16,6 +16,11 @@ from utils.training_utils import create_optimizer, create_lr_scheduler, auto_res
 
 # Load config and read(override) arguments from CLI
 config = init_config()
+relight_signals = config.training.get("relight_signals", ["envmap"])
+if isinstance(relight_signals, str):
+    relight_signals = [relight_signals]
+config.training.relight_signals = list(relight_signals)
+print(f"------0.0.1 relight_signals: {config.training.relight_signals}------")
 
 os.environ["OMP_NUM_THREADS"] = str(config.training.get("num_threads", 1))
 
