@@ -1210,8 +1210,8 @@ def create_full_list(output_root, split='test', broken_scenes=None):
 
 def main():
     parser = argparse.ArgumentParser(description='Preprocess Objaverse data to re10k format')
-    parser.add_argument('--input', '-i', required=True,
-                       help='Input directory containing objaverse data (e.g., data_samples/sample_objaverse)')
+    parser.add_argument('--input', '-i', default=None,
+                       help='Input directory containing objaverse data (required unless --full-list-only)')
     parser.add_argument('--output', '-o', required=True,
                        help='Output directory for processed data (e.g., data_samples/objaverse_processed)')
     parser.add_argument('--output-tar', type=str, default=None,
@@ -1228,13 +1228,38 @@ def main():
                        help='Maximum number of objects to process (overrides --test-run if specified)')
     parser.add_argument('--point-light-rays-n', type=int, default=8192,
                        help='Number of rays per point-light scene (default: 8192)')
+    parser.add_argument('--full-list-only', action='store_true',
+                       help='Skip all processing; only build full_list.txt from existing metadata in output.')
     
     args = parser.parse_args()
     
-    objaverse_root = args.input
     output_root = args.output
     output_tar_root = args.output_tar
     
+    if args.full_list_only:
+        # Skip processing; only create full_list from existing metadata
+        if not os.path.exists(output_root):
+            print(f"Error: Output directory {output_root} does not exist")
+            return
+        broken_scenes = []
+        broken_list_path = os.path.join(output_root, args.split, 'broken_scenes.txt')
+        if os.path.exists(broken_list_path):
+            with open(broken_list_path, 'r') as f:
+                broken_scenes = [line.strip() for line in f if line.strip()]
+            print(f"Loaded {len(broken_scenes)} broken scenes from {broken_list_path}")
+        print(f"\nCreating full_list.txt for {args.split} split (full-list-only mode)...")
+        create_full_list(output_root, split=args.split, broken_scenes=broken_scenes)
+        if output_tar_root and os.path.exists(output_tar_root):
+            create_full_list(output_tar_root, split=args.split, broken_scenes=broken_scenes)
+            print(f"Created full_list.txt for location B")
+        print("Done.")
+        return
+    
+    if args.input is None:
+        print("Error: --input is required when not using --full-list-only")
+        return
+    
+    objaverse_root = args.input
     if not os.path.exists(objaverse_root):
         print(f"Error: Input directory {objaverse_root} does not exist")
         return
