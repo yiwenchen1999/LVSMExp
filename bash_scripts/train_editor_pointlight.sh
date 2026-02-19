@@ -1,14 +1,24 @@
 #!/bin/bash
-set -euo pipefail
+#SBATCH --partition=jiang
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:a6000:4
+#SBATCH --time=72:00:00
+#SBATCH --job-name=train_editor_pointlight
+#SBATCH --mem=128
+#SBATCH --ntasks=32
+#SBATCH --output=myjob.train_editor_pointlight.out
+#SBATCH --error=myjob.train_editor_pointlight.err
+export HF_HOME=/projects/vig/yiwenc/caches
+export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 
-# Local single-node launch
-# Usage:
-#   bash bash_scripts/train_editor_pointlight.sh
+export WANDB_DIR=/scratch/chen.yiwe/wandb
+export WANDB_ARTIFACT_DIR=/scratch/chen.yiwe/wandb/artifacts
+export WANDB_CACHE_DIR=/scratch/chen.yiwe/wandb/cache
+export WANDB_CONFIG_DIR=/scratch/chen.yiwe/wandb/config
 
-PROJ_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$PROJ_DIR"
-
-CONFIG_PATH="configs/LVSM_scene_encoder_decoder_wEditor_pointlight.yaml"
+export XDG_CACHE_HOME=/scratch/chen.yiwe/.cache
+export XDG_CONFIG_HOME=/scratch/chen.yiwe/.config
+export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
@@ -19,4 +29,5 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.wandb_exp_name = LVSM_edit_pointlight \
     training.dataset_path = /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
     training.whiteEnvInput = true \
-    training.lr = 0.0002
+    training.vis_every = 2 \
+    training.lr = 0.0001
