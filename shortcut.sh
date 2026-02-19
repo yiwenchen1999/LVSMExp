@@ -65,6 +65,11 @@ python preprocess_scripts/remove_broken_scenes.py \
     --broken-scene scene_preview/broken_scene.txt \
     --full-list /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/full_list.txt
 
+# generate full list of point light scenes
+python preprocess_scripts/generate_full_list_point_light.py \
+  -i /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/test/full_list.txt \
+  -o /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/test/full_list_point_light.txt
+
 # create evaluation indices
 python preprocess_scripts/create_evaluation_index.py \
     --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
