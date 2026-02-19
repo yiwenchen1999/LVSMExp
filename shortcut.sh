@@ -52,7 +52,7 @@ python preprocess_scripts/preprocess_objaverse.py \
 
 # preview the scenes:
 python preprocess_scripts/preview_scenes.py \
-    --full-list /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
+    --full-list /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt \
     --output scene_preview/preview.png \
     --image-idx 64 \
     --grid-cols 8 \
@@ -67,8 +67,8 @@ python preprocess_scripts/remove_broken_scenes.py \
 
 # generate full list of point light scenes
 python preprocess_scripts/generate_full_list_point_light.py \
-  -i /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/test/full_list.txt \
-  -o /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/test/full_list_point_light.txt
+  -i /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
+  -o /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt
 
 # create evaluation indices
 python preprocess_scripts/create_evaluation_index.py \

@@ -69,28 +69,44 @@ class LatentSceneEditor(nn.Module):
             d_model = self.config.model.transformer.d
         )
         
-        # Environment tokenizer (RGB + ray directions)
-        env_config = self.config.model.get("env_tokenizer", {})
-        if env_config:
-            self.env_tokenizer = self._create_tokenizer(
-                in_channels = env_config.get("in_channels", 9),  # 3 RGB + 3 ray_d
-                patch_size = env_config.get("patch_size", 8),
-                d_model = self.config.model.transformer.d
-            )
-        else:
-            # Default: 3 RGB + 3 ray_d = 6 channels
-            self.env_tokenizer = self._create_tokenizer(
-                in_channels = 6,
-                patch_size = 8,
-                d_model = self.config.model.transformer.d
-            )
+        # Resolve which lighting tokenizers to create based on relight_signals
+        signal_list = self.config.training.get("relight_signals", ["envmap"])
+        if isinstance(signal_list, str):
+            signal_list = [signal_list]
+        use_envmap = "envmap" in signal_list
+        use_point_light = "point_light" in signal_list
+        if not use_envmap and not use_point_light:
+            use_envmap = True  # fallback
 
-        # Point-light tokenizer (ray token -> embedding token)
-        pl_config = self.config.model.get("point_light_tokenizer", {})
-        self.point_light_tokenizer = self._create_linear_tokenizer(
-            in_channels=pl_config.get("in_channels", 10),
-            d_model=self.config.model.transformer.d,
-        )
+        # Environment tokenizer (RGB + ray directions) - only if envmap in relight_signals
+        if use_envmap:
+            env_config = self.config.model.get("env_tokenizer", {})
+            if env_config:
+                self.env_tokenizer = self._create_tokenizer(
+                    in_channels=env_config.get("in_channels", 9),
+                    patch_size=env_config.get("patch_size", 8),
+                    d_model=self.config.model.transformer.d
+                )
+            else:
+                self.env_tokenizer = self._create_tokenizer(
+                    in_channels=6,
+                    patch_size=8,
+                    d_model=self.config.model.transformer.d
+                )
+            print(f"Initialized env_tokenizer (relight_signals includes envmap)")
+        else:
+            self.env_tokenizer = None
+
+        # Point-light tokenizer - only if point_light in relight_signals
+        if use_point_light:
+            pl_config = self.config.model.get("point_light_tokenizer", {})
+            self.point_light_tokenizer = self._create_linear_tokenizer(
+                in_channels=pl_config.get("in_channels", 10),
+                d_model=self.config.model.transformer.d,
+            )
+            print(f"Initialized point_light_tokenizer (relight_signals includes point_light)")
+        else:
+            self.point_light_tokenizer = None
         
         # Image token decoder (decode image tokens into pixels)
         self.image_token_decoder = nn.Sequential(
@@ -264,15 +280,20 @@ class LatentSceneEditor(nn.Module):
             for param in self.transformer_decoder_albedo.parameters():
                 param.requires_grad = False
         
-        # Keep editor layers trainable
-        for param in self.env_tokenizer.parameters():
-            param.requires_grad = True
-        for param in self.point_light_tokenizer.parameters():
-            param.requires_grad = True
+        # Keep editor layers trainable (only those that exist)
+        trainable_parts = []
+        if self.env_tokenizer is not None:
+            for param in self.env_tokenizer.parameters():
+                param.requires_grad = True
+            trainable_parts.append("env_tokenizer")
+        if self.point_light_tokenizer is not None:
+            for param in self.point_light_tokenizer.parameters():
+                param.requires_grad = True
+            trainable_parts.append("point_light_tokenizer")
         for param in self.transformer_editor.parameters():
             param.requires_grad = True
-        
-        print("Frozen reconstructor and renderer layers. Only editor layers (env_tokenizer, point_light_tokenizer, transformer_editor) are trainable.")
+        trainable_parts.append("transformer_editor")
+        print(f"Frozen reconstructor and renderer layers. Only editor layers ({', '.join(trainable_parts)}) are trainable.")
     
     def unfreeze_all(self):
         """Unfreeze all layers for full model training"""
@@ -382,6 +403,8 @@ class LatentSceneEditor(nn.Module):
         return pose_cond
 
     def _build_env_tokens(self, input_dict, token_dim):
+        if self.env_tokenizer is None:
+            return None
         if not (hasattr(input_dict, 'env_ldr') and hasattr(input_dict, 'env_hdr') and hasattr(input_dict, 'env_dir')):
             return None
         if input_dict.env_ldr is None or input_dict.env_hdr is None or input_dict.env_dir is None:
@@ -429,6 +452,8 @@ class LatentSceneEditor(nn.Module):
         return env_tokens
 
     def _build_point_light_tokens(self, input_dict, token_dim):
+        if self.point_light_tokenizer is None:
+            return None
         if not hasattr(input_dict, "point_light_rays"):
             return None
         if input_dict.point_light_rays is None:
