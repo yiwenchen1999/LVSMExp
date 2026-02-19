@@ -489,11 +489,11 @@ class LatentSceneEditor(nn.Module):
         return point_tokens
 
     def _build_editor_condition_tokens(self, input_dict, token_dim):
-        print('building conditional tokens...')
+        # print('building conditional tokens...')
         signal_list = self.config.training.get("relight_signals", ["envmap"])
         if isinstance(signal_list, str):
             signal_list = [signal_list]
-        print("signal_list:", signal_list)
+        # print("signal_list:", signal_list)
 
         cond_tokens = []
         if "envmap" in signal_list:
@@ -689,7 +689,7 @@ class LatentSceneEditor(nn.Module):
 
         #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
         condition_tokens = self._build_editor_condition_tokens(input, d)
-        print("condition_tokens:", condition_tokens.shape)
+        # print("condition_tokens:", condition_tokens.shape)
         if condition_tokens is not None:
             editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
             checkpoint_every = self.config.training.grad_checkpoint_every
