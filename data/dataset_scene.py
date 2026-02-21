@@ -41,6 +41,16 @@ class Dataset(Dataset):
                     filtered_scene_paths.append(scene_path)
             self.all_scene_paths = filtered_scene_paths
             print(f"whiteEnvInput enabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'white_env_0' (from {total_scenes_before} total)")
+        else:
+            # only keep scenes ending with "env_*" and "white_env_*"
+            filtered_scene_paths = []
+            for scene_path in self.all_scene_paths:
+                file_name = os.path.basename(scene_path)
+                scene_name = file_name.replace('.json', '')
+                if "_env_" in scene_name or "_white_env_" in scene_name:
+                    filtered_scene_paths.append(scene_path)
+            self.all_scene_paths = filtered_scene_paths
+            print(f"whiteEnvInput disabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'env_*' or 'white_env_*' (from {total_scenes_before} total)")
 
         self.inference = self.config.inference.get("if_inference", False)
         # Load file that specifies the input and target view indices to use for inference

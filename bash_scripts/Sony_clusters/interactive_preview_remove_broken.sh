@@ -12,9 +12,10 @@ export PROJ=/music-shared-disk/group/ct/yiwen/codes/LVSMExp
 export PY_SITE=/scratch2/$USER/py_lvsmexp
 export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
 export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
+export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt"
 
 # Sony cluster paths (map from shortcut.sh /projects/vig/...)
-export FULL_LIST_TEST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
+export FULL_LIST_TEST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt"
 export FULL_LIST_TRAIN="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/train/full_list.txt"
 export PREVIEW_OUTPUT="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/scene_preview/preview.png"
 export BROKEN_SCENE_FILE="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/scene_preview/broken_scene.txt"

@@ -20,9 +20,9 @@ export XDG_DATA_HOME=/scratch2/$USER/.local/share
 export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
-export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/processed_objaverse_with_pointLights/train/full_list.txt"
+export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt"
 export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_pointlight"
-export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder"
+export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
 echo "Host: $(hostname)"
 echo "PROJ: $PROJ"

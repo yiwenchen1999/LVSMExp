@@ -63,7 +63,7 @@ python test_data_visualization.py --config configs/LVSM_scene_encoder_decoder_wE
 # delete broken scenes
 python preprocess_scripts/remove_broken_scenes.py \
     --broken-scene scene_preview/broken_scene.txt \
-    --full-list /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/train/full_list.txt
+    --full-list /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt
 
 # generate full list of point light scenes
 python preprocess_scripts/generate_full_list_point_light.py \
