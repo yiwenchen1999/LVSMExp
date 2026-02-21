@@ -1,7 +1,12 @@
 #!/bin/bash
-# Run inside an interactive Sony cluster session.
-# Usage:
-#   source bash_scripts/Sony_clusters/interactive_train_editor_pointlight.sh
+#SBATCH --job-name=lvsm_editor_pointlight
+#SBATCH --partition=ct
+#SBATCH --account=ct
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --time=168:00:00
+#SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
+#SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
 set -euo pipefail
 
@@ -25,13 +30,14 @@ export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
 echo "Host: $(hostname)"
+echo "JobID: $SLURM_JOB_ID"
 echo "PROJ: $PROJ"
 echo "DATA_LIST: $DATA_LIST"
 echo "CKPT_DIR: $CKPT_DIR"
 echo "LVSM_CKPT_DIR: $LVSM_CKPT_DIR"
 echo "----------------------------------"
 
-singularity exec --nv $BIND $SIF bash -lc "
+srun singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
   export WANDB_DIR=\"$WANDB_DIR\"
@@ -45,8 +51,8 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
-    --rdzv_id \$(date +%s) \
+  torchrun --nproc_per_node 4 --nnodes 1 \
+    --rdzv_id \$SLURM_JOB_ID \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29517 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_pointlight.yaml \

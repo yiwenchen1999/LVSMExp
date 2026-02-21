@@ -75,8 +75,8 @@ training:
   point_light_num_rays: 1024
   point_light_plucker_method: "default_plucker"
   view_selector:
-    max_frame_dist: 180
-    min_frame_dist: 15
+    max_frame_dist: 25
+    min_frame_dist: 13
   vis_every: 1000
   wandb_exp_name: LVSM_wEditor_envmap_pointlight
   wandb_log_every: 50
