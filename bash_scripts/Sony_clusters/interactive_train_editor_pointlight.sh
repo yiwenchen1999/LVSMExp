@@ -52,6 +52,9 @@ singularity exec --nv $BIND $SIF bash -lc "
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_pointlight.yaml \
     training.dataset_path = \"$DATA_LIST\" \
     training.checkpoint_dir = \"$CKPT_DIR\" \
+    training.lr = 0.0001 \
+    training.vis_every = 1000 \
+    training.warmup = 3000 \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_editor_pointlight
 "

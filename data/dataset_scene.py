@@ -42,6 +42,7 @@ class Dataset(Dataset):
             self.all_scene_paths = filtered_scene_paths
             print(f"whiteEnvInput enabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'white_env_0' (from {total_scenes_before} total)")
         else:
+            total_scenes_before = len(self.all_scene_paths)
             # only keep scenes ending with "env_*" and "white_env_*"
             filtered_scene_paths = []
             for scene_path in self.all_scene_paths:
