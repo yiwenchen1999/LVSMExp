@@ -14,6 +14,7 @@ rsync -avh --partial --inplace --progress \
 
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=1
+sbash --partition=sharedp --account=ct --nodes=1 --gpus=1
 
 export PROJ=/music-shared-disk/group/ct/yiwen/codes/FLUX_finetune   # or Neural_Gaffer later
 export PY_SITE=/scratch2/$USER/ng_py
