@@ -21,3 +21,14 @@ python3 preprocess_scripts/remove_broken_scenes.py \
   --full-list /data/lvsmPlus_objaverse/train/full_list.txt
  
  scp ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/ckpt/LVSM_object_encoder_decoder_sparse/iter_00000001/supervision_2cb7026ffacf4889bb265099b8460c7f_env_2.jpg bash_scripts/VoltagePark/previews/
+
+tmux new -s finetune
+
+# 在 tmux 里运行
+cd ~/LVSMExp
+source /data/venv/lvsmexp/bin/activate
+bash bash_scripts/VoltagePark/finetune_objaverse.sh
+
+# 断开会话（保留运行）：Ctrl+B 然后按 D
+# 之后重连 SSH 并恢复会话：
+tmux attach -t finetune
