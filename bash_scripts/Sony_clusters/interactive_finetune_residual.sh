@@ -66,7 +66,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29501 \
-    train.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
     training.batch_size_per_gpu = 8 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\" \
