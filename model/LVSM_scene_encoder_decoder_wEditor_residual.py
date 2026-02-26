@@ -716,46 +716,41 @@ class LatentSceneEditor(nn.Module):
         # target.ray_d: [b, v_target, 3, h, w] - Target ray directions
         input, target = self.process_data(data_batch, has_target_image=has_target_image, target_has_input = self.config.training.target_has_input, compute_rays=True)
         
-        #& Step 2: Reconstructor - Get scene latent_tokens from input images
-        latent_tokens, n_patches, d = self.reconstructor(input)
-        
+        #& Step 2: Reconstructor + Fidelity - Get scene latent_tokens from input images
+        # When relit_images exist: merge input.image and input.relit_images into (2b, v_input, c, h, w),
+        # pass through reconstructor and fidelity_layer once, then split back to latent_tokens and latent_tokens_b
         checkpoint_every = self.config.training.grad_checkpoint_every
 
-        #& Step 2.5: Fidelity Transformer
-        # Pass latent_tokens through fidelity transformer
-        latent_tokens_fidelity = self.pass_layers(
-            self.transformer_fidelity,
-            latent_tokens,
-            gradient_checkpoint=True,
-            checkpoint_every=checkpoint_every
-        )
-
-        #& Step 2.6: Compute latent_tokens_b (from relit images if available)
-        latent_tokens_b = None
-        # Check if relit_images are available in input (from relit scene)
-        # Note: process_data splits data_batch into input and target based on keys.
-        # If 'relit_images' is in data_batch, it should be in input dict too.
         if hasattr(input, 'relit_images') and input.relit_images is not None:
-             # Create a temporary input dict for relit images
-             input_relit = edict(input.copy())
-             input_relit.image = input.relit_images
-             # We assume relit images share same camera params as input, so ray_o/ray_d are same
-             
-             # Pass through reconstructor
-             # We don't want gradients to flow back through reconstructor for latent_tokens_b calculation?
-             # Actually, for fidelity loss, we probably want gradients to flow through fidelity transformer
-             # but maybe not reconstructor if it's frozen. 
-             # If reconstructor is frozen, it doesn't matter. If it's not, we might want to train it.
-             # The user didn't specify detach, so we keep gradients.
-             latent_tokens_b_raw, _, _ = self.reconstructor(input_relit)
-             
-             # Pass through fidelity
-             latent_tokens_b = self.pass_layers(
+            # Merged path: combine input.image and input.relit_images for single pass
+            b = input.image.size(0)
+            combined_images = torch.cat([input.image, input.relit_images], dim=0)  # (2b, v_input, c, h, w)
+            combined_ray_o = torch.cat([input.ray_o, input.ray_o], dim=0)
+            combined_ray_d = torch.cat([input.ray_d, input.ray_d], dim=0)
+            input_combined = edict(input.copy())
+            input_combined.image = combined_images
+            input_combined.ray_o = combined_ray_o
+            input_combined.ray_d = combined_ray_d
+
+            latent_all_raw, n_patches, d = self.reconstructor(input_combined)  # (2b, n_latent, d)
+            latent_all_fidelity = self.pass_layers(
                 self.transformer_fidelity,
-                latent_tokens_b_raw,
+                latent_all_raw,
                 gradient_checkpoint=True,
                 checkpoint_every=checkpoint_every
-             )
+            )
+            latent_tokens_fidelity = latent_all_fidelity[:b]
+            latent_tokens_b = latent_all_fidelity[b:]
+        else:
+            # Original path: no relit images
+            latent_tokens_raw, n_patches, d = self.reconstructor(input)
+            latent_tokens_fidelity = self.pass_layers(
+                self.transformer_fidelity,
+                latent_tokens_raw,
+                gradient_checkpoint=True,
+                checkpoint_every=checkpoint_every
+            )
+            latent_tokens_b = None
 
         #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
         condition_tokens = self._build_editor_condition_tokens(input, d)
