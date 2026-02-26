@@ -78,5 +78,6 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     training.dataset_path = \"$DATA_LIST\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.vis_every = 1000 \
+    training.warmup = 1000 \
     training.grad_accum_steps = 1
 "
