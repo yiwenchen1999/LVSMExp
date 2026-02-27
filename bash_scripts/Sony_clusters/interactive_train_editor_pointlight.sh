@@ -45,7 +45,7 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29517 \
@@ -53,7 +53,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.dataset_path = \"$DATA_LIST\" \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.lr = 0.0001 \
-    training.vis_every = 1000 \
+    training.vis_every = 2 \
     training.warmup = 3000 \
     training.batch_size_per_gpu = 16 \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
