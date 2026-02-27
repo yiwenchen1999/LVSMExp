@@ -758,21 +758,21 @@ class LatentSceneEditor(nn.Module):
         # Initialize final latent tokens with fidelity output
         latent_tokens_final = latent_tokens_fidelity
         
-        # if condition_tokens is not None:
-        #     editor_input_tokens = torch.cat([latent_tokens_fidelity, condition_tokens], dim=1)
+        if condition_tokens is not None:
+            editor_input_tokens = torch.cat([latent_tokens_fidelity, condition_tokens], dim=1)
             
-        #     editor_output_tokens = self.pass_layers(
-        #         self.transformer_editor,
-        #         editor_input_tokens,
-        #         gradient_checkpoint=True,
-        #         checkpoint_every=checkpoint_every
-        #     )
-        #     n_latent_vectors = self.config.model.transformer.n_latent_vectors
+            editor_output_tokens = self.pass_layers(
+                self.transformer_editor,
+                editor_input_tokens,
+                gradient_checkpoint=True,
+                checkpoint_every=checkpoint_every
+            )
+            n_latent_vectors = self.config.model.transformer.n_latent_vectors
             
-        #     # Residual update: predict residual and add to original latent tokens
-        #     # Use the residual head to project to residual space (init to 0)
-        #     latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
-        #     latent_tokens_final = latent_tokens_fidelity + latent_tokens_res
+            # Residual update: predict residual and add to original latent tokens
+            # Use the residual head to project to residual space (init to 0)
+            latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
+            latent_tokens_final = latent_tokens_fidelity + latent_tokens_res
 
         
         #& Step 4: Renderer - Decode results from target ray maps

@@ -687,20 +687,20 @@ class LatentSceneEditor(nn.Module):
         #& Step 2: Reconstructor - Get scene latent_tokens from input images
         latent_tokens, n_patches, d = self.reconstructor(input)
 
-        #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
-        condition_tokens = self._build_editor_condition_tokens(input, d)
-        # print("condition_tokens:", condition_tokens.shape)
-        if condition_tokens is not None:
-            editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
-            checkpoint_every = self.config.training.grad_checkpoint_every
-            editor_output_tokens = self.pass_layers(
-                self.transformer_editor,
-                editor_input_tokens,
-                gradient_checkpoint=True,
-                checkpoint_every=checkpoint_every
-            )
-            n_latent_vectors = self.config.model.transformer.n_latent_vectors
-            latent_tokens = editor_output_tokens[:, :n_latent_vectors, :]
+        # #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
+        # condition_tokens = self._build_editor_condition_tokens(input, d)
+        # # print("condition_tokens:", condition_tokens.shape)
+        # if condition_tokens is not None:
+        #     editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
+        #     checkpoint_every = self.config.training.grad_checkpoint_every
+        #     editor_output_tokens = self.pass_layers(
+        #         self.transformer_editor,
+        #         editor_input_tokens,
+        #         gradient_checkpoint=True,
+        #         checkpoint_every=checkpoint_every
+        #     )
+        #     n_latent_vectors = self.config.model.transformer.n_latent_vectors
+        #     latent_tokens = editor_output_tokens[:, :n_latent_vectors, :]
         
         #& Step 4: Renderer - Decode results from target ray maps
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)
