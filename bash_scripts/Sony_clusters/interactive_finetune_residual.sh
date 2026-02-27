@@ -62,10 +62,10 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
-    --rdzv_endpoint localhost:29501 \
+    --rdzv_endpoint localhost:29505 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
     training.batch_size_per_gpu = 16 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
