@@ -746,24 +746,24 @@ class LatentSceneEditor(nn.Module):
         # Initialize final latent tokens
         latent_tokens_final = latent_tokens
         
-        if condition_tokens is not None:
-            editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
+        # if condition_tokens is not None:
+        #     editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
             
-            editor_output_tokens = self.pass_layers(
-                self.transformer_editor,
-                editor_input_tokens,
-                gradient_checkpoint=True,
-                checkpoint_every=checkpoint_every
-            )
-            n_latent_vectors = self.config.model.transformer.n_latent_vectors
+        #     editor_output_tokens = self.pass_layers(
+        #         self.transformer_editor,
+        #         editor_input_tokens,
+        #         gradient_checkpoint=True,
+        #         checkpoint_every=checkpoint_every
+        #     )
+        #     n_latent_vectors = self.config.model.transformer.n_latent_vectors
             
-            if self.use_residual_mode:
-                # Residual mode: predict residual and add to original latent tokens
-                latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
-                latent_tokens_final = latent_tokens + latent_tokens_res
-            else:
-                # Direct prediction mode: editor directly outputs final latent tokens
-                latent_tokens_final = editor_output_tokens[:, :n_latent_vectors, :]
+        #     if self.use_residual_mode:
+        #         # Residual mode: predict residual and add to original latent tokens
+        #         latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
+        #         latent_tokens_final = latent_tokens + latent_tokens_res
+        #     else:
+        #         # Direct prediction mode: editor directly outputs final latent tokens
+        #         latent_tokens_final = editor_output_tokens[:, :n_latent_vectors, :]
 
         
         #& Step 4: Renderer - Decode results from target ray maps
