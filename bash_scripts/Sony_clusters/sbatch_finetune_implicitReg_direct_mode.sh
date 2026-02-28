@@ -3,7 +3,7 @@
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --time=168:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
@@ -69,7 +69,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29501 \
@@ -82,6 +82,6 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_editor_implicitReg_direct_mode \
     training.vis_every = 1000 \
-    training.warmup = 3000 \
+    training.warmup = 1000 \
     training.grad_accum_steps = 1
 "
