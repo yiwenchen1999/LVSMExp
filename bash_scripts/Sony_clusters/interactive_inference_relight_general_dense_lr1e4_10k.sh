@@ -29,7 +29,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training/Inference paths (Sony cluster)
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/dense_relight_env"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder"
 
 ############################
