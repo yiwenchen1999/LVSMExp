@@ -31,7 +31,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_direct_mode"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_implicitReg_direct_mode"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
 ############################
@@ -64,14 +64,14 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29505 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
     model.transformer.editor.use_residual_mode = false \
     model.transformer.editor.init_scale = 0.1 \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 4 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \

@@ -31,7 +31,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_residual_mode"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_implicitReg_residual_mode"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
 ############################
@@ -71,11 +71,13 @@ singularity exec --nv $BIND $SIF bash -lc "
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
     model.transformer.editor.use_residual_mode = true \
     model.transformer.editor.init_scale = 0.01 \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 4 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_editor_residual_mode \
+    training.learning_rate = 0.000000001 \
+    training.warmup = 100000000 \
     training.vis_every = 2 \
     training.grad_accum_steps = 1
 "
