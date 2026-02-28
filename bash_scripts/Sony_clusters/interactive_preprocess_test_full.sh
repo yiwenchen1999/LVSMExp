@@ -38,6 +38,19 @@ export SINGULARITYENV_OPENCV_IO_ENABLE_OPENEXR=1
 export SINGULARITYENV_QT_QPA_PLATFORM=offscreen
 export SINGULARITYENV_PYOPENGL_PLATFORM=egl
 
+# First, ensure opencv-python-headless is installed
+echo "Checking/installing opencv-python-headless..."
+singularity exec --nv $BIND $SIF bash -lc "
+  set -euo pipefail
+  export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
+  cd $PROJ
+  
+  pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true
+  pip install opencv-python-headless
+"
+
+echo ""
+echo "Running preprocessing..."
 singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
