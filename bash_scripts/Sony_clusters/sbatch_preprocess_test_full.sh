@@ -41,11 +41,13 @@ echo "----------------------------------"
 ############################
 # Run preprocessing
 ############################
-srun singularity exec $BIND $SIF bash -lc "
+export SINGULARITYENV_OPENCV_IO_ENABLE_OPENEXR=1
+export SINGULARITYENV_QT_QPA_PLATFORM=offscreen
+export SINGULARITYENV_PYOPENGL_PLATFORM=egl
+
+srun singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
-  export OPENCV_IO_ENABLE_OPENEXR=1
-  export QT_QPA_PLATFORM=offscreen
   cd $PROJ
 
   python preprocess_scripts/preprocess_objaverse.py \
