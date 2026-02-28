@@ -9,8 +9,13 @@ cd /music-shared-disk/group/ct/yiwen/codes/FLUX_finetune
 cd /music-shared-disk/group/ct/yiwen/data/objaverse
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
-  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/Datasets/objaverse/envmaps_256/  \
-  hdris_256/
+  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/dense_relight_env/ckpt_0000000000026000.pt  \
+  ckpt/dense_relight_env/
+
+rsync -avh --partial --inplace --progress \
+  -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
+  /music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm \
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/polyhaven_lvsm
 
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=2

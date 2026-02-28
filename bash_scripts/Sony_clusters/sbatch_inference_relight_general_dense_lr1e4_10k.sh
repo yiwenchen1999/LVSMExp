@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=finetune_implicitReg_direct_mode
+#SBATCH --job-name=inference_relight_dense_lr1e4_10k
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
-#SBATCH --time=168:00:00
+#SBATCH --time=72:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
@@ -16,7 +16,7 @@ set -euo pipefail
 export PROJ=/music-shared-disk/group/ct/yiwen/codes/LVSMExp
 export PY_SITE=/scratch2/$USER/py_lvsmexp
 export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
-export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
+export BIND="-B /group2,/scratch2,/music-shared-disk"
 
 # WANDB directories (Sony cluster paths)
 export WANDB_DIR=/scratch2/$USER/wandb
@@ -33,10 +33,10 @@ export XDG_DATA_HOME=/scratch2/$USER/.local/share
 export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
-# Training paths (Sony cluster)
-export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_implicitReg_direct_mode"
-export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
+# Training/Inference paths (Sony cluster)
+export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4"
+export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder"
 
 ############################
 # Logging
@@ -49,11 +49,10 @@ echo "CKPT_DIR: $CKPT_DIR"
 echo "LVSM_CKPT_DIR: $LVSM_CKPT_DIR"
 echo "PY_SITE: $PY_SITE"
 echo "WANDB_DIR: $WANDB_DIR"
-echo "MODE: DIRECT (editor directly predicts latent_tokens)"
 echo "----------------------------------"
 
 ############################
-# Run training
+# Run inference
 ############################
 srun singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
@@ -73,15 +72,17 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29501 \
-    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
-    model.transformer.editor.use_residual_mode = false \
-    model.transformer.editor.init_scale = 0.1 \
-    training.batch_size_per_gpu = 16 \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
+    training.batch_size_per_gpu = 4 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
-    training.wandb_exp_name = LVSM_editor_implicitReg_direct_mode \
-    training.vis_every = 1000 \
+    training.wandb_exp_name = LVSM_edit_dense_general_lr1e4_10k \
     training.warmup = 3000 \
-    training.grad_accum_steps = 1
+    training.vis_every = 1000 \
+    training.lr = 0.0001 \
+    training.single_env_map = true
 "
+
+echo ""
+echo "Inference complete!"
