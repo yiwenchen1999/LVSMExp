@@ -37,6 +37,8 @@ echo "----------------------------------"
 singularity exec $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
+  export OPENCV_IO_ENABLE_OPENEXR=1
+  export QT_QPA_PLATFORM=offscreen
   cd $PROJ
 
   python preprocess_scripts/preprocess_objaverse.py \
