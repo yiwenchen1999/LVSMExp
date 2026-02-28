@@ -11,7 +11,7 @@ set -euo pipefail
 export PROJ=/music-shared-disk/group/ct/yiwen/codes/LVSMExp
 export PY_SITE=/scratch2/$USER/py_lvsmexp
 export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
-export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
+export BIND="-B /group2,/scratch2,/music-shared-disk"
 
 # Input/Output paths (Sony cluster)
 export INPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/rendered_dense_polyhaven"
