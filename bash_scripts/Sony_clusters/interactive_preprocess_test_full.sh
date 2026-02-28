@@ -17,7 +17,7 @@ export BIND="-B /group2,/scratch2,/music-shared-disk"
 export INPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/rendered_dense_polyhaven"
 export OUTPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm"
 export OUTPUT_TAR="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm_tar"
-export HDRI_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/hdris_256"
+export HDRI_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/hdris_256/hdirs"
 
 ############################
 # Logging
