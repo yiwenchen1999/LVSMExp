@@ -13,3 +13,5 @@ cd LVSMExp
 pip install -r requirements.txt
 
 https://huggingface.co/coast01/LVSM/resolve/main/scene_encoder_decoder_256.pt?download=true
+
+

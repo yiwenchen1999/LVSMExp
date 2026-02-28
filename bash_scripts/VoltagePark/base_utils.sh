@@ -3,6 +3,12 @@ rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
   chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes/test \
     lvsm_scenes/
+
+
+rsync -avh --partial --inplace --progress \
+  -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
+  ckpt_0000000000026000.pt \
+  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/dense_relight_env
 python3 preprocess_scripts/update_paths.py \
   --old-path /scratch/chen.yiwe/temp_objaverse \
   --new-path /data \
