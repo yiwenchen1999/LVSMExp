@@ -208,47 +208,51 @@ class LatentSceneEditor(nn.Module):
         # Transformer editor block (for editing latent tokens)
         editor_config = config.get("editor", {})
         editor_n_layer = editor_config.get("n_layer", 1)
+        self.use_residual_mode = editor_config.get("use_residual_mode", False)
+        print(f"Editor mode: {'residual' if self.use_residual_mode else 'direct prediction'}")
+        
         self.transformer_editor = nn.ModuleList([
             QK_Norm_TransformerBlock(
                 config.d, config.d_head, use_qk_norm=use_qk_norm
             ) for _ in range(editor_n_layer)
         ])
         
-        # Initialize editor blocks with smaller weights to start near identity (output near zero)
-        # This prevents the editor from disrupting pre-trained latent tokens initially
-        # For residual mode, we want the editor to output near-zero residuals
-        editor_init_scale = editor_config.get("init_scale", 0.01)  # Default: very small for residual
-        if config.get("special_init", False):
-            for idx, block in enumerate(self.transformer_editor):
-                if config.get("depth_init", False):
-                    weight_init_std = (0.02 / (2 * (idx + 1)) ** 0.5) * editor_init_scale
-                else:
-                    weight_init_std = (0.02 / (2 * editor_n_layer) ** 0.5) * editor_init_scale
-                block.apply(lambda module: init_weights(module, weight_init_std))
+        # Initialize editor based on mode
+        if self.use_residual_mode:
+            # Residual mode: init editor to output near-zero residuals
+            editor_init_scale = editor_config.get("init_scale", 0.01)  # Default: very small
+            if config.get("special_init", False):
+                for idx, block in enumerate(self.transformer_editor):
+                    if config.get("depth_init", False):
+                        weight_init_std = (0.02 / (2 * (idx + 1)) ** 0.5) * editor_init_scale
+                    else:
+                        weight_init_std = (0.02 / (2 * editor_n_layer) ** 0.5) * editor_init_scale
+                    block.apply(lambda module: init_weights(module, weight_init_std))
+            else:
+                editor_std = 0.02 * editor_init_scale
+                for block in self.transformer_editor:
+                    block.apply(lambda module: init_weights(module, editor_std))
+            
+            # Editor residual head (to ensure zero residual at init)
+            self.editor_residual_head = nn.Linear(config.d, config.d, bias=False)
+            nn.init.zeros_(self.editor_residual_head.weight)
         else:
-            editor_std = 0.02 * editor_init_scale
-            for block in self.transformer_editor:
-                block.apply(lambda module: init_weights(module, editor_std))
-        
-        # Editor residual head (to ensure zero residual at init)
-        self.editor_residual_head = nn.Linear(config.d, config.d, bias=False)
-        nn.init.zeros_(self.editor_residual_head.weight)
-
-        # Fidelity Transformer (Identity Init)
-        fidelity_config = config.get("fidelity", {})
-        fidelity_n_layer = fidelity_config.get("n_layer", 1) # Default 1 layer or as needed
-        self.transformer_fidelity = nn.ModuleList([
-            QK_Norm_TransformerBlock(
-                config.d, config.d_head, use_qk_norm=use_qk_norm
-            ) for _ in range(fidelity_n_layer)
-        ])
-        
-        # Initialize fidelity transformer to be identity
-        # Since transformer blocks are residual (x + f(x)), we initialize f(x) to be near zero
-        fidelity_init_scale = 1e-5 # Very small value for identity behavior
-        fidelity_std = 0.02 * fidelity_init_scale
-        for block in self.transformer_fidelity:
-             block.apply(lambda module: init_weights(module, fidelity_std))
+            # Direct prediction mode: init editor to approximate identity (output ≈ input)
+            editor_init_scale = editor_config.get("init_scale", 0.1)  # Default: 0.1x for near-identity
+            if config.get("special_init", False):
+                for idx, block in enumerate(self.transformer_editor):
+                    if config.get("depth_init", False):
+                        weight_init_std = (0.02 / (2 * (idx + 1)) ** 0.5) * editor_init_scale
+                    else:
+                        weight_init_std = (0.02 / (2 * editor_n_layer) ** 0.5) * editor_init_scale
+                    block.apply(lambda module: init_weights(module, weight_init_std))
+            else:
+                editor_std = 0.02 * editor_init_scale
+                for block in self.transformer_editor:
+                    block.apply(lambda module: init_weights(module, editor_std))
+            
+            # No residual head in direct prediction mode
+            self.editor_residual_head = None
 
 
 
@@ -315,15 +319,11 @@ class LatentSceneEditor(nn.Module):
             param.requires_grad = True
         trainable_parts.append("transformer_editor")
         
-        # Keep editor residual head trainable
-        for param in self.editor_residual_head.parameters():
-            param.requires_grad = True
-        trainable_parts.append("editor_residual_head")
-        
-        # Keep fidelity transformer trainable
-        for param in self.transformer_fidelity.parameters():
-            param.requires_grad = True
-        trainable_parts.append("transformer_fidelity")
+        # Keep editor residual head trainable (if it exists)
+        if self.editor_residual_head is not None:
+            for param in self.editor_residual_head.parameters():
+                param.requires_grad = True
+            trainable_parts.append("editor_residual_head")
 
         print(f"Frozen reconstructor and renderer layers. Only editor layers ({', '.join(trainable_parts)}) are trainable.")
     
@@ -716,9 +716,9 @@ class LatentSceneEditor(nn.Module):
         # target.ray_d: [b, v_target, 3, h, w] - Target ray directions
         input, target = self.process_data(data_batch, has_target_image=has_target_image, target_has_input = self.config.training.target_has_input, compute_rays=True)
         
-        #& Step 2: Reconstructor + Fidelity - Get scene latent_tokens from input images
+        #& Step 2: Reconstructor - Get scene latent_tokens from input images
         # When relit_images exist: merge input.image and input.relit_images into (2b, v_input, c, h, w),
-        # pass through reconstructor and fidelity_layer once, then split back to latent_tokens and latent_tokens_b
+        # pass through reconstructor once, then split back to latent_tokens and latent_tokens_b
         checkpoint_every = self.config.training.grad_checkpoint_every
 
         if hasattr(input, 'relit_images') and input.relit_images is not None:
@@ -732,34 +732,22 @@ class LatentSceneEditor(nn.Module):
             input_combined.ray_o = combined_ray_o
             input_combined.ray_d = combined_ray_d
 
-            latent_all_raw, n_patches, d = self.reconstructor(input_combined)  # (2b, n_latent, d)
-            latent_all_fidelity = self.pass_layers(
-                self.transformer_fidelity,
-                latent_all_raw,
-                gradient_checkpoint=True,
-                checkpoint_every=checkpoint_every
-            )
-            latent_tokens_fidelity = latent_all_fidelity[:b]
-            latent_tokens_b = latent_all_fidelity[b:]
+            latent_all, n_patches, d = self.reconstructor(input_combined)  # (2b, n_latent, d)
+            latent_tokens = latent_all[:b]
+            latent_tokens_b = latent_all[b:]
         else:
             # Original path: no relit images
-            latent_tokens_raw, n_patches, d = self.reconstructor(input)
-            latent_tokens_fidelity = self.pass_layers(
-                self.transformer_fidelity,
-                latent_tokens_raw,
-                gradient_checkpoint=True,
-                checkpoint_every=checkpoint_every
-            )
+            latent_tokens, n_patches, d = self.reconstructor(input)
             latent_tokens_b = None
 
         #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
         condition_tokens = self._build_editor_condition_tokens(input, d)
         
-        # Initialize final latent tokens with fidelity output
-        latent_tokens_final = latent_tokens_fidelity
+        # Initialize final latent tokens
+        latent_tokens_final = latent_tokens
         
         if condition_tokens is not None:
-            editor_input_tokens = torch.cat([latent_tokens_fidelity, condition_tokens], dim=1)
+            editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
             
             editor_output_tokens = self.pass_layers(
                 self.transformer_editor,
@@ -769,10 +757,13 @@ class LatentSceneEditor(nn.Module):
             )
             n_latent_vectors = self.config.model.transformer.n_latent_vectors
             
-            # Residual update: predict residual and add to original latent tokens
-            # Use the residual head to project to residual space (init to 0)
-            latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
-            latent_tokens_final = latent_tokens_fidelity + latent_tokens_res
+            if self.use_residual_mode:
+                # Residual mode: predict residual and add to original latent tokens
+                latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
+                latent_tokens_final = latent_tokens + latent_tokens_res
+            else:
+                # Direct prediction mode: editor directly outputs final latent tokens
+                latent_tokens_final = editor_output_tokens[:, :n_latent_vectors, :]
 
         
         #& Step 4: Renderer - Decode results from target ray maps
@@ -800,12 +791,12 @@ class LatentSceneEditor(nn.Module):
                 target_images
             )
             
-            # Fidelity Loss
+            # Fidelity Loss (compare latent_tokens with latent_tokens_b from relit images)
             fidelity_loss = torch.tensor(0.0, device=rendered_images.device)
             if latent_tokens_b is not None:
                 fidelity_weight = self.config.loss.get("fidelity_weight", 0.1)
                 if fidelity_weight > 0:
-                    fidelity_loss = torch.nn.functional.mse_loss(latent_tokens_fidelity, latent_tokens_b) * fidelity_weight
+                    fidelity_loss = torch.nn.functional.mse_loss(latent_tokens, latent_tokens_b) * fidelity_weight
 
             # Compute albedo loss if albedo decoder is enabled and target albedos are available
             if self.use_albedo_decoder and hasattr(target, 'albedos') and target.albedos is not None:
@@ -877,9 +868,15 @@ class LatentSceneEditor(nn.Module):
             checkpoint_every=checkpoint_every
         )
         n_latent_vectors = self.config.model.transformer.n_latent_vectors
-        # For residual mode: latent + residual
-        latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
-        edited_latent_tokens = latent_tokens + latent_tokens_res
+        
+        if self.use_residual_mode:
+            # Residual mode: latent + residual
+            latent_tokens_res = self.editor_residual_head(editor_output_tokens[:, :n_latent_vectors, :])
+            edited_latent_tokens = latent_tokens + latent_tokens_res*5e-2
+        else:
+            # Direct prediction mode: editor directly outputs edited latent tokens
+            edited_latent_tokens = editor_output_tokens[:, :n_latent_vectors, :]
+        
         return edited_latent_tokens
 
 

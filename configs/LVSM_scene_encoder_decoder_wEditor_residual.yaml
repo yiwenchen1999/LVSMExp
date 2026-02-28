@@ -27,10 +27,10 @@ model:
     n_latent_vectors: 3072 # 3x32x32
     editor:
       n_layer: 12  # Number of transformer blocks for editor
-      init_scale: 0.01  # Initialization scale (0.01 for residual mode)
+      use_residual_mode: true  # If true: predict residual and add to latent_tokens (init_scale should be small, e.g., 0.01)
+                               # If false: directly predict latent_tokens_final (init_scale should be ~0.1 for near-identity)
+      init_scale: 0.01  # Initialization scale (0.01 for residual mode, 0.1 for direct mode)
       init_from_decoder: false
-    fidelity:
-      n_layer: 6 # Structured like editor
     # freeze_reconstructor_renderer: true
 
 loss:
