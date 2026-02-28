@@ -1,3 +1,8 @@
+# rsync data from neu to voltage park
+rsync -avh --partial --inplace --progress \
+  -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes/test \
+    lvsm_scenes/
 python3 preprocess_scripts/update_paths.py \
   --old-path /scratch/chen.yiwe/temp_objaverse \
   --new-path /data \
