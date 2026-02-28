@@ -34,7 +34,7 @@ export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
-export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/train/full_list.txt"
+export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list.txt"
 export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_implicitReg_residual_mode"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
