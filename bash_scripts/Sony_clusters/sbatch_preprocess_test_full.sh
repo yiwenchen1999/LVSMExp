@@ -46,14 +46,14 @@ export SINGULARITYENV_QT_QPA_PLATFORM=offscreen
 export SINGULARITYENV_PYOPENGL_PLATFORM=egl
 
 # First, ensure opencv-python-headless is installed
-echo "Checking/installing opencv-python-headless..."
+echo "Checking/installing required packages..."
 srun singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:${PYTHONPATH:-}\"
   cd $PROJ
   
   pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true
-  pip install opencv-python-headless
+  pip install opencv-python-headless pyexr
 "
 
 echo ""
