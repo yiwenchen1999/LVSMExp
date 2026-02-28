@@ -12,7 +12,7 @@ set -euo pipefail
 export PROJ=/music-shared-disk/group/ct/yiwen/codes/LVSMExp
 export PY_SITE=/scratch2/$USER/py_lvsmexp
 export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
-export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
+export BIND="-B /group2,/scratch2,/music-shared-disk"
 
 # WANDB directories (Sony cluster paths)
 export WANDB_DIR=/scratch2/$USER/wandb
@@ -64,7 +64,7 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29505 \
