@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=finetune_direct_mode
+#SBATCH --job-name=finetune_implicitReg_residual_mode
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --time=168:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
@@ -35,7 +35,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/train/full_list.txt"
-export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_direct_mode"
+export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_implicitReg_residual_mode"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
 ############################
@@ -49,7 +49,7 @@ echo "CKPT_DIR: $CKPT_DIR"
 echo "LVSM_CKPT_DIR: $LVSM_CKPT_DIR"
 echo "PY_SITE: $PY_SITE"
 echo "WANDB_DIR: $WANDB_DIR"
-echo "MODE: DIRECT (editor directly predicts latent_tokens)"
+echo "MODE: RESIDUAL (editor predicts residual)"
 echo "----------------------------------"
 
 ############################
@@ -69,18 +69,18 @@ srun singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 4 --nnodes 1 \
+  torchrun --nproc_per_node 2 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
-    --rdzv_endpoint localhost:29501 \
+    --rdzv_endpoint localhost:29505 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_residual.yaml \
-    model.transformer.editor.use_residual_mode = false \
-    model.transformer.editor.init_scale = 0.1 \
-    training.batch_size_per_gpu = 8 \
+    model.transformer.editor.use_residual_mode = true \
+    model.transformer.editor.init_scale = 0.01 \
+    training.batch_size_per_gpu = 16 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.dataset_path = \"$DATA_LIST\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
-    training.wandb_exp_name = LVSM_editor_direct_mode \
+    training.wandb_exp_name = LVSM_editor_implicitReg_residual_mode \
     training.vis_every = 1000 \
     training.warmup = 3000 \
     training.grad_accum_steps = 1
