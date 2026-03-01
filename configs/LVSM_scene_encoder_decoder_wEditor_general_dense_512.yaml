@@ -76,7 +76,7 @@ training:
   use_tf32: true
   view_selector:
     max_frame_dist: 60
-    min_frame_dist: 15
+    min_frame_dist: 13
   vis_every: 1000
   wandb_exp_name: LVSM_edit_dense_general_512
   wandb_log_every: 50
