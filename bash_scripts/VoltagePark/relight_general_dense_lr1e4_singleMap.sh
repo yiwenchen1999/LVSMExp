@@ -43,7 +43,7 @@ echo "----------------------------------"
 torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512.yaml \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 8 \
     training.checkpoint_dir = "$CKPT_DIR" \
     training.dataset_path = "$DATA_LIST" \
     training.LVSM_checkpoint_dir = "$LVSM_CKPT_DIR" \
