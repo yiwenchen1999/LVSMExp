@@ -14,9 +14,9 @@ export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
 export BIND="-B /group2,/scratch2,/music-shared-disk"
 
 # Input/Output paths (Sony cluster)
-export INPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/rendered_dense_polyhaven"
-export OUTPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm"
-export OUTPUT_TAR="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm_tar"
+export INPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/rendered_scenes_dense"
+export OUTPUT_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense"
+export OUTPUT_TAR="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense_tar"
 export HDRI_DIR="/music-shared-disk/group/ct/yiwen/data/objaverse/hdris_256/hdirs"
 
 ############################

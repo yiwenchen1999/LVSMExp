@@ -1276,9 +1276,9 @@ def main():
     for object_id in object_ids:
         object_path = os.path.join(objaverse_root, object_id)
         done_file = os.path.join(object_path, 'done.txt')
-        if not os.path.exists(done_file):
-            print(f"Skipping {object_id}: done.txt not found")
-            continue
+        # if not os.path.exists(done_file):
+        #     print(f"Skipping {object_id}: done.txt not found")
+        #     continue
         filtered_object_ids.append(object_id)
     object_ids = filtered_object_ids
     
