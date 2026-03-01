@@ -1,0 +1,55 @@
+#!/bin/bash
+# Relight general dense lr1e4 single map (VoltagePark - dedicated GPU, no sbatch).
+# Usage: bash bash_scripts/VoltagePark/relight_general_dense_lr1e4_singleMap.sh
+#   or:  source bash_scripts/VoltagePark/relight_general_dense_lr1e4_singleMap.sh
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+############################
+# VoltagePark paths
+############################
+export PROJ="${PROJ:-$REPO_ROOT}"
+export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes/test/full_list.txt}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_dense_env_scene}"
+export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
+
+# Detect GPU count (override with NPROC env var)
+if [[ -n "${NPROC:-}" ]]; then
+    NPROC_PER_NODE="$NPROC"
+else
+    NPROC_PER_NODE=$(nvidia-smi -L 2>/dev/null | wc -l) || NPROC_PER_NODE=1
+fi
+NNODES="${NNODES:-1}"
+
+############################
+# Logging
+############################
+echo "Host: $(hostname)"
+echo "PROJ: $PROJ"
+echo "DATA_LIST: $DATA_LIST"
+echo "CKPT_DIR: $CKPT_DIR"
+echo "LVSM_CKPT_DIR: $LVSM_CKPT_DIR"
+echo "nproc_per_node: $NPROC_PER_NODE"
+echo "nnodes: $NNODES"
+echo "----------------------------------"
+
+############################
+# Run training
+############################
+
+torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
+    --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512.yaml \
+    training.batch_size_per_gpu = 16 \
+    training.checkpoint_dir = "$CKPT_DIR" \
+    training.dataset_path = "$DATA_LIST" \
+    training.LVSM_checkpoint_dir = "$LVSM_CKPT_DIR" \
+    training.wandb_exp_name = relight_dense_env_scene \
+    training.warmup = 3000 \
+    training.vis_every = 1000 \
+    training.lr = 0.0001 \
+    training.single_env_map = true \
+    training.grad_accum_steps = 1

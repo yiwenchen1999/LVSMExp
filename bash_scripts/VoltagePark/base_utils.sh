@@ -12,7 +12,7 @@ rsync -avh --partial --inplace --progress \
 python3 preprocess_scripts/update_paths.py \
   --old-path /scratch/chen.yiwe/temp_objaverse \
   --new-path /data \
-  --root-dir /data/lvsmPlus_objaverse/test \
+  --root-dir /data/lvsm_scenes/test \
   --extensions json txt \
   --backup
 
