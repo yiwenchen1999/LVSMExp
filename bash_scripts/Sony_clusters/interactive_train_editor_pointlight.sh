@@ -8,7 +8,7 @@ set -euo pipefail
 export PROJ=/music-shared-disk/group/ct/yiwen/codes/LVSMExp
 export PY_SITE=/scratch2/$USER/py_lvsmexp
 export SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
-export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
+export BIND="-B /group2,/scratch2,/music-shared-disk"
 
 export WANDB_DIR=/scratch2/$USER/wandb
 export WANDB_ARTIFACT_DIR=/scratch2/$USER/wandb/artifacts
@@ -20,7 +20,7 @@ export XDG_DATA_HOME=/scratch2/$USER/.local/share
 export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
-export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/lvsmPlus_objaverse/test/full_list_point_light.txt"
+export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list_point_light.txt"
 export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder_wEditor_pointlight"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_object_encoder_decoder_dense"
 
@@ -55,7 +55,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.lr = 0.0001 \
     training.vis_every = 2 \
     training.warmup = 3000 \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 8 \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_editor_pointlight
 "
