@@ -56,3 +56,10 @@ python3 preprocess_scripts/preprocess_obj_with_light.py \
   --output-root /data/obj_with_light_processed \
   --split test \
   --target-size 512
+
+python3 preprocess_scripts/preprocess_obj_with_light.py \
+  --crop-mode square \
+  --target-size 512 \
+  --input-root /data/dataset \
+  --output-root /data/obj_with_light_processed \
+  --split test

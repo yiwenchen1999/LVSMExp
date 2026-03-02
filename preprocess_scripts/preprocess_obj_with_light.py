@@ -95,6 +95,61 @@ def apply_mask_white_background(image_path: Path, mask_path: Path) -> np.ndarray
     return out
 
 
+def center_crop_to_square_simple(
+    rgb: np.ndarray, K: np.ndarray, target_size: int
+) -> tuple[np.ndarray, list]:
+    """
+    Simple center crop to square (min(w,h)), then resize to target_size.
+    Preserves original focal length ratios.
+    
+    Args:
+        rgb: Input image (H, W, 3)
+        K: Intrinsic matrix (3x3) with fx=K[0,0], fy=K[1,1]
+        target_size: Output square size
+    
+    Returns:
+        cropped_rgb: Cropped and resized image (target_size, target_size, 3)
+        new_fxfycxcy: [fx, fy, cx, cy] for the output image
+    """
+    h, w = rgb.shape[:2]
+    fx_src = K[0, 0]
+    fy_src = K[1, 1]
+    
+    # Take the smaller dimension as crop size
+    crop_size = min(w, h)
+    
+    # Center crop to square
+    x0 = (w - crop_size) // 2
+    y0 = (h - crop_size) // 2
+    
+    cropped = rgb[y0 : y0 + crop_size, x0 : x0 + crop_size]
+    
+    # Compute intrinsics after cropping
+    # fx' = fx * (crop_size / w)
+    # fy' = fy * (crop_size / h)
+    fx_crop = fx_src * (crop_size / float(w))
+    fy_crop = fy_src * (crop_size / float(h))
+    
+    # Resize to target size
+    if crop_size != target_size:
+        img = Image.fromarray(cropped)
+        img = img.resize((target_size, target_size), Image.Resampling.BICUBIC)
+        cropped = np.array(img, dtype=np.uint8)
+        
+        # Scale intrinsics proportionally
+        scale = target_size / float(crop_size)
+        fx_final = fx_crop * scale
+        fy_final = fy_crop * scale
+    else:
+        fx_final = fx_crop
+        fy_final = fy_crop
+    
+    cx_final = target_size / 2.0
+    cy_final = target_size / 2.0
+    
+    return cropped, [fx_final, fy_final, cx_final, cy_final]
+
+
 def center_crop_to_target_fov_square(
     rgb: np.ndarray, K: np.ndarray, target_fov_deg: float, target_size: int
 ) -> tuple[np.ndarray, list]:
@@ -185,6 +240,7 @@ def process_scene(
     scene_dir: Path,
     output_root: Path,
     split: str,
+    crop_mode: str,
     target_fov: float,
     target_size: int,
 ):
@@ -219,7 +275,13 @@ def process_scene(
         K, R, t, src_w, src_h = parse_camera_file(cam_file)
         
         rgb = apply_mask_white_background(image_file, mask_file)
-        rgb_out, fxfycxcy = center_crop_to_target_fov_square(rgb, K, target_fov, target_size)
+        
+        if crop_mode == "fov":
+            rgb_out, fxfycxcy = center_crop_to_target_fov_square(rgb, K, target_fov, target_size)
+        elif crop_mode == "square":
+            rgb_out, fxfycxcy = center_crop_to_square_simple(rgb, K, target_size)
+        else:
+            raise ValueError(f"Unknown crop_mode: {crop_mode}")
         
         out_name = f"{int(frame_id):05d}.png"
         out_path = out_images_dir / out_name
@@ -244,9 +306,12 @@ def process_scene(
     with open(meta_path, "w") as f:
         json.dump(scene_meta, f, indent=2)
     
+    mode_desc = f"crop_mode={crop_mode}"
+    if crop_mode == "fov":
+        mode_desc += f", target_fov={target_fov}"
     print(
         f"[Done] {scene_name} ({split}): {len(frames_out)} frames, "
-        f"target_fov={target_fov}, target_size={target_size}"
+        f"{mode_desc}, target_size={target_size}"
     )
     return scene_name
 
@@ -296,8 +361,20 @@ def parse_args():
         choices=["test", "train"],
         help="Which split to process (default: test)",
     )
+    parser.add_argument(
+        "--crop-mode",
+        type=str,
+        default="fov",
+        choices=["fov", "square"],
+        help="Crop mode: 'fov' (crop to target FOV, fx=fy), 'square' (simple center crop to square, preserve fx/fy ratio)",
+    )
     parser.add_argument("--target-size", type=int, default=512, help="Output square image size")
-    parser.add_argument("--target-fov", type=float, default=30.0, help="Target horizontal FOV in degrees")
+    parser.add_argument(
+        "--target-fov",
+        type=float,
+        default=30.0,
+        help="Target horizontal FOV in degrees (only used when crop-mode=fov)",
+    )
     return parser.parse_args()
 
 
@@ -321,6 +398,7 @@ def main():
             scene_dir=scene_dir,
             output_root=output_root,
             split=args.split,
+            crop_mode=args.crop_mode,
             target_fov=args.target_fov,
             target_size=args.target_size,
         )
