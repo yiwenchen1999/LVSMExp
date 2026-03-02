@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # ############################
 export PROJ="${PROJ:-$REPO_ROOT}"
 export DATA_LIST="${DATA_LIST:-/data/obj_with_light_processed/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_sparse}"
 
 # # Caches (use $HOME on clean machine)
 # export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
@@ -51,7 +51,7 @@ echo "----------------------------------"
 
 torchrun --nproc_per_node 1 --nnodes "$NNODES" \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-    train.py --config configs/LVSM_scene_encoder_decoder.yaml \
+    train.py --config configs/LVSM_scene_encoder_decoder_sparse.yaml \
     training.batch_size_per_gpu = 8 \
     training.dataset_path = "$DATA_LIST" \
     training.checkpoint_dir = "$CKPT_DIR" \
