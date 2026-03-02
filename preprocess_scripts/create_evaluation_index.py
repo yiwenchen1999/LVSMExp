@@ -47,7 +47,8 @@ def extract_object_prefix(scene_name):
         str: Object prefix (e.g., "wooden_table_02")
     """
     # Look for common lighting condition suffixes
-    split_tags = ["_white_env_", "_env_", "_white_pl_", "_rgb_pl_"]
+    split_tags = ["_white_env_", "_env_", "_white_pl_", "_rgb_pl_",
+                  "_multi_pl_", "_area_", "_combined_"]
     for tag in split_tags:
         idx = scene_name.rfind(tag)
         if idx != -1:

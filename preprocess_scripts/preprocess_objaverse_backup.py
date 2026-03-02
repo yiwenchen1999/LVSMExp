@@ -101,21 +101,6 @@ def is_pl_folder(name):
     return (name.startswith('rgb_pl_') or name.startswith('white_pl_'))
 
 
-def is_multi_pl_folder(name):
-    """Return True if folder name indicates multi-point-light lighting (multi_pl_*)."""
-    return name.startswith('multi_pl_')
-
-
-def is_area_folder(name):
-    """Return True if folder name indicates area light lighting (area_*)."""
-    return name.startswith('area_')
-
-
-def is_combined_folder(name):
-    """Return True if folder name indicates combined lighting (combined_*)."""
-    return name.startswith('combined_')
-
-
 def load_point_light_info(pl_folder_path):
     """
     Load point light position, color and power from rgb_pl.json or white_pl.json.
@@ -155,22 +140,25 @@ POWER_MIN = 10.0
 POWER_MAX = 1500.0
 
 
-def build_point_light_rays_array(pos, color, power, N=8192, scene_sphere_radius=3.0):
+def build_point_light_rays_array(pos, color, power, N=8192):
     """
     Build ray array for a point light: rays from light origin to uniformly sampled points on sphere.
-    Sphere: center (0,0,0), radius scene_sphere_radius. Intensity: power is normalized to [0,1] by
-    the known sampling range [POWER_MIN, POWER_MAX], then log-normalized like HDR (log1p(10*x)) so
-    intensity lies in [0, log1p(10)] ~ [0, 2.4], matching env map scale.
+    Sphere: center (0,0,0), radius 0.5. Intensity: power is normalized to [0,1] by the known
+    sampling range [POWER_MIN, POWER_MAX], then log-normalized like HDR (log1p(10*x)) so intensity
+    lies in [0, log1p(10)] ~ [0, 2.4], matching env map scale.
     Shape: [N, 10] = 1 (intensity) + 3 (color) + 3 (ray_o) + 3 (ray_d), ray_d normalized.
     """
     pos = np.asarray(pos, dtype=np.float64).reshape(3)
     color = np.asarray(color, dtype=np.float64).reshape(3)
-    points = uniform_sphere_surface(N, center=(0, 0, 0), radius=scene_sphere_radius)
+    points = uniform_sphere_surface(N, center=(0, 0, 0), radius=0.5)
+    # Ray origin is the point light position (same for all rays)
     ray_o = np.broadcast_to(pos, (N, 3)).astype(np.float32)
+    # Direction from light to sphere point, then normalize
     ray_d = points - pos
     norms = np.linalg.norm(ray_d, axis=1, keepdims=True)
     norms = np.where(norms > 1e-8, norms, 1.0)
     ray_d = (ray_d / norms).astype(np.float32)
+    # Normalize power from [POWER_MIN, POWER_MAX] to [0,1], then HDR log (same scale as env maps)
     power_clip = np.clip(power, POWER_MIN, POWER_MAX)
     power_norm = (float(power_clip) - POWER_MIN) / (POWER_MAX - POWER_MIN)
     intensity = np.log1p(10.0 * power_norm)
@@ -178,185 +166,6 @@ def build_point_light_rays_array(pos, color, power, N=8192, scene_sphere_radius=
     color_broadcast = np.broadcast_to(color.astype(np.float32), (N, 3))
     arr = np.concatenate([intensity, color_broadcast, ray_o, ray_d], axis=1)
     return arr
-
-
-def load_multi_point_light_info(folder_path):
-    """
-    Load multi-point-light info from multi_pl.json.
-    Returns list of (pos, color, power) tuples, or None if not found.
-    """
-    path = os.path.join(folder_path, 'multi_pl.json')
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r') as f:
-        data = json.load(f)
-    positions = [np.array(p, dtype=np.float64) for p in data['pos']]
-    powers = [float(pw) for pw in data['power']]
-    colors = [np.array(c, dtype=np.float64) for c in data['color']]
-    return list(zip(positions, colors, powers))
-
-
-def load_area_light_info(folder_path):
-    """
-    Load area light info from area.json.
-    Returns (pos, color, power, size) or None if not found.
-    """
-    path = os.path.join(folder_path, 'area.json')
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r') as f:
-        data = json.load(f)
-    pos = np.array(data['pos'], dtype=np.float64)
-    power = float(data['power'])
-    size = float(data['size'])
-    color = np.array(data.get('color', [1.0, 1.0, 1.0]), dtype=np.float64)
-    return pos, color, power, size
-
-
-def load_combined_light_info(folder_path):
-    """
-    Load combined lighting info from combined.json.
-    Handles multiple JSON formats:
-      - Format A (with 'stage'): has description, env_map, point_lights dict, area_light dict
-      - Format B (flat): has env_map, pos/power/color at top level (single point light)
-
-    Returns dict with keys:
-      'env_map': str or None
-      'rotation_euler': list or None
-      'strength': float
-      'point_lights': list of (pos, color, power) or []
-      'area_lights': list of (pos, color, power, size) or []
-    """
-    path = os.path.join(folder_path, 'combined.json')
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r') as f:
-        data = json.load(f)
-
-    result = {
-        'env_map': data.get('env_map', None),
-        'rotation_euler': data.get('rotation_euler', None),
-        'strength': float(data.get('strength', 1.0)),
-        'point_lights': [],
-        'area_lights': [],
-    }
-
-    # Format A: structured point_lights dict
-    if 'point_lights' in data:
-        pl = data['point_lights']
-        for i in range(len(pl['pos'])):
-            pos = np.array(pl['pos'][i], dtype=np.float64)
-            power = float(pl['power'][i])
-            color = np.array(pl['color'][i], dtype=np.float64)
-            result['point_lights'].append((pos, color, power))
-
-    # Format B: single point light at top level (pos, power, color but also has env_map)
-    elif 'pos' in data and 'power' in data and 'env_map' in data:
-        pos = np.array(data['pos'], dtype=np.float64)
-        power = float(data['power'])
-        color = np.array(data.get('color', [1.0, 1.0, 1.0]), dtype=np.float64)
-        result['point_lights'].append((pos, color, power))
-
-    # Area light (Format A only)
-    if 'area_light' in data:
-        al = data['area_light']
-        pos = np.array(al['pos'], dtype=np.float64)
-        power = float(al['power'])
-        size = float(al['size'])
-        color = np.array(al.get('color', [1.0, 1.0, 1.0]), dtype=np.float64)
-        result['area_lights'].append((pos, color, power, size))
-
-    return result
-
-
-def build_area_light_rays_array(pos, color, power, size, N=8192, scene_sphere_radius=3.0):
-    """
-    Build ray array for an area light.
-    Rays originate from random points on a square plane centered at `pos`, with normal facing
-    world center (0,0,0), and side length `size`. They point toward random targets on a
-    scene sphere of radius `scene_sphere_radius` centered at (0,0,0).
-    Shape: [N, 10] = 1 (intensity) + 3 (color) + 3 (ray_o) + 3 (ray_d), ray_d normalized.
-    """
-    pos = np.asarray(pos, dtype=np.float64).reshape(3)
-    color = np.asarray(color, dtype=np.float64).reshape(3)
-
-    # Build orthonormal basis for the plane: normal faces world center
-    normal = -pos / (np.linalg.norm(pos) + 1e-8)  # pointing toward origin
-    # Pick an arbitrary "up" that isn't parallel to normal
-    up_candidate = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(normal, up_candidate)) > 0.99:
-        up_candidate = np.array([0.0, 1.0, 0.0])
-    tangent = np.cross(normal, up_candidate)
-    tangent /= np.linalg.norm(tangent) + 1e-8
-    bitangent = np.cross(normal, tangent)
-    bitangent /= np.linalg.norm(bitangent) + 1e-8
-
-    # Sample random origins on the plane
-    half = size / 2.0
-    u = np.random.uniform(-half, half, size=N)
-    v = np.random.uniform(-half, half, size=N)
-    ray_o = pos[None, :] + u[:, None] * tangent[None, :] + v[:, None] * bitangent[None, :]
-
-    # Sample random target points on scene sphere
-    targets = uniform_sphere_surface(N, center=(0, 0, 0), radius=scene_sphere_radius)
-
-    # Direction from origin to target, then normalize
-    ray_d = targets - ray_o
-    norms = np.linalg.norm(ray_d, axis=1, keepdims=True)
-    norms = np.where(norms > 1e-8, norms, 1.0)
-    ray_d = (ray_d / norms).astype(np.float32)
-    ray_o = ray_o.astype(np.float32)
-
-    # Normalize power
-    power_clip = np.clip(power, POWER_MIN, POWER_MAX)
-    power_norm = (float(power_clip) - POWER_MIN) / (POWER_MAX - POWER_MIN)
-    intensity = np.log1p(10.0 * power_norm)
-    intensity = np.full((N, 1), intensity, dtype=np.float32)
-    color_broadcast = np.broadcast_to(color.astype(np.float32), (N, 3))
-
-    arr = np.concatenate([intensity, color_broadcast, ray_o, ray_d], axis=1)
-    return arr
-
-
-def build_multi_source_light_rays(point_lights, area_lights, N=8192, scene_sphere_radius=3.0):
-    """
-    Build a combined ray array from multiple point lights and/or area lights.
-    The total number of rays is N, allocated proportionally to each light's power.
-    Shape: [N, 10]
-    """
-    all_sources = []  # list of (type, data, power)
-    for (pos, color, power) in point_lights:
-        all_sources.append(('point', (pos, color, power), power))
-    for (pos, color, power, size) in area_lights:
-        all_sources.append(('area', (pos, color, power, size), power))
-
-    if not all_sources:
-        return np.zeros((N, 10), dtype=np.float32)
-
-    # Allocate rays proportional to power
-    total_power = sum(s[2] for s in all_sources)
-    if total_power < 1e-8:
-        # Equal allocation if all powers are zero
-        counts = [N // len(all_sources)] * len(all_sources)
-    else:
-        counts = [max(1, int(round(N * (s[2] / total_power)))) for s in all_sources]
-    # Adjust to make total exactly N
-    diff = N - sum(counts)
-    counts[0] += diff
-
-    arrays = []
-    for (src_type, src_data, _), n_rays in zip(all_sources, counts):
-        if n_rays <= 0:
-            continue
-        if src_type == 'point':
-            pos, color, power = src_data
-            arr = build_point_light_rays_array(pos, color, power, N=n_rays)
-        else:
-            pos, color, power, size = src_data
-            arr = build_area_light_rays_array(pos, color, power, size, N=n_rays, scene_sphere_radius=scene_sphere_radius)
-        arrays.append(arr)
-
-    return np.concatenate(arrays, axis=0)[:N]  # ensure exactly N
 
 
 def check_scene_broken(split_path, object_id):
@@ -660,26 +469,17 @@ def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, spli
     return exists_in_a and exists_in_b
 
 
-def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root, split='test', hdri_dir=None, point_light_rays_n=8192, scene_sphere_radius=3.0):
+def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root, split='test', hdri_dir=None, point_light_rays_n=8192):
     """
-    Process a single Objaverse object and convert all lighting scenes to re10k format.
-    
-    Supported folder types:
-      - env_*/white_env_*: environment-lit scenes (envmaps)
-      - rgb_pl_*/white_pl_*: single point-light scenes
-      - multi_pl_*: multiple point-light scenes
-      - area_*: area light scenes
-      - combined_*: combined lighting (env + point/area combos)
+    Process a single Objaverse object and convert all env/point-light scenes to re10k format.
     
     Args:
-        objaverse_root: Root directory of objaverse data
+        objaverse_root: Root directory of objaverse data (e.g., data_samples/sample_objaverse)
         object_id: Object ID folder name
-        output_root: Root directory for output
-        output_tar_root: Root directory for tar archives (location B, can be None)
+        output_root: Root directory for output (e.g., data_samples/objaverse_processed)
         split: 'train' or 'test'
-        hdri_dir: Directory containing HDR environment maps (optional)
-        point_light_rays_n: Number of rays to sample per scene (default 8192)
-        scene_sphere_radius: Radius of the scene bounding sphere for ray sampling (default 3.0)
+        hdri_dir: Directory containing HDR environment maps (optional, for env-lit scenes)
+        point_light_rays_n: Number of rays to sample per point-light scene (default 8192)
     """
     object_path = os.path.join(objaverse_root, object_id)
     split_path = os.path.join(object_path, split)
@@ -705,14 +505,12 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
     with open(cameras_json_path, 'r') as f:
         cameras_data = json.load(f)
     
-    # Find all lighting folders and tar files
+    # Find all env folders (env_0, white_env_0, ...) and point-light folders (rgb_pl_0, white_pl_0, ...)
+    # Only process directory folders (not tar files, as those indicate already processed scenes)
     env_folders = []
     env_tar_files = []
     pl_folders = []
     pl_tar_files = []
-    multi_pl_folders = []
-    area_folders = []
-    combined_folders = []
     for item in os.listdir(split_path):
         item_path = os.path.join(split_path, item)
         if os.path.isdir(item_path):
@@ -720,12 +518,6 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                 env_folders.append(item)
             elif is_pl_folder(item):
                 pl_folders.append(item)
-            elif is_multi_pl_folder(item):
-                multi_pl_folders.append(item)
-            elif is_area_folder(item):
-                area_folders.append(item)
-            elif is_combined_folder(item):
-                combined_folders.append(item)
         elif item.endswith('.tar'):
             folder_name = item.replace('.tar', '')
             if folder_name.startswith('env_') or folder_name.startswith('white_env_'):
@@ -733,7 +525,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             elif is_pl_folder(folder_name):
                 pl_tar_files.append(folder_name)
     
-    all_light_folders = sorted(env_folders) + sorted(pl_folders) + sorted(multi_pl_folders) + sorted(area_folders) + sorted(combined_folders)
+    all_light_folders = sorted(env_folders) + sorted(pl_folders)
     if not all_light_folders:
         # All folders are already compressed or none found; collect existing scenes from tar
         scene_names_from_tar = []
@@ -747,7 +539,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                 scene_names_from_tar.append(scene_name)
         if scene_names_from_tar:
             return scene_names_from_tar
-        print(f"Warning: No lighting folders found in {split_path}, skipping {object_id}")
+        print(f"Warning: No env or point-light folders found in {split_path}, skipping {object_id}")
         return None
     
     # Process albedo folder (shared across all scenes with the same object_id)
@@ -1242,7 +1034,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
         elif pl_info is not None:
             pos, color, power = pl_info
             if not skip_file_processing:
-                rays_arr = build_point_light_rays_array(pos, color, power, N=point_light_rays_n, scene_sphere_radius=scene_sphere_radius)
+                rays_arr = build_point_light_rays_array(pos, color, power, N=point_light_rays_n)
                 np.save(output_pl_rays_path, rays_arr)
         frames = []
         for frame_idx, image_file in image_files_with_idx:
@@ -1312,324 +1104,6 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                 except Exception as e:
                     print(f"Warning: Error deleting {pl_path}: {e}")
     
-    # ======================================================================
-    # Process multi_pl_* folders (multiple point lights, no envmap)
-    # ======================================================================
-    for mpl_folder in sorted(multi_pl_folders):
-        mpl_path = os.path.join(split_path, mpl_folder)
-        all_image_files = [f for f in os.listdir(mpl_path) if f.startswith('gt_') and f.endswith('.png')]
-        image_files_with_idx = []
-        for image_file in all_image_files:
-            idx_str = image_file.replace('gt_', '').replace('.png', '')
-            try:
-                frame_idx = int(idx_str)
-                image_files_with_idx.append((frame_idx, image_file))
-            except ValueError:
-                continue
-        if not image_files_with_idx:
-            print(f"Warning: No valid gt_*.png in {mpl_path}, skipping")
-            continue
-        image_files_with_idx.sort(key=lambda x: x[0])
-        first_image_path = os.path.join(mpl_path, image_files_with_idx[0][1])
-        try:
-            with Image.open(first_image_path) as img:
-                image_width, image_height = img.size
-        except Exception as e:
-            print(f"Error reading image {first_image_path}: {e}, skipping")
-            continue
-
-        scene_name = f"{object_id}_{mpl_folder}"
-        output_metadata_dir = os.path.join(output_root, split, 'metadata')
-        output_images_dir = os.path.join(output_root, split, 'images', scene_name)
-        output_point_light_rays_dir = os.path.join(output_root, split, 'point_light_rays')
-        output_pl_rays_path = os.path.join(output_point_light_rays_dir, f"{scene_name}.npy")
-        os.makedirs(output_metadata_dir, exist_ok=True)
-
-        scene_exists = os.path.exists(output_images_dir) and os.path.exists(output_pl_rays_path)
-        skip_file_processing = False
-        if scene_exists:
-            all_files_exist = all(
-                os.path.exists(os.path.join(output_images_dir, f"{fi:05d}.png"))
-                for fi, _ in image_files_with_idx
-            )
-            if all_files_exist:
-                print(f"Skipping multi-pl processing for {scene_name}: all files already exist")
-                skip_file_processing = True
-
-        os.makedirs(output_images_dir, exist_ok=True)
-        os.makedirs(output_point_light_rays_dir, exist_ok=True)
-
-        mpl_info = load_multi_point_light_info(mpl_path)
-        if mpl_info is None and not skip_file_processing:
-            print(f"Warning: No multi_pl.json in {mpl_path}, skipping point-light rays")
-        elif mpl_info is not None and not skip_file_processing:
-            rays_arr = build_multi_source_light_rays(
-                point_lights=mpl_info, area_lights=[],
-                N=point_light_rays_n, scene_sphere_radius=scene_sphere_radius
-            )
-            np.save(output_pl_rays_path, rays_arr)
-
-        frames = []
-        for frame_idx, image_file in image_files_with_idx:
-            if frame_idx >= len(cameras_data):
-                continue
-            camera_info = cameras_data[frame_idx]
-            c2w_blender = np.array(camera_info['c2w'])
-            c2w_opencv = blender_to_opencv_c2w(c2w_blender)
-            w2c = np.linalg.inv(c2w_opencv)
-            fov = camera_info.get('fov', 30.0)
-            fxfycxcy = fov_to_fxfycxcy(fov, image_width, image_height)
-            output_image_name = f"{frame_idx:05d}.png"
-            output_image_path = os.path.join(output_images_dir, output_image_name)
-            if not skip_file_processing:
-                shutil.copy2(os.path.join(mpl_path, image_file), output_image_path)
-            frames.append({
-                "image_path": os.path.abspath(output_image_path),
-                "fxfycxcy": fxfycxcy,
-                "w2c": w2c.tolist()
-            })
-
-        scene_data = {"scene_name": scene_name, "frames": frames}
-        with open(os.path.join(output_metadata_dir, f"{scene_name}.json"), 'w') as f:
-            json.dump(scene_data, f, indent=2)
-        print(f"Processed multi-pl scene {scene_name}: {len(frames)} frames")
-        processed_scene_names.append(scene_name)
-
-    # ======================================================================
-    # Process area_* folders (area light, no envmap)
-    # ======================================================================
-    for area_folder in sorted(area_folders):
-        area_path = os.path.join(split_path, area_folder)
-        all_image_files = [f for f in os.listdir(area_path) if f.startswith('gt_') and f.endswith('.png')]
-        image_files_with_idx = []
-        for image_file in all_image_files:
-            idx_str = image_file.replace('gt_', '').replace('.png', '')
-            try:
-                frame_idx = int(idx_str)
-                image_files_with_idx.append((frame_idx, image_file))
-            except ValueError:
-                continue
-        if not image_files_with_idx:
-            print(f"Warning: No valid gt_*.png in {area_path}, skipping")
-            continue
-        image_files_with_idx.sort(key=lambda x: x[0])
-        first_image_path = os.path.join(area_path, image_files_with_idx[0][1])
-        try:
-            with Image.open(first_image_path) as img:
-                image_width, image_height = img.size
-        except Exception as e:
-            print(f"Error reading image {first_image_path}: {e}, skipping")
-            continue
-
-        scene_name = f"{object_id}_{area_folder}"
-        output_metadata_dir = os.path.join(output_root, split, 'metadata')
-        output_images_dir = os.path.join(output_root, split, 'images', scene_name)
-        output_point_light_rays_dir = os.path.join(output_root, split, 'point_light_rays')
-        output_pl_rays_path = os.path.join(output_point_light_rays_dir, f"{scene_name}.npy")
-        os.makedirs(output_metadata_dir, exist_ok=True)
-
-        scene_exists = os.path.exists(output_images_dir) and os.path.exists(output_pl_rays_path)
-        skip_file_processing = False
-        if scene_exists:
-            all_files_exist = all(
-                os.path.exists(os.path.join(output_images_dir, f"{fi:05d}.png"))
-                for fi, _ in image_files_with_idx
-            )
-            if all_files_exist:
-                print(f"Skipping area-light processing for {scene_name}: all files already exist")
-                skip_file_processing = True
-
-        os.makedirs(output_images_dir, exist_ok=True)
-        os.makedirs(output_point_light_rays_dir, exist_ok=True)
-
-        al_info = load_area_light_info(area_path)
-        if al_info is None and not skip_file_processing:
-            print(f"Warning: No area.json in {area_path}, skipping area-light rays")
-        elif al_info is not None and not skip_file_processing:
-            pos, color, power, size = al_info
-            rays_arr = build_area_light_rays_array(
-                pos, color, power, size,
-                N=point_light_rays_n, scene_sphere_radius=scene_sphere_radius
-            )
-            np.save(output_pl_rays_path, rays_arr)
-
-        frames = []
-        for frame_idx, image_file in image_files_with_idx:
-            if frame_idx >= len(cameras_data):
-                continue
-            camera_info = cameras_data[frame_idx]
-            c2w_blender = np.array(camera_info['c2w'])
-            c2w_opencv = blender_to_opencv_c2w(c2w_blender)
-            w2c = np.linalg.inv(c2w_opencv)
-            fov = camera_info.get('fov', 30.0)
-            fxfycxcy = fov_to_fxfycxcy(fov, image_width, image_height)
-            output_image_name = f"{frame_idx:05d}.png"
-            output_image_path = os.path.join(output_images_dir, output_image_name)
-            if not skip_file_processing:
-                shutil.copy2(os.path.join(area_path, image_file), output_image_path)
-            frames.append({
-                "image_path": os.path.abspath(output_image_path),
-                "fxfycxcy": fxfycxcy,
-                "w2c": w2c.tolist()
-            })
-
-        scene_data = {"scene_name": scene_name, "frames": frames}
-        with open(os.path.join(output_metadata_dir, f"{scene_name}.json"), 'w') as f:
-            json.dump(scene_data, f, indent=2)
-        print(f"Processed area-light scene {scene_name}: {len(frames)} frames")
-        processed_scene_names.append(scene_name)
-
-    # ======================================================================
-    # Process combined_* folders (env + point/area combos)
-    # ======================================================================
-    for comb_folder in sorted(combined_folders):
-        comb_path = os.path.join(split_path, comb_folder)
-        all_image_files = [f for f in os.listdir(comb_path) if f.startswith('gt_') and f.endswith('.png')]
-        image_files_with_idx = []
-        for image_file in all_image_files:
-            idx_str = image_file.replace('gt_', '').replace('.png', '')
-            try:
-                frame_idx = int(idx_str)
-                image_files_with_idx.append((frame_idx, image_file))
-            except ValueError:
-                continue
-        if not image_files_with_idx:
-            print(f"Warning: No valid gt_*.png in {comb_path}, skipping")
-            continue
-        image_files_with_idx.sort(key=lambda x: x[0])
-        first_image_path = os.path.join(comb_path, image_files_with_idx[0][1])
-        try:
-            with Image.open(first_image_path) as img:
-                image_width, image_height = img.size
-        except Exception as e:
-            print(f"Error reading image {first_image_path}: {e}, skipping")
-            continue
-
-        scene_name = f"{object_id}_{comb_folder}"
-        output_metadata_dir = os.path.join(output_root, split, 'metadata')
-        output_images_dir = os.path.join(output_root, split, 'images', scene_name)
-        output_envmaps_dir = os.path.join(output_root, split, 'envmaps', scene_name)
-        output_point_light_rays_dir = os.path.join(output_root, split, 'point_light_rays')
-        output_pl_rays_path = os.path.join(output_point_light_rays_dir, f"{scene_name}.npy")
-        os.makedirs(output_metadata_dir, exist_ok=True)
-
-        comb_info = load_combined_light_info(comb_path)
-        if comb_info is None:
-            print(f"Warning: No combined.json in {comb_path}, skipping")
-            continue
-
-        has_envmap = comb_info['env_map'] is not None
-        has_local_lights = len(comb_info['point_lights']) > 0 or len(comb_info['area_lights']) > 0
-
-        # Determine skip logic
-        skip_file_processing = False
-        images_exist = os.path.exists(output_images_dir)
-        envmap_files_exist = os.path.exists(output_envmaps_dir) if has_envmap else True
-        rays_exist = os.path.exists(output_pl_rays_path) if has_local_lights else True
-        if images_exist and envmap_files_exist and rays_exist:
-            all_files_exist = all(
-                os.path.exists(os.path.join(output_images_dir, f"{fi:05d}.png"))
-                for fi, _ in image_files_with_idx
-            )
-            if all_files_exist:
-                print(f"Skipping combined processing for {scene_name}: all files already exist")
-                skip_file_processing = True
-
-        os.makedirs(output_images_dir, exist_ok=True)
-        if has_envmap:
-            os.makedirs(output_envmaps_dir, exist_ok=True)
-        if has_local_lights:
-            os.makedirs(output_point_light_rays_dir, exist_ok=True)
-
-        # Load environment map if present
-        env_map_comb = None
-        euler_rotation_comb = comb_info.get('rotation_euler', None)
-        if not skip_file_processing and has_envmap and hdri_dir:
-            env_map_name = comb_info['env_map']
-            possible_names = [
-                env_map_name, f"{env_map_name}.exr", f"{env_map_name}.hdr",
-                f"{env_map_name}_8k.exr", f"{env_map_name}_8k.hdr",
-            ]
-            env_map_path = None
-            for name in possible_names:
-                test_path = os.path.join(hdri_dir, name)
-                if os.path.exists(test_path):
-                    env_map_path = test_path
-                    break
-            if env_map_path:
-                env_map_comb = read_hdr(env_map_path)
-                if env_map_comb is not None:
-                    env_map_comb = torch.from_numpy(env_map_comb).float()
-                else:
-                    print(f"Warning: Failed to read envmap {env_map_path}")
-            else:
-                print(f"Warning: Environment map '{env_map_name}' not found in {hdri_dir}")
-
-        light_area_weight_comb, view_dirs_comb = None, None
-        if env_map_comb is not None:
-            env_h, env_w = env_map_comb.shape[0], env_map_comb.shape[1]
-            light_area_weight_comb, view_dirs_comb = generate_envir_map_dir(env_h, env_w)
-
-        # Build point/area light rays if present
-        if not skip_file_processing and has_local_lights:
-            rays_arr = build_multi_source_light_rays(
-                point_lights=comb_info['point_lights'],
-                area_lights=comb_info['area_lights'],
-                N=point_light_rays_n, scene_sphere_radius=scene_sphere_radius
-            )
-            np.save(output_pl_rays_path, rays_arr)
-
-        # Process frames
-        frames = []
-        for frame_idx, image_file in image_files_with_idx:
-            if frame_idx >= len(cameras_data):
-                continue
-            camera_info = cameras_data[frame_idx]
-            c2w_blender = np.array(camera_info['c2w'])
-            c2w_opencv = blender_to_opencv_c2w(c2w_blender)
-            w2c = np.linalg.inv(c2w_opencv)
-            fov = camera_info.get('fov', 30.0)
-            fxfycxcy = fov_to_fxfycxcy(fov, image_width, image_height)
-            output_image_name = f"{frame_idx:05d}.png"
-            output_image_path = os.path.join(output_images_dir, output_image_name)
-
-            if not skip_file_processing:
-                shutil.copy2(os.path.join(comb_path, image_file), output_image_path)
-                # Process envmap per frame if available
-                if env_map_comb is not None:
-                    env_hdr_raw, env_ldr, env_hdr = rotate_and_preprocess_envir_map(
-                        env_map_comb, c2w_blender, euler_rotation=euler_rotation_comb,
-                        light_area_weight=light_area_weight_comb, view_dirs=view_dirs_comb
-                    )
-                    if env_hdr_raw is not None:
-                        env_hdr_uint8 = np.uint8(env_hdr * 255)
-                        Image.fromarray(env_hdr_uint8).save(
-                            os.path.join(output_envmaps_dir, f"{frame_idx:05d}_hdr.png"))
-                        env_ldr_uint8 = np.uint8(env_ldr * 255)
-                        Image.fromarray(env_ldr_uint8).save(
-                            os.path.join(output_envmaps_dir, f"{frame_idx:05d}_ldr.png"))
-
-            frames.append({
-                "image_path": os.path.abspath(output_image_path),
-                "fxfycxcy": fxfycxcy,
-                "w2c": w2c.tolist()
-            })
-
-        scene_data = {"scene_name": scene_name, "frames": frames}
-        with open(os.path.join(output_metadata_dir, f"{scene_name}.json"), 'w') as f:
-            json.dump(scene_data, f, indent=2)
-
-        desc = comb_info.get('description', '')
-        extras = []
-        if has_envmap:
-            extras.append("envmap")
-        if comb_info['point_lights']:
-            extras.append(f"{len(comb_info['point_lights'])} point")
-        if comb_info['area_lights']:
-            extras.append(f"{len(comb_info['area_lights'])} area")
-        print(f"Processed combined scene {scene_name}: {len(frames)} frames [{', '.join(extras)}] {desc}")
-        processed_scene_names.append(scene_name)
-
     # Create tar for albedos folder (shared across all scenes with same object_id)
     # Only create once after processing all scenes for this object
     if output_tar_root is not None and output_albedos_dir and os.path.exists(output_albedos_dir):
@@ -1754,8 +1228,6 @@ def main():
                        help='Maximum number of objects to process (overrides --test-run if specified)')
     parser.add_argument('--point-light-rays-n', type=int, default=8192,
                        help='Number of rays per point-light scene (default: 8192)')
-    parser.add_argument('--scene-sphere-radius', type=float, default=3.0,
-                       help='Radius of scene bounding sphere for ray sampling (default: 3.0)')
     parser.add_argument('--full-list-only', action='store_true',
                        help='Skip all processing; only build full_list.txt from existing metadata in output.')
     
@@ -1931,8 +1403,7 @@ def main():
         try:
             result = process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_root,
                                             split=args.split, hdri_dir=args.hdri_dir,
-                                            point_light_rays_n=args.point_light_rays_n,
-                                            scene_sphere_radius=args.scene_sphere_radius)
+                                            point_light_rays_n=args.point_light_rays_n)
             if result == "broken":
                 # Find all scenes for this object (env + point-light) and mark as broken
                 split_path = os.path.join(objaverse_root, object_id, args.split)

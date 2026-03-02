@@ -97,10 +97,17 @@ class Dataset(Dataset):
             return "envmap"
         if "_white_pl_" in scene_name or "_rgb_pl_" in scene_name:
             return "point_light"
+        if "_multi_pl_" in scene_name:
+            return "point_light"
+        if "_area_" in scene_name:
+            return "point_light"
+        if "_combined_" in scene_name:
+            return "combined"
         return "other"
 
     def _extract_object_id(self, scene_name: str) -> str:
-        split_tags = ["_white_env_", "_env_", "_white_pl_", "_rgb_pl_"]
+        split_tags = ["_white_env_", "_env_", "_white_pl_", "_rgb_pl_",
+                       "_multi_pl_", "_area_", "_combined_"]
         for tag in split_tags:
             idx = scene_name.rfind(tag)
             if idx != -1:
@@ -685,6 +692,7 @@ class Dataset(Dataset):
             # This prevents KeyError during DataLoader collation when some samples have these fields and others don't
             if self.use_relit_images:
                 result_dict["relit_images"] = relit_images
+                result_dict["relit_scene_name"] = relit_scene_name  # Add relit scene name for tracking
                 if self.use_relight_envmap:
                     result_dict["env_ldr"] = env_ldr
                     result_dict["env_hdr"] = env_hdr

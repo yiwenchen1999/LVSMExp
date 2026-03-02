@@ -2,6 +2,7 @@
 
 import importlib
 import os
+import json
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
@@ -129,6 +130,32 @@ if ddp_info.is_main_process and config.inference.get("compute_metrics", False):
     summarize_evaluation(config.inference_out_dir)
     if config.inference.get("generate_website", True):
         os.system(f"python generate_html.py {config.inference_out_dir}")
+    
+    # Generate consolidated metadata summary
+    print("Generating consolidated metadata summary...")
+    metadata_files = []
+    for root, dirs, files in os.walk(config.inference_out_dir):
+        for file in files:
+            if file == "metadata.json":
+                metadata_files.append(os.path.join(root, file))
+    
+    if metadata_files:
+        consolidated_metadata = {}
+        for metadata_file in metadata_files:
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+                scene_name = metadata.get("scene_name")
+                if scene_name:
+                    consolidated_metadata[scene_name] = metadata
+        
+        summary_path = os.path.join(config.inference_out_dir, "inference_metadata_summary.json")
+        with open(summary_path, 'w') as f:
+            json.dump(consolidated_metadata, f, indent=2)
+        print(f"Consolidated metadata saved to: {summary_path}")
+        print(f"Total scenes: {len(consolidated_metadata)}")
+    else:
+        print("No metadata files found to consolidate.")
+        
 dist.barrier()
 dist.destroy_process_group()
 exit(0)

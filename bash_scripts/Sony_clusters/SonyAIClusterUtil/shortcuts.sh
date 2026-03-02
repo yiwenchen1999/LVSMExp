@@ -17,6 +17,11 @@ rsync -avh --partial --inplace --progress \
   /music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense \
   chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes_dense
 
+# 直接运行命令
+rsync -avzP --human-readable \
+  mfml1:/music-shared-disk/group/ct/yiwen/data/objaverse/rendered_scenes_dense/0c09dbb153a44de0826179d04883a1fd \
+  data_samples/scene_light_combined/
+
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=2
 sbash --partition=ct_l40s --account=ct --nodes=1 --gpus=1

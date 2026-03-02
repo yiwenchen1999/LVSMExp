@@ -97,7 +97,20 @@ python preprocess_scripts/preprocess_objaverse_env_variations.py \
     --n-variations 36 \
     --scene-list env_varation_scene_list.json
 
+# 激活 venv
+source /Users/yiwenchen/Desktop/ResearchProjects/scripts/venv/bin/activate
 
+# 进入项目目录
+cd /Users/yiwenchen/Desktop/ResearchProjects/LightingDiffusion/3dgs/LVSMExp
+
+# 运行预处理
+python preprocess_scripts/preprocess_objaverse.py \
+  --input data_samples/scene_light_combined \
+  --output data_samples/scene_light_combined_processed \
+  --split test \
+  --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
+  --scene-sphere-radius 3.0 \
+  --point-light-rays-n 8192
 
 # train-og:
 torchrun --nproc_per_node 1 --nnodes 1 \

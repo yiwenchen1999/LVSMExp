@@ -143,8 +143,25 @@ def export_results(
         sample_dir = os.path.join(out_dir, safe_scene_name)
         os.makedirs(sample_dir, exist_ok=True)
         
-        # Get target view indices
-        target_indices = target_data.index[batch_idx, :, 0].cpu().numpy()
+        # Get input (context) and target view indices
+        input_indices = input_data.index[batch_idx, :, 0].cpu().numpy().tolist()
+        target_indices = target_data.index[batch_idx, :, 0].cpu().numpy().tolist()
+        
+        # Get relit scene name if available
+        relit_scene_name = None
+        if hasattr(input_data, 'relit_scene_name') and input_data.relit_scene_name is not None:
+            relit_scene_name = input_data.relit_scene_name[batch_idx]
+        
+        # Save metadata JSON
+        metadata = {
+            "scene_name": scene_name,
+            "context_view_indices": input_indices,
+            "target_view_indices": target_indices,
+            "relit_scene_name": relit_scene_name
+        }
+        metadata_path = os.path.join(sample_dir, "metadata.json")
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
         
         # Save images
         print('saving images to: ', sample_dir)
