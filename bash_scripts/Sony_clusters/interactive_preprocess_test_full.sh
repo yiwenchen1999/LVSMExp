@@ -62,6 +62,9 @@ singularity exec --nv $BIND $SIF bash -lc "
     --output-tar \"$OUTPUT_TAR\" \
     --split test \
     --hdri-dir \"$HDRI_DIR\"
+    --scene-sphere-radius 3.0 \
+    --point-light-rays-n 8192
+
 "
 
 echo ""
