@@ -46,7 +46,13 @@ tmux attach -t finetune
 
 #preprocess stanford orb
 python3 preprocess_scripts/preprocess_stanford_orb.py \
-  --input-root /data/blender_LDR \
+  --input-root /data/dataset \
   --output-root /data/stanford_ORB_processed \
   --split both \
   --target-size 512 \
+
+python3 preprocess_scripts/preprocess_obj_with_light.py \
+  --input-root /data/dataset \
+  --output-root /data/obj_with_light_processed \
+  --split test \
+  --target-size 512
