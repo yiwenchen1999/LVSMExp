@@ -53,6 +53,12 @@ def fov_to_fxfycxcy(fov_degrees: float, image_width: int, image_height: int):
     return [fx, fy, cx, cy]
 
 
+def scale_intrinsics(fxfycxcy, scale_x: float, scale_y: float):
+    """Scale [fx, fy, cx, cy] from source resolution to target resolution."""
+    fx, fy, cx, cy = fxfycxcy
+    return [fx * scale_x, fy * scale_y, cx * scale_x, cy * scale_y]
+
+
 def find_image_path(scene_dir: Path, frame_rel: str) -> Path:
     rel = frame_rel.replace("./", "")
     base = scene_dir / rel
@@ -202,7 +208,6 @@ def process_scene(
     out_images_dir.mkdir(parents=True, exist_ok=True)
     out_meta_dir.mkdir(parents=True, exist_ok=True)
 
-    fxfycxcy = fov_to_fxfycxcy(target_fov, target_size, target_size)
     frames_out = []
 
     for idx, frame in enumerate(tf_data["frames"]):
@@ -217,8 +222,17 @@ def process_scene(
 
         mask = load_mask(image_path, mask_path)
         rgb = apply_mask_white_background(image_path, mask)
+        src_h, src_w = rgb.shape[:2]
         if adjust_fov:
             rgb = expand_or_crop_to_target_fov(rgb, source_fov_deg, target_fov)
+            fxfycxcy = fov_to_fxfycxcy(target_fov, target_size, target_size)
+        else:
+            src_fxfycxcy = fov_to_fxfycxcy(source_fov_deg, src_w, src_h)
+            fxfycxcy = scale_intrinsics(
+                src_fxfycxcy,
+                scale_x=target_size / float(src_w),
+                scale_y=target_size / float(src_h),
+            )
         rgb = resize_to_square(rgb, target_size)
 
         frame_stem = Path(frame_rel).name
