@@ -43,3 +43,11 @@ bash bash_scripts/VoltagePark/finetune_objaverse.sh
 # 断开会话（保留运行）：Ctrl+B 然后按 D
 # 之后重连 SSH 并恢复会话：
 tmux attach -t finetune
+
+#preprocess stanford orb
+python3 preprocess_scripts/preprocess_stanford_orb.py \
+  --input-root /data/blender_LDR \
+  --output-root /data/stanford_ORB_processed \
+  --split both \
+  --target-size 512 \
+  --target-fov 30

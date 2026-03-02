@@ -14,8 +14,8 @@ rsync -avh --partial --inplace --progress \
 
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
-  /music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm \
-  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/polyhaven_lvsm
+  /music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense \
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes_dense
 
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=2
