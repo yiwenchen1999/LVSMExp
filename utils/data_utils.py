@@ -214,7 +214,7 @@ class ProcessData(nn.Module):
 
 
         for key, value in data_batch.items():
-            if key == "scene_name":
+            if not isinstance(value, torch.Tensor):
                 input_dict[key] = value
                 target_dict[key] = value
                 continue

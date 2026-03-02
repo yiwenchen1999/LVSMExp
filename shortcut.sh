@@ -27,14 +27,16 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
-    --output data/evaluation_index_objaverse_dense.json \
+    --full-list /scratch/chen.yiwe/temp_objaverse/lvsm_scenes/test/full_list.txt \
+    --output data/evaluation_index_scenes.json \
     --n-input 4 \
     --n-target 8 \
     --min-frame-dist 13 \
-    --max-frame-dist 100 \
-    --max-scenes 125 \
-    --seed 42
+    --max-frame-dist 125 \
+    --max-scenes 5000 \
+    --seed 46
+
+#
 
 # preprocess objaverse with envmaps
 python preprocess_scripts/preprocess_objaverse.py \
@@ -153,20 +155,21 @@ inference_out_dir = ./experiments/evaluation/test_dense_reconstruction
 # inference, objaverse
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-inference_editor.py --config "configs/LVSM_scene_encoder_decoder_wEditor.yaml" \
-training.dataset_path = "/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_test_split/test/full_list.txt" \
-training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4 \
-training.batch_size_per_gpu = 4 \
-training.target_has_input = false \
-training.num_views = 12 \
-training.square_crop = true \
-training.num_input_views = 4 \
-training.num_target_views = 8 \
-inference.if_inference = true \
-inference.compute_metrics = true \
-inference.render_video = false \
-inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense_test_split.json" \
-inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor_test_split
+  inference_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
+  training.dataset_path = /scratch/chen.yiwe/temp_objaverse/lvsm_scenes/test/full_list.txt \
+  training.checkpoint_dir = ckpt/relight_dense_env_scene \
+  training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
+  training.batch_size_per_gpu = 4 \
+  training.target_has_input = false \
+  training.num_views = 12 \
+  training.square_crop = true \
+  training.num_input_views = 4 \
+  training.num_target_views = 8 \
+  inference.if_inference = true \
+  inference.compute_metrics = true \
+  inference.render_video = false \
+  inference.view_idx_file_path = data/evaluation_index_scenes.json \
+  inference_out_dir = experiments/evaluation/test_scenes_dense
 
 # env variations inference
 torchrun --nproc_per_node 1 --nnodes 1 \

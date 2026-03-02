@@ -7,8 +7,9 @@ rsync -avh --partial --inplace --progress \
 
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
-  ckpt_0000000000026000.pt \
-  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/dense_relight_env
+  ckpt_0000000000010000.pt \
+  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/relight_dense_env_scene
+
 python3 preprocess_scripts/update_paths.py \
   --old-path /scratch/chen.yiwe/temp_objaverse \
   --new-path /data \
