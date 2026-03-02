@@ -176,7 +176,14 @@ def resize_to_square(rgb: np.ndarray, size: int) -> np.ndarray:
     return np.array(img, dtype=np.uint8)
 
 
-def process_scene(scene_dir: Path, output_root: Path, split: str, target_fov: float, target_size: int):
+def process_scene(
+    scene_dir: Path,
+    output_root: Path,
+    split: str,
+    target_fov: float,
+    target_size: int,
+    adjust_fov: bool,
+):
     transforms_path = scene_dir / f"transforms_{split}.json"
     if not transforms_path.exists():
         return None
@@ -210,7 +217,8 @@ def process_scene(scene_dir: Path, output_root: Path, split: str, target_fov: fl
 
         mask = load_mask(image_path, mask_path)
         rgb = apply_mask_white_background(image_path, mask)
-        rgb = expand_or_crop_to_target_fov(rgb, source_fov_deg, target_fov)
+        if adjust_fov:
+            rgb = expand_or_crop_to_target_fov(rgb, source_fov_deg, target_fov)
         rgb = resize_to_square(rgb, target_size)
 
         frame_stem = Path(frame_rel).name
@@ -291,6 +299,12 @@ def parse_args():
     )
     parser.add_argument("--target-size", type=int, default=512, help="Output square image size.")
     parser.add_argument("--target-fov", type=float, default=30.0, help="Target horizontal FOV in degrees.")
+    parser.add_argument(
+        "--adjust-fov",
+        action="store_true",
+        help="If set, adjust image framing from source FOV to target FOV before resize. "
+        "Default is disabled (resize only).",
+    )
     return parser.parse_args()
 
 
@@ -317,6 +331,7 @@ def main():
                 split=split,
                 target_fov=args.target_fov,
                 target_size=args.target_size,
+                adjust_fov=args.adjust_fov,
             )
         write_full_list(output_root, split)
 
