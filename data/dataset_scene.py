@@ -499,21 +499,29 @@ class Dataset(Dataset):
                             raise ValueError(error_msg)
                         env_ldr = torch.stack(env_ldr_list, dim=0)  # [v, 3, h, w]
                         env_hdr = torch.stack(env_hdr_list, dim=0)  # [v, 3, h, w]
-                        print(f"actual_lighting_type: {actual_lighting_type}")
-                        print(f"env_ldr: {env_ldr.shape}")
-                        print(f"env_hdr: {env_hdr.shape}")
                     else:
                         # Relit scene is NOT envmap-lit, create placeholder zeros
-                        # Get envmap shape from first available envmap scene (for shape reference)
-                        # Typical shape: [v, 3, 128, 256] or similar
-                        env_h = 128
-                        env_w = 256
+                        # Need to get the correct envmap shape from an actual envmap scene
+                        if len(candidate_scenes_by_type["envmap"]) > 0:
+                            # Sample one envmap scene to get the shape
+                            sample_env_scene = candidate_scenes_by_type["envmap"][0]
+                            sample_envmaps_dir = os.path.join(base_dir, 'envmaps', sample_env_scene)
+                            sample_env_files = [f for f in os.listdir(sample_envmaps_dir) if f.endswith('_ldr.png')]
+                            if sample_env_files:
+                                sample_env_path = os.path.join(sample_envmaps_dir, sample_env_files[0])
+                                sample_env_img = PIL.Image.open(sample_env_path)
+                                env_h, env_w = sample_env_img.size[1], sample_env_img.size[0]  # PIL size is (width, height)
+                            else:
+                                # Fallback to default
+                                env_h, env_w = 256, 512
+                        else:
+                            # No envmap scenes available, use default shape
+                            env_h, env_w = 256, 512
+                        
                         # Use .clone() to ensure tensor is resizable for DataLoader collate
                         env_ldr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
                         env_hdr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
-                        print(f"actual_lighting_type: {actual_lighting_type}")
-                        print(f"env_ldr: {env_ldr.shape}")
-                        print(f"env_hdr: {env_hdr.shape}")
+                        
                 # Load point light rays if enabled by relight_signals
                 if self.use_relight_point_light:
                     if actual_lighting_type == "point_light":
@@ -524,8 +532,6 @@ class Dataset(Dataset):
                             scene_name=point_light_scene_name,
                             num_views=len(image_indices),
                         )  # [v, num_rays, 10]
-                        print(f"actual_lighting_type: {actual_lighting_type}")
-                        print(f"point_light_rays: {point_light_rays.shape}")
                     else:
                         # Relit scene is NOT point-light-lit, create placeholder zeros
                         # Shape: [v, num_rays, 10]
@@ -536,8 +542,6 @@ class Dataset(Dataset):
                             10, 
                             dtype=torch.float32
                         ).clone()
-                        print(f"actual_lighting_type: {actual_lighting_type}")
-                        print(f"point_light_rays: {point_light_rays.shape}")
             else:
                 # Skip loading relit signals if not configured
                 relit_images = None
