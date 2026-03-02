@@ -12,7 +12,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # VoltagePark paths
 ############################
 export PROJ="${PROJ:-$REPO_ROOT}"
-export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes/test/full_list.txt}"
+export DATA_LIST="${DATA_LIST:-/data/lvsmPlus_objaverse/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
 
