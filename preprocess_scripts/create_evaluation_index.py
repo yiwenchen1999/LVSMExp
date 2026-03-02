@@ -9,6 +9,10 @@ strategy as data/dataset_scene.py:
 3. Samples remaining frames from the range between start and end
 4. First n_input frames become context, rest become targets
 
+For scenes with the same object prefix (e.g., wooden_table_02_env_0, wooden_table_02_rgb_pl_0),
+the same input and target indices are used to ensure consistent camera views across
+different lighting conditions.
+
 Output format matches data/evaluation_index_re10k.json:
 {
     "scene_name": {
@@ -24,6 +28,32 @@ import argparse
 import random
 import numpy as np
 from pathlib import Path
+from collections import defaultdict
+
+
+def extract_object_prefix(scene_name):
+    """
+    Extract the object prefix from a scene name.
+    
+    Examples:
+        wooden_table_02_env_0 -> wooden_table_02
+        wooden_table_02_rgb_pl_0 -> wooden_table_02
+        wooden_table_02_white_env_0 -> wooden_table_02
+        
+    Args:
+        scene_name: Scene name (e.g., "wooden_table_02_env_0")
+        
+    Returns:
+        str: Object prefix (e.g., "wooden_table_02")
+    """
+    # Look for common lighting condition suffixes
+    split_tags = ["_white_env_", "_env_", "_white_pl_", "_rgb_pl_"]
+    for tag in split_tags:
+        idx = scene_name.rfind(tag)
+        if idx != -1:
+            return scene_name[:idx]
+    # Fallback: return the scene name as-is
+    return scene_name
 
 
 def sample_frames(num_frames, n_input, n_target, min_frame_dist=25, max_frame_dist=100):
@@ -93,6 +123,9 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
     """
     Create evaluation index JSON file from a full_list.txt.
     
+    Scenes with the same object prefix (e.g., wooden_table_02_env_0, wooden_table_02_rgb_pl_0)
+    will use the same input and target indices for consistent camera views across lighting conditions.
+    
     Args:
         full_list_path: Path to full_list.txt containing scene JSON paths
         output_path: Path to save evaluation index JSON
@@ -119,12 +152,11 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
         else:
             print(f"Requested {max_scenes} scenes, but only {len(scene_json_paths)} available.")
     
-    evaluation_index = {}
+    # Group scenes by object prefix
+    scenes_by_object = defaultdict(list)
+    scene_data_cache = {}
     
-    print(f"Processing {len(scene_json_paths)} scenes...")
-    successful = 0
-    failed = 0
-    
+    print(f"Loading and grouping {len(scene_json_paths)} scenes...")
     for scene_json_path in scene_json_paths:
         try:
             # Load scene JSON
@@ -132,33 +164,86 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
                 scene_data = json.load(f)
             
             scene_name = scene_data['scene_name']
-            frames = scene_data['frames']
-            num_frames = len(frames)
+            scene_data_cache[scene_name] = scene_data
             
-            # Sample frames using same strategy as dataset_scene.py
-            result = sample_frames(num_frames, n_input, n_target, min_frame_dist, max_frame_dist)
+            # Extract object prefix and group scenes
+            object_prefix = extract_object_prefix(scene_name)
+            scenes_by_object[object_prefix].append(scene_name)
             
-            if result is None:
-                # Skip scenes that don't have enough frames
+        except Exception as e:
+            print(f"  Error loading {scene_json_path}: {e}")
+            scene_name = Path(scene_json_path).stem
+            scene_data_cache[scene_name] = None
+            object_prefix = extract_object_prefix(scene_name)
+            scenes_by_object[object_prefix].append(scene_name)
+    
+    print(f"Found {len(scenes_by_object)} unique objects")
+    
+    # Sample indices per object (all scenes with same object prefix use same indices)
+    evaluation_index = {}
+    successful = 0
+    failed = 0
+    object_indices_cache = {}
+    
+    print(f"\nProcessing scenes...")
+    for object_prefix, scene_names in scenes_by_object.items():
+        # Sample indices once per object
+        if object_prefix not in object_indices_cache:
+            # Use the first valid scene to determine frame count and sample indices
+            sampled_result = None
+            reference_scene = None
+            
+            for scene_name in scene_names:
+                scene_data = scene_data_cache.get(scene_name)
+                if scene_data is None:
+                    continue
+                    
+                frames = scene_data.get("frames", [])
+                num_frames = len(frames)
+                
+                # Try to sample frames
+                result = sample_frames(num_frames, n_input, n_target, min_frame_dist, max_frame_dist)
+                
+                if result is not None:
+                    sampled_result = result
+                    reference_scene = scene_name
+                    break
+            
+            if sampled_result is not None:
+                object_indices_cache[object_prefix] = sampled_result
+                print(f"  Object '{object_prefix}': sampled indices from '{reference_scene}'")
+            else:
+                object_indices_cache[object_prefix] = None
+                print(f"  Object '{object_prefix}': insufficient frames in all variants")
+        
+        # Apply the same indices to all scenes with this object prefix
+        cached_indices = object_indices_cache[object_prefix]
+        
+        for scene_name in scene_names:
+            scene_data = scene_data_cache.get(scene_name)
+            
+            if scene_data is None or cached_indices is None:
                 evaluation_index[scene_name] = None
                 failed += 1
-                print(f"  Skipped {scene_name}: insufficient frames ({num_frames})")
                 continue
             
-            input_indices, target_indices = result
+            frames = scene_data.get("frames", [])
+            num_frames = len(frames)
+            input_indices, target_indices = cached_indices
+            
+            # Verify that the cached indices are valid for this scene
+            max_index = max(input_indices + target_indices)
+            if max_index >= num_frames:
+                print(f"    Warning: '{scene_name}' has only {num_frames} frames, but needs index {max_index}")
+                evaluation_index[scene_name] = None
+                failed += 1
+                continue
             
             evaluation_index[scene_name] = {
                 "context": input_indices,
                 "target": target_indices
             }
             successful += 1
-            
-        except Exception as e:
-            print(f"  Error processing {scene_json_path}: {e}")
-            # Extract scene name from path if possible
-            scene_name = Path(scene_json_path).stem
-            evaluation_index[scene_name] = None
-            failed += 1
     
     # Save evaluation index
     output_dir = os.path.dirname(output_path)
@@ -172,6 +257,7 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
     print(f"  Successful: {successful}")
     print(f"  Failed/Skipped: {failed}")
     print(f"  Total: {len(evaluation_index)}")
+    print(f"  Unique objects: {len(scenes_by_object)}")
 
 
 def main():
