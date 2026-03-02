@@ -505,8 +505,9 @@ class Dataset(Dataset):
                         # Typical shape: [v, 3, 128, 256] or similar
                         env_h = 128
                         env_w = 256
-                        env_ldr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32)
-                        env_hdr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32)
+                        # Use .clone() to ensure tensor is resizable for DataLoader collate
+                        env_ldr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
+                        env_hdr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
 
                 # Load point light rays if enabled by relight_signals
                 if self.use_relight_point_light:
@@ -521,12 +522,13 @@ class Dataset(Dataset):
                     else:
                         # Relit scene is NOT point-light-lit, create placeholder zeros
                         # Shape: [v, num_rays, 10]
+                        # Use .clone() to ensure tensor is resizable for DataLoader collate
                         point_light_rays = torch.zeros(
                             len(image_indices), 
                             self.point_light_num_rays, 
                             10, 
                             dtype=torch.float32
-                        )
+                        ).clone()
             else:
                 # Skip loading relit signals if not configured
                 relit_images = None
