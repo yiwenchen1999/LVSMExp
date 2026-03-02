@@ -2,8 +2,12 @@
 """
 Script to create evaluation index JSON files for inference.
 
-The script randomly samples input and target frame indices from each scene,
-ensuring the sampling window is smaller than 4*(n_input + n_target).
+The script samples input and target frame indices from each scene using the same
+strategy as data/dataset_scene.py:
+1. Randomly selects a frame distance between min_frame_dist and max_frame_dist
+2. Picks a start_frame and end_frame as anchors separated by this distance
+3. Samples remaining frames from the range between start and end
+4. First n_input frames become context, rest become targets
 
 Output format matches data/evaluation_index_re10k.json:
 {
@@ -22,55 +26,70 @@ import numpy as np
 from pathlib import Path
 
 
-def sample_frames(num_frames, n_input, n_target, max_window_size=None):
+def sample_frames(num_frames, n_input, n_target, min_frame_dist=25, max_frame_dist=100):
     """
-    Randomly sample input and target frame indices from a scene.
+    Sample input and target frame indices using the same strategy as dataset_scene.py.
+    
+    This strategy:
+    1. Randomly selects a frame distance (min_frame_dist to max_frame_dist)
+    2. Picks a start_frame and end_frame as anchors
+    3. Samples remaining frames from the range between start and end
+    4. First n_input frames become context, rest become targets
     
     Args:
         num_frames: Total number of frames in the scene
         n_input: Number of input frames to sample
         n_target: Number of target frames to sample
-        max_window_size: Maximum window size (default: 4*(n_input+n_target))
+        min_frame_dist: Minimum distance between start and end frame (default: 25)
+        max_frame_dist: Maximum distance between start and end frame (default: 100)
         
     Returns:
         tuple: (input_indices, target_indices) or None if sampling fails
     """
-    if max_window_size is None:
-        max_window_size = 4 * (n_input + n_target)
+    num_views = n_input + n_target
     
     # Check if we have enough frames
-    if num_frames < max_window_size:
-        max_window_size = num_frames
-    
-    if num_frames < n_input + n_target:
+    if num_frames < num_views:
         return None
     
-    # Randomly select a window start position
-    max_start = num_frames - max_window_size
-    if max_start < 0:
-        window_start = 0
-        window_size = num_frames
-    else:
-        window_start = random.randint(0, max_start)
-        window_size = max_window_size
+    # Adjust max_frame_dist based on available frames
+    max_frame_dist = min(num_frames - 1, max_frame_dist)
     
-    # Create frame indices within the window
-    window_indices = list(range(window_start, window_start + window_size))
-    
-    # Randomly sample input and target frames from the window
-    if len(window_indices) < n_input + n_target:
+    if max_frame_dist <= min_frame_dist:
         return None
     
-    # Sample without replacement
-    all_sampled = random.sample(window_indices, n_input + n_target)
-    input_indices = sorted(all_sampled[:n_input])
-    target_indices = sorted(all_sampled[n_input:])
+    # Randomly select frame distance
+    frame_dist = random.randint(min_frame_dist, max_frame_dist)
+    
+    if num_frames <= frame_dist:
+        return None
+    
+    # Randomly select start frame
+    start_frame = random.randint(0, num_frames - frame_dist - 1)
+    end_frame = start_frame + frame_dist
+    
+    # Check if we have enough frames between start and end
+    num_samples_needed = num_views - 2
+    available_range_size = end_frame - start_frame - 1
+    
+    if available_range_size < num_samples_needed:
+        return None
+    
+    # Sample frames between start and end
+    sampled_frames = random.sample(range(start_frame + 1, end_frame), num_samples_needed)
+    
+    # Combine: start_frame, end_frame, and sampled frames
+    image_indices = sorted([start_frame, end_frame] + sampled_frames)
+    
+    # Split into input and target
+    input_indices = image_indices[:n_input]
+    target_indices = image_indices[n_input:]
     
     return input_indices, target_indices
 
 
 def create_evaluation_index(full_list_path, output_path, n_input, n_target, 
-                            max_window_size=None, seed=42, max_scenes=None):
+                            min_frame_dist=25, max_frame_dist=100, seed=42, max_scenes=None):
     """
     Create evaluation index JSON file from a full_list.txt.
     
@@ -79,7 +98,8 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
         output_path: Path to save evaluation index JSON
         n_input: Number of input frames
         n_target: Number of target frames
-        max_window_size: Maximum window size (default: 4*(n_input+n_target))
+        min_frame_dist: Minimum distance between start and end frame (default: 25)
+        max_frame_dist: Maximum distance between start and end frame (default: 100)
         seed: Random seed for reproducibility
         max_scenes: Maximum number of scenes to process (optional)
     """
@@ -115,8 +135,8 @@ def create_evaluation_index(full_list_path, output_path, n_input, n_target,
             frames = scene_data['frames']
             num_frames = len(frames)
             
-            # Sample frames
-            result = sample_frames(num_frames, n_input, n_target, max_window_size)
+            # Sample frames using same strategy as dataset_scene.py
+            result = sample_frames(num_frames, n_input, n_target, min_frame_dist, max_frame_dist)
             
             if result is None:
                 # Skip scenes that don't have enough frames
@@ -164,8 +184,10 @@ def main():
                        help='Number of input frames (default: 2)')
     parser.add_argument('--n-target', type=int, default=6,
                        help='Number of target frames (default: 6)')
-    parser.add_argument('--max-window-size', type=int, default=None,
-                       help='Maximum window size (default: 4*(n_input+n_target))')
+    parser.add_argument('--min-frame-dist', type=int, default=25,
+                       help='Minimum distance between start and end frame (default: 25)')
+    parser.add_argument('--max-frame-dist', type=int, default=100,
+                       help='Maximum distance between start and end frame (default: 100)')
     parser.add_argument('--seed', type=int, default=42,
                        help='Random seed (default: 42)')
     parser.add_argument('--max-scenes', type=int, default=None,
@@ -173,13 +195,11 @@ def main():
     
     args = parser.parse_args()
     
-    if args.max_window_size is None:
-        args.max_window_size = 4 * (args.n_input + args.n_target)
-    
     print(f"Creating evaluation index with:")
     print(f"  Input frames: {args.n_input}")
     print(f"  Target frames: {args.n_target}")
-    print(f"  Max window size: {args.max_window_size}")
+    print(f"  Min frame distance: {args.min_frame_dist}")
+    print(f"  Max frame distance: {args.max_frame_dist}")
     print(f"  Random seed: {args.seed}")
     if args.max_scenes:
         print(f"  Max scenes: {args.max_scenes}")
@@ -189,7 +209,8 @@ def main():
         args.output,
         args.n_input,
         args.n_target,
-        args.max_window_size,
+        args.min_frame_dist,
+        args.max_frame_dist,
         args.seed,
         args.max_scenes
     )

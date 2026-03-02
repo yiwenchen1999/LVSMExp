@@ -27,10 +27,13 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list data_samples/objaverse_processed/test/full_list.txt \
-    --output data/evaluation_index_objaverse_test_4i3o.json \
+    --full-list /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt \
+    --output data/evaluation_index_objaverse_dense.json \
     --n-input 4 \
-    --n-target 3 \
+    --n-target 8 \
+    --min-frame-dist 13 \
+    --max-frame-dist 100 \
+    --max-scenes 125 \
     --seed 42
 
 # preprocess objaverse with envmaps
