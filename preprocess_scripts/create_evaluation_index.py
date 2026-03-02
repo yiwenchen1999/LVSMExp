@@ -64,7 +64,7 @@ def sample_frames(num_frames, n_input, n_target, min_frame_dist=25, max_frame_di
     1. Randomly selects a frame distance (min_frame_dist to max_frame_dist)
     2. Picks a start_frame and end_frame as anchors
     3. Samples remaining frames from the range between start and end
-    4. First n_input frames become context, rest become targets
+    4. Randomly selects which frames are context vs targets (not just first n_input)
     
     Args:
         num_frames: Total number of frames in the scene
@@ -111,9 +111,11 @@ def sample_frames(num_frames, n_input, n_target, min_frame_dist=25, max_frame_di
     # Combine: start_frame, end_frame, and sampled frames
     image_indices = sorted([start_frame, end_frame] + sampled_frames)
     
-    # Split into input and target
-    input_indices = image_indices[:n_input]
-    target_indices = image_indices[n_input:]
+    # Randomly select which indices are context vs targets
+    # This ensures context frames are distributed throughout the sequence, not just the first few
+    context_positions = sorted(random.sample(range(num_views), n_input))
+    input_indices = sorted([image_indices[i] for i in context_positions])
+    target_indices = sorted([image_indices[i] for i in range(num_views) if i not in context_positions])
     
     return input_indices, target_indices
 
