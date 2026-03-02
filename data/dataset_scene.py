@@ -431,97 +431,102 @@ class Dataset(Dataset):
                 # Load relit images
                 relit_images, _, _ = self.preprocess_frames(relit_frames_chosen, relit_image_paths)
                 
+                # Determine actual lighting type of chosen relit scene
+                actual_lighting_type = self._scene_lighting_type(relit_scene_name)
+                
                 # Load envmaps if enabled by relight_signals
                 if self.use_relight_envmap:
-                    if self._scene_lighting_type(relit_scene_name) == "envmap":
+                    if actual_lighting_type == "envmap":
+                        # Relit scene is envmap-lit, load actual envmaps
                         env_scene_name = relit_scene_name
-                    else:
-                        if len(candidate_scenes_by_type["envmap"]) == 0:
-                            error_msg = (
-                                f"relight_signals includes envmap but no envmap-lit scenes found for object '{object_id}'"
-                            )
+                        envmaps_dir = os.path.join(base_dir, 'envmaps', env_scene_name)
+                        if not os.path.exists(envmaps_dir):
+                            error_msg = f"Environment maps directory not found: {envmaps_dir}"
+                            print(f"Error: {error_msg}")
+                            raise FileNotFoundError(error_msg)
+
+                        env_ldr_list = []
+                        env_hdr_list = []
+                        for ic in image_indices:
+                            env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
+                            env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
+                            if not os.path.exists(env_ldr_path):
+                                error_msg = f"Environment LDR file not found: {env_ldr_path}"
+                                print(f"Error: {error_msg}")
+                                raise FileNotFoundError(error_msg)
+                            if not os.path.exists(env_hdr_path):
+                                error_msg = f"Environment HDR file not found: {env_hdr_path}"
+                                print(f"Error: {error_msg}")
+                                raise FileNotFoundError(error_msg)
+                            try:
+                                env_ldr_img = PIL.Image.open(env_ldr_path)
+                                env_ldr_img.load()
+                                env_ldr_array = np.array(env_ldr_img) / 255.0
+                                if len(env_ldr_array.shape) == 2:
+                                    env_ldr_array = np.stack([env_ldr_array, env_ldr_array, env_ldr_array], axis=2)
+                                elif env_ldr_array.shape[2] == 4:
+                                    rgb = env_ldr_array[:, :, :3]
+                                    alpha = env_ldr_array[:, :, 3:4]
+                                    env_ldr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                elif env_ldr_array.shape[2] != 3:
+                                    env_ldr_array = env_ldr_array[:, :, :3]
+                                env_ldr_tensor = torch.from_numpy(env_ldr_array).permute(2, 0, 1).float()
+
+                                env_hdr_img = PIL.Image.open(env_hdr_path)
+                                env_hdr_img.load()
+                                env_hdr_array = np.array(env_hdr_img) / 255.0
+                                if len(env_hdr_array.shape) == 2:
+                                    env_hdr_array = np.stack([env_hdr_array, env_hdr_array, env_hdr_array], axis=2)
+                                elif env_hdr_array.shape[2] == 4:
+                                    rgb = env_hdr_array[:, :, :3]
+                                    alpha = env_hdr_array[:, :, 3:4]
+                                    env_hdr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                elif env_hdr_array.shape[2] != 3:
+                                    env_hdr_array = env_hdr_array[:, :, :3]
+                                env_hdr_tensor = torch.from_numpy(env_hdr_array).permute(2, 0, 1).float()
+
+                                env_ldr_list.append(env_ldr_tensor)
+                                env_hdr_list.append(env_hdr_tensor)
+                            except Exception as e:
+                                error_msg = f"Failed to load environment map for frame {ic} in scene '{env_scene_name}': {type(e).__name__}: {str(e)}"
+                                print(f"Error: {error_msg}")
+                                traceback.print_exc()
+                                raise RuntimeError(error_msg) from e
+
+                        if len(env_ldr_list) != len(image_indices) or len(env_hdr_list) != len(image_indices):
+                            error_msg = f"Mismatch in environment map count: expected {len(image_indices)}, got {len(env_ldr_list)} LDR and {len(env_hdr_list)} HDR"
                             print(f"Error: {error_msg}")
                             raise ValueError(error_msg)
-                        env_scene_name = random.choice(candidate_scenes_by_type["envmap"])
-
-                    envmaps_dir = os.path.join(base_dir, 'envmaps', env_scene_name)
-                    if not os.path.exists(envmaps_dir):
-                        error_msg = f"Environment maps directory not found: {envmaps_dir}"
-                        print(f"Error: {error_msg}")
-                        raise FileNotFoundError(error_msg)
-
-                    env_ldr_list = []
-                    env_hdr_list = []
-                    for ic in image_indices:
-                        env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
-                        env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
-                        if not os.path.exists(env_ldr_path):
-                            error_msg = f"Environment LDR file not found: {env_ldr_path}"
-                            print(f"Error: {error_msg}")
-                            raise FileNotFoundError(error_msg)
-                        if not os.path.exists(env_hdr_path):
-                            error_msg = f"Environment HDR file not found: {env_hdr_path}"
-                            print(f"Error: {error_msg}")
-                            raise FileNotFoundError(error_msg)
-                        try:
-                            env_ldr_img = PIL.Image.open(env_ldr_path)
-                            env_ldr_img.load()
-                            env_ldr_array = np.array(env_ldr_img) / 255.0
-                            if len(env_ldr_array.shape) == 2:
-                                env_ldr_array = np.stack([env_ldr_array, env_ldr_array, env_ldr_array], axis=2)
-                            elif env_ldr_array.shape[2] == 4:
-                                rgb = env_ldr_array[:, :, :3]
-                                alpha = env_ldr_array[:, :, 3:4]
-                                env_ldr_array = rgb * alpha + (1.0 - alpha) * 1.0
-                            elif env_ldr_array.shape[2] != 3:
-                                env_ldr_array = env_ldr_array[:, :, :3]
-                            env_ldr_tensor = torch.from_numpy(env_ldr_array).permute(2, 0, 1).float()
-
-                            env_hdr_img = PIL.Image.open(env_hdr_path)
-                            env_hdr_img.load()
-                            env_hdr_array = np.array(env_hdr_img) / 255.0
-                            if len(env_hdr_array.shape) == 2:
-                                env_hdr_array = np.stack([env_hdr_array, env_hdr_array, env_hdr_array], axis=2)
-                            elif env_hdr_array.shape[2] == 4:
-                                rgb = env_hdr_array[:, :, :3]
-                                alpha = env_hdr_array[:, :, 3:4]
-                                env_hdr_array = rgb * alpha + (1.0 - alpha) * 1.0
-                            elif env_hdr_array.shape[2] != 3:
-                                env_hdr_array = env_hdr_array[:, :, :3]
-                            env_hdr_tensor = torch.from_numpy(env_hdr_array).permute(2, 0, 1).float()
-
-                            env_ldr_list.append(env_ldr_tensor)
-                            env_hdr_list.append(env_hdr_tensor)
-                        except Exception as e:
-                            error_msg = f"Failed to load environment map for frame {ic} in scene '{env_scene_name}': {type(e).__name__}: {str(e)}"
-                            print(f"Error: {error_msg}")
-                            traceback.print_exc()
-                            raise RuntimeError(error_msg) from e
-
-                    if len(env_ldr_list) != len(image_indices) or len(env_hdr_list) != len(image_indices):
-                        error_msg = f"Mismatch in environment map count: expected {len(image_indices)}, got {len(env_ldr_list)} LDR and {len(env_hdr_list)} HDR"
-                        print(f"Error: {error_msg}")
-                        raise ValueError(error_msg)
-                    env_ldr = torch.stack(env_ldr_list, dim=0)  # [v, 3, h, w]
-                    env_hdr = torch.stack(env_hdr_list, dim=0)  # [v, 3, h, w]
+                        env_ldr = torch.stack(env_ldr_list, dim=0)  # [v, 3, h, w]
+                        env_hdr = torch.stack(env_hdr_list, dim=0)  # [v, 3, h, w]
+                    else:
+                        # Relit scene is NOT envmap-lit, create placeholder zeros
+                        # Get envmap shape from first available envmap scene (for shape reference)
+                        # Typical shape: [v, 3, 128, 256] or similar
+                        env_h = 128
+                        env_w = 256
+                        env_ldr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32)
+                        env_hdr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32)
 
                 # Load point light rays if enabled by relight_signals
                 if self.use_relight_point_light:
-                    if self._scene_lighting_type(relit_scene_name) == "point_light":
+                    if actual_lighting_type == "point_light":
+                        # Relit scene is point-light-lit, load actual rays
                         point_light_scene_name = relit_scene_name
+                        point_light_rays = self._load_point_light_rays(
+                            base_dir=base_dir,
+                            scene_name=point_light_scene_name,
+                            num_views=len(image_indices),
+                        )  # [v, num_rays, 10]
                     else:
-                        if len(candidate_scenes_by_type["point_light"]) == 0:
-                            error_msg = (
-                                f"relight_signals includes point_light but no point-light scenes found for object '{object_id}'"
-                            )
-                            print(f"Error: {error_msg}")
-                            raise ValueError(error_msg)
-                        point_light_scene_name = random.choice(candidate_scenes_by_type["point_light"])
-                    point_light_rays = self._load_point_light_rays(
-                        base_dir=base_dir,
-                        scene_name=point_light_scene_name,
-                        num_views=len(image_indices),
-                    )  # [v, num_rays, 10]
+                        # Relit scene is NOT point-light-lit, create placeholder zeros
+                        # Shape: [v, num_rays, 10]
+                        point_light_rays = torch.zeros(
+                            len(image_indices), 
+                            self.point_light_num_rays, 
+                            10, 
+                            dtype=torch.float32
+                        )
             else:
                 # Skip loading relit signals if not configured
                 relit_images = None
