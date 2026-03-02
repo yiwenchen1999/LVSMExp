@@ -50,4 +50,3 @@ python3 preprocess_scripts/preprocess_stanford_orb.py \
   --output-root /data/stanford_ORB_processed \
   --split both \
   --target-size 512 \
-  --target-fov 30
