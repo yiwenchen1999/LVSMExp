@@ -40,7 +40,7 @@ echo "----------------------------------"
 # Run training
 ############################
 
-torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
+torchrun --nproc_per_node 1 --nnodes "$NNODES" \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_envmap_pointlight.yaml \
     training.batch_size_per_gpu = 16 \
