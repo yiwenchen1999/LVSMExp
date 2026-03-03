@@ -19,6 +19,9 @@ export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_den
 # Detect GPU count (override with NPROC env var)
 if [[ -n "${NPROC:-}" ]]; then
     NPROC_PER_NODE="$NPROC"
+elif [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+    # Count comma-separated device IDs
+    NPROC_PER_NODE=$(echo "$CUDA_VISIBLE_DEVICES" | awk -F',' '{print NF}')
 else
     NPROC_PER_NODE=$(nvidia-smi -L 2>/dev/null | wc -l) || NPROC_PER_NODE=1
 fi
