@@ -43,15 +43,15 @@ class Dataset(Dataset):
             print(f"whiteEnvInput enabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'white_env_0' (from {total_scenes_before} total)")
         else:
             total_scenes_before = len(self.all_scene_paths)
-            # only keep scenes ending with "env_*" and "white_env_*"
+            _valid_tags = ("_env_", "_white_env_", "_area_", "_multi_pl_", "_combined_")
             filtered_scene_paths = []
             for scene_path in self.all_scene_paths:
                 file_name = os.path.basename(scene_path)
                 scene_name = file_name.replace('.json', '')
-                if "_env_" in scene_name or "_white_env_" in scene_name:
+                if any(tag in scene_name for tag in _valid_tags):
                     filtered_scene_paths.append(scene_path)
             self.all_scene_paths = filtered_scene_paths
-            print(f"whiteEnvInput disabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'env_*' or 'white_env_*' (from {total_scenes_before} total)")
+            print(f"whiteEnvInput disabled: Filtered to {len(self.all_scene_paths)} scenes with valid lighting tags (from {total_scenes_before} total)")
 
         self.inference = self.config.inference.get("if_inference", False)
         # Load file that specifies the input and target view indices to use for inference
@@ -375,7 +375,7 @@ class Dataset(Dataset):
                     raise FileNotFoundError(error_msg)
                 
                 all_scene_json_files = [f for f in os.listdir(metadata_dir) if f.endswith('.json')]
-                candidate_scenes_by_type = {"envmap": [], "point_light": []}
+                candidate_scenes_by_type = {"envmap": [], "point_light": [], "combined": []}
                 for json_file in all_scene_json_files:
                     candidate_scene_name = json_file[:-5]  # Remove .json extension
                     if not (candidate_scene_name.startswith(object_id + '_') and candidate_scene_name != scene_name):
@@ -395,6 +395,9 @@ class Dataset(Dataset):
                 candidate_scenes = []
                 for sig in enabled_signal_types:
                     candidate_scenes.extend(candidate_scenes_by_type[sig])
+                # Combined scenes are valid targets whenever either signal type is enabled
+                if self.use_relight_envmap or self.use_relight_point_light:
+                    candidate_scenes.extend(candidate_scenes_by_type["combined"])
 
                 if not candidate_scenes:
                     error_msg = (
@@ -406,6 +409,7 @@ class Dataset(Dataset):
 
                 # Sample one relit scene for relit image supervision
                 relit_scene_name = random.choice(candidate_scenes)
+                print(f"chose relit scene: {relit_scene_name}")
                 relit_scene_path = os.path.join(metadata_dir, relit_scene_name + '.json')
                 
                 # Load relit scene JSON
@@ -441,108 +445,106 @@ class Dataset(Dataset):
                 # Determine actual lighting type of chosen relit scene
                 actual_lighting_type = self._scene_lighting_type(relit_scene_name)
                 
+                # Determine whether this scene should provide envmaps / point-light rays.
+                # For "combined" scenes we attempt both and gracefully fall back to zeros.
+                should_load_envmap = actual_lighting_type == "envmap" or actual_lighting_type == "combined"
+                should_load_point_light = actual_lighting_type == "point_light" or actual_lighting_type == "combined"
+
                 # Load envmaps if enabled by relight_signals
                 if self.use_relight_envmap:
-                    if actual_lighting_type == "envmap":
-                        # Relit scene is envmap-lit, load actual envmaps
-                        env_scene_name = relit_scene_name
-                        envmaps_dir = os.path.join(base_dir, 'envmaps', env_scene_name)
-                        if not os.path.exists(envmaps_dir):
-                            error_msg = f"Environment maps directory not found: {envmaps_dir}"
-                            print(f"Error: {error_msg}")
-                            raise FileNotFoundError(error_msg)
+                    envmaps_loaded = False
+                    if should_load_envmap:
+                        envmaps_dir = os.path.join(base_dir, 'envmaps', relit_scene_name)
+                        # For pure envmap scenes the directory must exist; for combined it's optional
+                        has_envmaps_dir = os.path.exists(envmaps_dir)
+                        if has_envmaps_dir:
+                            env_ldr_list = []
+                            env_hdr_list = []
+                            all_found = True
+                            for ic in image_indices:
+                                env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
+                                env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
+                                if not os.path.exists(env_ldr_path) or not os.path.exists(env_hdr_path):
+                                    if actual_lighting_type == "envmap":
+                                        raise FileNotFoundError(f"Environment map file not found: {env_ldr_path} or {env_hdr_path}")
+                                    all_found = False
+                                    break
+                                try:
+                                    env_ldr_img = PIL.Image.open(env_ldr_path)
+                                    env_ldr_img.load()
+                                    env_ldr_array = np.array(env_ldr_img) / 255.0
+                                    if len(env_ldr_array.shape) == 2:
+                                        env_ldr_array = np.stack([env_ldr_array, env_ldr_array, env_ldr_array], axis=2)
+                                    elif env_ldr_array.shape[2] == 4:
+                                        rgb = env_ldr_array[:, :, :3]
+                                        alpha = env_ldr_array[:, :, 3:4]
+                                        env_ldr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                    elif env_ldr_array.shape[2] != 3:
+                                        env_ldr_array = env_ldr_array[:, :, :3]
+                                    env_ldr_tensor = torch.from_numpy(env_ldr_array).permute(2, 0, 1).float()
 
-                        env_ldr_list = []
-                        env_hdr_list = []
-                        for ic in image_indices:
-                            env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
-                            env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
-                            if not os.path.exists(env_ldr_path):
-                                error_msg = f"Environment LDR file not found: {env_ldr_path}"
-                                print(f"Error: {error_msg}")
-                                raise FileNotFoundError(error_msg)
-                            if not os.path.exists(env_hdr_path):
-                                error_msg = f"Environment HDR file not found: {env_hdr_path}"
-                                print(f"Error: {error_msg}")
-                                raise FileNotFoundError(error_msg)
-                            try:
-                                env_ldr_img = PIL.Image.open(env_ldr_path)
-                                env_ldr_img.load()
-                                env_ldr_array = np.array(env_ldr_img) / 255.0
-                                if len(env_ldr_array.shape) == 2:
-                                    env_ldr_array = np.stack([env_ldr_array, env_ldr_array, env_ldr_array], axis=2)
-                                elif env_ldr_array.shape[2] == 4:
-                                    rgb = env_ldr_array[:, :, :3]
-                                    alpha = env_ldr_array[:, :, 3:4]
-                                    env_ldr_array = rgb * alpha + (1.0 - alpha) * 1.0
-                                elif env_ldr_array.shape[2] != 3:
-                                    env_ldr_array = env_ldr_array[:, :, :3]
-                                env_ldr_tensor = torch.from_numpy(env_ldr_array).permute(2, 0, 1).float()
+                                    env_hdr_img = PIL.Image.open(env_hdr_path)
+                                    env_hdr_img.load()
+                                    env_hdr_array = np.array(env_hdr_img) / 255.0
+                                    if len(env_hdr_array.shape) == 2:
+                                        env_hdr_array = np.stack([env_hdr_array, env_hdr_array, env_hdr_array], axis=2)
+                                    elif env_hdr_array.shape[2] == 4:
+                                        rgb = env_hdr_array[:, :, :3]
+                                        alpha = env_hdr_array[:, :, 3:4]
+                                        env_hdr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                                    elif env_hdr_array.shape[2] != 3:
+                                        env_hdr_array = env_hdr_array[:, :, :3]
+                                    env_hdr_tensor = torch.from_numpy(env_hdr_array).permute(2, 0, 1).float()
 
-                                env_hdr_img = PIL.Image.open(env_hdr_path)
-                                env_hdr_img.load()
-                                env_hdr_array = np.array(env_hdr_img) / 255.0
-                                if len(env_hdr_array.shape) == 2:
-                                    env_hdr_array = np.stack([env_hdr_array, env_hdr_array, env_hdr_array], axis=2)
-                                elif env_hdr_array.shape[2] == 4:
-                                    rgb = env_hdr_array[:, :, :3]
-                                    alpha = env_hdr_array[:, :, 3:4]
-                                    env_hdr_array = rgb * alpha + (1.0 - alpha) * 1.0
-                                elif env_hdr_array.shape[2] != 3:
-                                    env_hdr_array = env_hdr_array[:, :, :3]
-                                env_hdr_tensor = torch.from_numpy(env_hdr_array).permute(2, 0, 1).float()
+                                    env_ldr_list.append(env_ldr_tensor)
+                                    env_hdr_list.append(env_hdr_tensor)
+                                except Exception as e:
+                                    if actual_lighting_type == "envmap":
+                                        raise RuntimeError(
+                                            f"Failed to load environment map for frame {ic} in scene '{relit_scene_name}': {e}"
+                                        ) from e
+                                    all_found = False
+                                    break
 
-                                env_ldr_list.append(env_ldr_tensor)
-                                env_hdr_list.append(env_hdr_tensor)
-                            except Exception as e:
-                                error_msg = f"Failed to load environment map for frame {ic} in scene '{env_scene_name}': {type(e).__name__}: {str(e)}"
-                                print(f"Error: {error_msg}")
-                                traceback.print_exc()
-                                raise RuntimeError(error_msg) from e
+                            if all_found and len(env_ldr_list) == len(image_indices):
+                                env_ldr = torch.stack(env_ldr_list, dim=0)
+                                env_hdr = torch.stack(env_hdr_list, dim=0)
+                                envmaps_loaded = True
+                            elif actual_lighting_type == "envmap":
+                                raise ValueError(
+                                    f"Mismatch in environment map count for scene '{relit_scene_name}'"
+                                )
 
-                        if len(env_ldr_list) != len(image_indices) or len(env_hdr_list) != len(image_indices):
-                            error_msg = f"Mismatch in environment map count: expected {len(image_indices)}, got {len(env_ldr_list)} LDR and {len(env_hdr_list)} HDR"
-                            print(f"Error: {error_msg}")
-                            raise ValueError(error_msg)
-                        env_ldr = torch.stack(env_ldr_list, dim=0)  # [v, 3, h, w]
-                        env_hdr = torch.stack(env_hdr_list, dim=0)  # [v, 3, h, w]
-                    else:
-                        # Relit scene is NOT envmap-lit, create placeholder zeros
-                        # Need to get the correct envmap shape from an actual envmap scene
+                    if not envmaps_loaded:
+                        env_h, env_w = 256, 512
                         if len(candidate_scenes_by_type["envmap"]) > 0:
-                            # Sample one envmap scene to get the shape
                             sample_env_scene = candidate_scenes_by_type["envmap"][0]
                             sample_envmaps_dir = os.path.join(base_dir, 'envmaps', sample_env_scene)
-                            sample_env_files = [f for f in os.listdir(sample_envmaps_dir) if f.endswith('_ldr.png')]
-                            if sample_env_files:
-                                sample_env_path = os.path.join(sample_envmaps_dir, sample_env_files[0])
-                                sample_env_img = PIL.Image.open(sample_env_path)
-                                env_h, env_w = sample_env_img.size[1], sample_env_img.size[0]  # PIL size is (width, height)
-                            else:
-                                # Fallback to default
-                                env_h, env_w = 256, 512
-                        else:
-                            # No envmap scenes available, use default shape
-                            env_h, env_w = 256, 512
-                        
-                        # Use .clone() to ensure tensor is resizable for DataLoader collate
+                            if os.path.exists(sample_envmaps_dir):
+                                sample_env_files = [f for f in os.listdir(sample_envmaps_dir) if f.endswith('_ldr.png')]
+                                if sample_env_files:
+                                    sample_env_path = os.path.join(sample_envmaps_dir, sample_env_files[0])
+                                    sample_env_img = PIL.Image.open(sample_env_path)
+                                    env_h, env_w = sample_env_img.size[1], sample_env_img.size[0]
                         env_ldr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
                         env_hdr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
                         
                 # Load point light rays if enabled by relight_signals
                 if self.use_relight_point_light:
-                    if actual_lighting_type == "point_light":
-                        # Relit scene is point-light-lit, load actual rays
-                        point_light_scene_name = relit_scene_name
-                        point_light_rays = self._load_point_light_rays(
-                            base_dir=base_dir,
-                            scene_name=point_light_scene_name,
-                            num_views=len(image_indices),
-                        )  # [v, num_rays, 10]
-                    else:
-                        # Relit scene is NOT point-light-lit, create placeholder zeros
-                        # Shape: [v, num_rays, 10]
-                        # Use .clone() to ensure tensor is resizable for DataLoader collate
+                    point_light_loaded = False
+                    if should_load_point_light:
+                        rays_path = os.path.join(base_dir, "point_light_rays", f"{relit_scene_name}.npy")
+                        if os.path.exists(rays_path):
+                            point_light_rays = self._load_point_light_rays(
+                                base_dir=base_dir,
+                                scene_name=relit_scene_name,
+                                num_views=len(image_indices),
+                            )
+                            point_light_loaded = True
+                        elif actual_lighting_type == "point_light":
+                            raise FileNotFoundError(f"Point light rays file not found: {rays_path}")
+
+                    if not point_light_loaded:
                         point_light_rays = torch.zeros(
                             len(image_indices), 
                             self.point_light_num_rays, 
