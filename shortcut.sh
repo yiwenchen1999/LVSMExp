@@ -188,3 +188,13 @@ inference.compute_metrics = true \
 inference.render_video = false \
 inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense_env_variations.json" \
 inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor_env_variations
+
+
+
+#post-process the results:
+
+# obtain the og data for relights
+python3 scripts/fetch_source_data.py \
+    --metadata_dir  result_previews/polyhaven_dense_inference_same_pose_flat/metadata \
+    --dataset_root  /path/to/polyhaven_lvsm/test \
+    --out_dir       result_previews/polyhaven_dense_inference_same_pose_flat/source_data

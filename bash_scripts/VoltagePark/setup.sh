@@ -1,4 +1,4 @@
-ssh 1
+ssh ubuntu@147.185.41.15
 sudo apt install nfs-common
 sudo mkdir /data
 sudo nano /etc/fstab
