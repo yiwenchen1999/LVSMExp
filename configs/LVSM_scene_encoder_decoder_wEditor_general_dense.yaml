@@ -89,6 +89,7 @@ training:
 # inference / evaluation
 inference:
   if_inference: False
+  same_pose: False
   compute_metrics: False
   view_idx_file_path: ./data/evaluation_index_objaverse_train.json
   render_video: False

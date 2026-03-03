@@ -15,13 +15,16 @@ rsync -avh --partial --inplace --progress \
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
   /music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense \
-  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes_dense
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/
+  
 
 # 直接运行命令
 rsync -avzP --human-readable \
-  mfml1:/music-shared-disk/group/ct/yiwen/data/objaverse/rendered_scenes_dense/0c09dbb153a44de0826179d04883a1fd \
-  data_samples/scene_light_combined/
-
+  mfml1:/music-shared-disk/group/ct/yiwen/codes/LVSMExp/experiments/evaluation/polyhaven_dense_inference \
+  result_previews/
+rsync -avzP --human-readable \
+  chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/experiments/evaluation/test_scenes_dense \
+  result_previews/
 # env creation:
 sbash --partition=ct --account=ct --nodes=1 --gpus=2
 sbash --partition=ct_l40s --account=ct --nodes=1 --gpus=1

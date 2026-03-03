@@ -32,9 +32,9 @@ python preprocess_scripts/create_evaluation_index.py \
     --n-input 4 \
     --n-target 8 \
     --min-frame-dist 13 \
-    --max-frame-dist 125 \
+    --max-frame-dist 20 \
     --max-scenes 5000 \
-    --seed 46
+    --seed 48
 
 #
 

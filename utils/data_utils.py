@@ -183,7 +183,22 @@ class ProcessData(nn.Module):
         
 
         input_dict, target_dict = {}, {}
-        # index = [] save for future use if we want to select specific views
+
+        # same_pose mode: clone input views to target (no novel-view sampling)
+        same_pose = self.config.inference.get("same_pose", False)
+        if same_pose:
+            for key, value in data_batch.items():
+                if not isinstance(value, torch.Tensor):
+                    input_dict[key] = value
+                    target_dict[key] = value
+                    continue
+                input_dict[key] = value[:, :self.config.training.num_input_views, ...]
+                target_dict[key] = input_dict[key].clone()
+
+            height, width = data_batch["image"].shape[3], data_batch["image"].shape[4]
+            input_dict["image_h_w"] = (height, width)
+            target_dict["image_h_w"] = (height, width)
+            return edict(input_dict), edict(target_dict)
 
         num_target_views, num_views, bs = self.config.training.num_target_views, data_batch["c2w"].size(1), data_batch["image"].size(0)
         assert num_target_views < num_views, f"We have {num_views} views, but we want to select {num_target_views} target views. This is more than the total number of views we have."
