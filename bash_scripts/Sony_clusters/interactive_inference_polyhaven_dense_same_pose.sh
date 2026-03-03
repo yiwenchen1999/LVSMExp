@@ -3,6 +3,7 @@
 # In same_pose mode, target views are cloned from input views (same pose, same image).
 # Usage: bash bash_scripts/Sony_clusters/interactive_inference_polyhaven_dense_same_pose.sh
 
+# evaluation on polyHaven data for img2img relighting
 set -euo pipefail
 
 ############################

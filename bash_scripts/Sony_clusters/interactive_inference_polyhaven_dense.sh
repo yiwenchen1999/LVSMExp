@@ -2,6 +2,7 @@
 # Interactive inference for polyhaven dataset on Sony cluster
 # Usage: bash bash_scripts/Sony_clusters/interactive_inference_polyhaven_dense.sh
 
+# evaluation on polyHaven data for novel-view relighting
 set -euo pipefail
 
 ############################

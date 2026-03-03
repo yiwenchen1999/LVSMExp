@@ -1,8 +1,8 @@
 # rsync data from neu to voltage park
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
-  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/polyhaven_lvsm/test/ \
-    polyhaven_lvsm/test/
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes_dense \
+    .
 
 
 rsync -avh --partial --inplace --progress \
@@ -11,9 +11,9 @@ rsync -avh --partial --inplace --progress \
   chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/relight_dense_env_scene
 
 python3 preprocess_scripts/update_paths.py \
-  --old-path /scratch/chen.yiwe/temp_objaverse \
+  --old-path /music-shared-disk/group/ct/yiwen/data/objaverse \
   --new-path /data \
-  --root-dir /data/lvsmPlus_objaverse/test \
+  --root-dir /data/lvsm_scenes_dense/test \
   --extensions json txt \
   --backup
 
