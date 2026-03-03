@@ -409,7 +409,7 @@ class Dataset(Dataset):
 
                 # Sample one relit scene for relit image supervision
                 relit_scene_name = random.choice(candidate_scenes)
-                print(f"chose relit scene: {relit_scene_name}")
+                # print(f"chose relit scene: {relit_scene_name}")
                 relit_scene_path = os.path.join(metadata_dir, relit_scene_name + '.json')
                 
                 # Load relit scene JSON
