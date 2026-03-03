@@ -64,3 +64,9 @@ python3 preprocess_scripts/preprocess_obj_with_light.py \
   --input-root /data/dataset \
   --output-root /data/obj_with_light_processed \
   --split test
+
+
+  python3 scripts/fetch_source_data.py \
+    --metadata_dir  metadata_polyhaven \
+    --dataset_root  /data/polyhaven_lvsm/test \
+    --out_dir       source_data_polyhaven
