@@ -189,6 +189,12 @@ inference.render_video = false \
 inference.view_idx_file_path = "./data/evaluation_index_objaverse_dense_env_variations.json" \
 inference_out_dir = ./experiments/evaluation/test_obj_dense_wEditor_env_variations
 
+python3 preprocess_scripts/update_paths.py \
+  --old-path /music-shared-disk/group/ct/yiwen/data/objaverse \
+  --new-path /scratch/chen.yiwe/temp_objaverse \
+  --root-dir /scratch/chen.yiwe/temp_objaverse/polyhaven_lvsm/test/ \
+  --extensions json txt \
+  --backup
 
 
 #post-process the results:
