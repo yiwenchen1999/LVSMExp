@@ -201,7 +201,7 @@ with torch.no_grad(), torch.autocast(
         # 3. Render for visualisation and metrics
         rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
 
-        if step%10 != 0:
+        if np.random.randint(0, 10) <8 and step <17:
             current_tokens = latent_tokens.detach().clone()
         else:
             latent_tokens = current_tokens
