@@ -97,7 +97,11 @@ model = DDP(model, device_ids=[ddp_info.local_rank])
 
 
 if ddp_info.is_main_process:  
+    condition_reverse = config.training.get("condition_reverse", False)
     print(f"Running inference; save results to: {config.inference_out_dir}")
+    if condition_reverse:
+        print(f"  condition_reverse=True: input images from relit scene, "
+              f"relit/lighting from current scene")
     # avoid multiple processes downloading LPIPS at the same time
     import lpips
     # Suppress the warning by setting weights_only=True

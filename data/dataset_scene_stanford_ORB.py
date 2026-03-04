@@ -50,8 +50,13 @@ class Dataset(Dataset):
             oid = self._extract_object_id(sn)
             self._object_scenes.setdefault(oid, []).append(sn)
 
+        # Condition reverse: swap input/relit sources so input comes from relit scene
+        # and relit supervision + lighting comes from the current scene
+        self.condition_reverse = self.config.training.get("condition_reverse", False)
+
         print(f"[StanfordORB] Loaded {len(self.all_scene_paths)} scenes, "
-              f"{len(self._object_scenes)} objects")
+              f"{len(self._object_scenes)} objects"
+              f"{', condition_reverse=True' if self.condition_reverse else ''}")
 
     def __len__(self):
         return len(self.all_scene_paths)
@@ -310,11 +315,20 @@ class Dataset(Dataset):
             relit_c2ws = avg_pose @ relit_c2ws
             relit_c2ws[:, :3, 3] /= scene_scale
 
+            # Condition reverse: input images come from relit scene,
+            # relit supervision + lighting come from the current scene
+            if self.condition_reverse:
+                input_images, relit_images = relit_images, input_images
+                lighting_source_scene_name = scene_name
+                lighting_source_frames = frames
+            else:
+                lighting_source_scene_name = relit_scene_name
+                lighting_source_frames = relit_frames
+
             # ---- envmap loading (randomly choose one available envmap) ----
-            envmaps_dir = os.path.join(base_dir, "envmaps", relit_scene_name)
+            envmaps_dir = os.path.join(base_dir, "envmaps", lighting_source_scene_name)
             env_indices = self._list_envmap_indices(envmaps_dir)
-            # keep only indices that are valid frame indices in the relit scene
-            env_indices = [i for i in env_indices if i < len(relit_frames)]
+            env_indices = [i for i in env_indices if i < len(lighting_source_frames)]
 
             num_views = len(image_indices)
 
@@ -322,8 +336,8 @@ class Dataset(Dataset):
                 chosen_env_idx = random.choice(env_indices)
                 env_ldr, env_hdr = self._load_envmap_pair(envmaps_dir, chosen_env_idx)
 
-                # envmap camera pose from the relit scene metadata
-                envmap_frame = relit_frames[chosen_env_idx]
+                # envmap camera pose from the lighting source scene metadata
+                envmap_frame = lighting_source_frames[chosen_env_idx]
                 w2c = np.array(envmap_frame["w2c"])
                 envmap_c2w_raw = torch.from_numpy(np.linalg.inv(w2c)).float()
 

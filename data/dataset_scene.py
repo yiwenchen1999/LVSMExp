@@ -88,6 +88,10 @@ class Dataset(Dataset):
         # Check if we should use white_env_0 scene images as albedo instead of loading from albedos folder
         self.white_env_as_albedo = self.config.training.get("white_env_as_albedo", False)
 
+        # Condition reverse: swap input/relit sources so input comes from relit scene
+        # and relit supervision + lighting comes from the current scene
+        self.condition_reverse = self.config.training.get("condition_reverse", False)
+
 
     def __len__(self):
         return len(self.all_scene_paths)
@@ -441,9 +445,17 @@ class Dataset(Dataset):
                 
                 # Load relit images
                 relit_images, _, _ = self.preprocess_frames(relit_frames_chosen, relit_image_paths)
-                
-                # Determine actual lighting type of chosen relit scene
-                actual_lighting_type = self._scene_lighting_type(relit_scene_name)
+
+                # Condition reverse: input images come from relit scene,
+                # relit supervision + lighting come from the current scene
+                if self.condition_reverse:
+                    input_images, relit_images = relit_images, input_images
+                    lighting_source_scene_name = scene_name
+                else:
+                    lighting_source_scene_name = relit_scene_name
+
+                # Determine actual lighting type of the lighting source scene
+                actual_lighting_type = self._scene_lighting_type(lighting_source_scene_name)
                 
                 # Determine whether this scene should provide envmaps / point-light rays.
                 # For "combined" scenes we attempt both and gracefully fall back to zeros.
@@ -454,7 +466,7 @@ class Dataset(Dataset):
                 if self.use_relight_envmap:
                     envmaps_loaded = False
                     if should_load_envmap:
-                        envmaps_dir = os.path.join(base_dir, 'envmaps', relit_scene_name)
+                        envmaps_dir = os.path.join(base_dir, 'envmaps', lighting_source_scene_name)
                         # For pure envmap scenes the directory must exist; for combined it's optional
                         has_envmaps_dir = os.path.exists(envmaps_dir)
                         if has_envmaps_dir:
@@ -501,7 +513,7 @@ class Dataset(Dataset):
                                 except Exception as e:
                                     if actual_lighting_type == "envmap":
                                         raise RuntimeError(
-                                            f"Failed to load environment map for frame {ic} in scene '{relit_scene_name}': {e}"
+                                            f"Failed to load environment map for frame {ic} in scene '{lighting_source_scene_name}': {e}"
                                         ) from e
                                     all_found = False
                                     break
@@ -512,7 +524,7 @@ class Dataset(Dataset):
                                 envmaps_loaded = True
                             elif actual_lighting_type == "envmap":
                                 raise ValueError(
-                                    f"Mismatch in environment map count for scene '{relit_scene_name}'"
+                                    f"Mismatch in environment map count for scene '{lighting_source_scene_name}'"
                                 )
 
                     if not envmaps_loaded:
@@ -533,11 +545,11 @@ class Dataset(Dataset):
                 if self.use_relight_point_light:
                     point_light_loaded = False
                     if should_load_point_light:
-                        rays_path = os.path.join(base_dir, "point_light_rays", f"{relit_scene_name}.npy")
+                        rays_path = os.path.join(base_dir, "point_light_rays", f"{lighting_source_scene_name}.npy")
                         if os.path.exists(rays_path):
                             point_light_rays = self._load_point_light_rays(
                                 base_dir=base_dir,
-                                scene_name=relit_scene_name,
+                                scene_name=lighting_source_scene_name,
                                 num_views=len(image_indices),
                             )
                             point_light_loaded = True
