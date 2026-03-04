@@ -187,7 +187,7 @@ with torch.no_grad(), torch.autocast(
 ):
     # Reconstruct ONCE from original input images
     latent_tokens, n_patches, d = model.module.reconstructor(input_data)
-    current_tokens = latent_tokens
+    current_tokens = latent_tokens.detach().clone()
 
     for step in range(num_iterations):
         # 1. Pick envmap for this step (same cycle as image-space)
@@ -200,6 +200,11 @@ with torch.no_grad(), torch.autocast(
 
         # 3. Render for visualisation and metrics
         rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
+
+        if step%4 != 0:
+            latent_tokens = current_tokens
+            current_tokens = latent_tokens.detach().clone()
+            
 
         # 4. Save results + compute metrics vs GT relit images
         if ddp_info.is_main_process:
