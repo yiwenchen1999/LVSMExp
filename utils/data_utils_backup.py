@@ -288,15 +288,11 @@ class ProcessData(nn.Module):
                 ray_o, ray_d = self.compute_rays(c2w, fxfycxcy, image_height, image_width, device=data_batch["image"].device)
                 dict["ray_o"], dict["ray_d"] = ray_o, ray_d
         
-        # Compute environment map directions for input and target.
-        # If envmap_c2w is provided (e.g. Stanford ORB), use it instead of the
-        # camera c2w so that the env directions match the envmap's own viewpoint.
-        for d in [input_dict, target_dict]:
-            env_c2w = d.get("envmap_c2w", None)
-            if env_c2w is None:
-                env_c2w = d["c2w"]
-            env_dir = self.compute_env_dir(env_c2w, envmap_h=256, envmap_w=512, device=data_batch["image"].device)
-            d["env_dir"] = env_dir
+        # Compute environment map directions for input and target
+        for dict in [input_dict, target_dict]:
+            c2w = dict["c2w"]
+            env_dir = self.compute_env_dir(c2w, envmap_h=256, envmap_w=512, device=data_batch["image"].device)
+            dict["env_dir"] = env_dir
 
         return input_dict, target_dict
 
