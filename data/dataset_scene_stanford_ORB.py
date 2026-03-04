@@ -303,9 +303,12 @@ class Dataset(Dataset):
                 if not os.path.exists(p):
                     raise FileNotFoundError(f"Relit image not found: {p}")
 
-            relit_images, _, _ = self.preprocess_frames(
+            relit_images, relit_intrinsics, relit_c2ws = self.preprocess_frames(
                 relit_frames_chosen, relit_image_paths
             )
+            # normalise relit poses with the SAME transform as input poses
+            relit_c2ws = avg_pose @ relit_c2ws
+            relit_c2ws[:, :3, 3] /= scene_scale
 
             # ---- envmap loading (randomly choose one available envmap) ----
             envmaps_dir = os.path.join(base_dir, "envmaps", relit_scene_name)
@@ -354,6 +357,8 @@ class Dataset(Dataset):
                 "scene_name": scene_name,
                 "relit_images": relit_images,
                 "relit_scene_name": relit_scene_name,
+                "relit_c2w": relit_c2ws,
+                "relit_fxfycxcy": relit_intrinsics,
                 "env_ldr": env_ldr,
                 "env_hdr": env_hdr,
                 "envmap_c2w": envmap_c2w,

@@ -676,20 +676,25 @@ class LatentSceneEditor(nn.Module):
 
     def forward(self, data_batch, has_target_image=True):
         #& Step 1: Data preprocessing - Extract input and target data from data_batch, compute rays
-        # input.image: [b, v_input, 3, h, w] - Input RGB images (v_input=2 views)
-        # input.ray_o: [b, v_input, 3, h, w] - Ray origins
-        # input.ray_d: [b, v_input, 3, h, w] - Ray directions
-        # target.image: [b, v_target, 3, h, w] - Target RGB images (v_target=6 views)
-        # target.ray_o: [b, v_target, 3, h, w] - Target ray origins
-        # target.ray_d: [b, v_target, 3, h, w] - Target ray directions
         input, target = self.process_data(data_batch, has_target_image=has_target_image, target_has_input = self.config.training.target_has_input, compute_rays=True)
+
+        #& Step 1.5: If relit poses exist, recompute target rays at the relit camera poses
+        # Stanford ORB lighting-variation scenes have different poses per scene,
+        # so we render at the relit scene's poses to match its GT images.
+        if hasattr(target, 'relit_c2w') and target.relit_c2w is not None:
+            h, w = target.image_h_w
+            relit_ray_o, relit_ray_d = self.process_data.compute_rays(
+                target.relit_c2w, target.relit_fxfycxcy, h, w,
+                device=data_batch["image"].device
+            )
+            target.ray_o = relit_ray_o
+            target.ray_d = relit_ray_d
         
         #& Step 2: Reconstructor - Get scene latent_tokens from input images
         latent_tokens, n_patches, d = self.reconstructor(input)
 
-        # #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
+        #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
         condition_tokens = self._build_editor_condition_tokens(input, d)
-        # print("condition_tokens:", condition_tokens.shape)
         if condition_tokens is not None:
             editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
             checkpoint_every = self.config.training.grad_checkpoint_every
@@ -702,7 +707,7 @@ class LatentSceneEditor(nn.Module):
             n_latent_vectors = self.config.model.transformer.n_latent_vectors
             latent_tokens = editor_output_tokens[:, :n_latent_vectors, :]
         
-        #& Step 4: Renderer - Decode results from target ray maps
+        #& Step 4: Renderer - Decode results from target ray maps (using relit poses if available)
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)
         
         #& Step 4.5: Process albedo decoder if enabled
