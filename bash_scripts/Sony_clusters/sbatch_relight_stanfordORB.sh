@@ -74,7 +74,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29510 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_stanfordORB.yaml \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 8 \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = LVSM_edit_stanfordORB \
