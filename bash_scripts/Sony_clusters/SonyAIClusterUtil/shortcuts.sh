@@ -109,4 +109,4 @@ python preprocess_scripts/preprocess_stanford_orb.py \
 "
 
 #iterative relighting:
-SCENE_IDX=0 NUM_ITER=50 NUM_INPUT_VIEWS=4 bash bash_scripts/Sony_clusters/SonyAIClusterUtil/interactive_degrade_test.sh
+SCENE_IDX=80 NUM_ITER=50 NUM_INPUT_VIEWS=4 bash bash_scripts/Sony_clusters/SonyAIClusterUtil/interactive_degrade_test.sh

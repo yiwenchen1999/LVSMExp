@@ -201,9 +201,10 @@ with torch.no_grad(), torch.autocast(
         # 3. Render for visualisation and metrics
         rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
 
-        if step%4 != 0:
-            latent_tokens = current_tokens
+        if step%10 != 0:
             current_tokens = latent_tokens.detach().clone()
+        else:
+            latent_tokens = current_tokens
             
 
         # 4. Save results + compute metrics vs GT relit images
