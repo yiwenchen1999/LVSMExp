@@ -29,7 +29,7 @@ export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Training paths (Sony cluster)
-export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/stanford_ORB/stanford_ORB_processed/test/full_list.txt"
+export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/stanford_ORB_lvsm/test/full_list.txt"
 export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/relight_stanfordORB"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder"
 export EVAL_IDX="/music-shared-disk/group/ct/yiwen/data/stanford_ORB/stanford_ORB_processed/test/eval_index.json"
