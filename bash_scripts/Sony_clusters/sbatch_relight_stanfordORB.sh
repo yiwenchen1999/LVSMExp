@@ -1,7 +1,12 @@
 #!/bin/bash
-# Train LatentSceneEditor on Stanford ORB relighting data.
-# Usage: source bash_scripts/Sony_clusters/interactive_relight_stanfordORB.sh
-#    or: bash   bash_scripts/Sony_clusters/interactive_relight_stanfordORB.sh
+#SBATCH --job-name=relight_stanfordORB
+#SBATCH --partition=sharedp
+#SBATCH --account=ct
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --time=72:00:00
+#SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
+#SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
 set -euo pipefail
 
@@ -28,7 +33,7 @@ export XDG_DATA_HOME=/scratch2/$USER/.local/share
 export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
-# Training paths (Sony cluster)
+# Training paths (Sony cluster) – Stanford ORB
 export DATA_LIST="/music-shared-disk/group/ct/yiwen/data/stanford_ORB_lvsm/test/full_list.txt"
 export CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/relight_stanfordORB"
 export LVSM_CKPT_DIR="/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder"
@@ -38,6 +43,7 @@ export EVAL_IDX="/music-shared-disk/group/ct/yiwen/data/stanford_ORB/stanford_OR
 # Logging
 ############################
 echo "Host: $(hostname)"
+echo "JobID: $SLURM_JOB_ID"
 echo "PROJ: $PROJ"
 echo "DATA_LIST: $DATA_LIST"
 echo "CKPT_DIR: $CKPT_DIR"
@@ -49,7 +55,7 @@ echo "----------------------------------"
 ############################
 # Run training
 ############################
-singularity exec --nv $BIND $SIF bash -lc "
+srun singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:\${PYTHONPATH:-}\"
   export WANDB_DIR=\"$WANDB_DIR\"
@@ -63,20 +69,20 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \\
-    --rdzv_id \$(date +%s) \\
-    --rdzv_backend c10d \\
-    --rdzv_endpoint localhost:29510 \\
-    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_stanfordORB.yaml \\
-    training.batch_size_per_gpu = 16 \\
-    training.checkpoint_dir = \"$CKPT_DIR\" \\
-    training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \\
-    training.wandb_exp_name = LVSM_edit_stanfordORB \\
-    training.warmup = 1500 \\
-    training.vis_every = 1000 \\
-    training.lr = 0.0001 \\
-    training.single_env_map = true \\
-    training.freeze_reconstructor_renderer = true \\
-    training.dataset_path = \"$DATA_LIST\" \\
+  torchrun --nproc_per_node 4 --nnodes 1 \
+    --rdzv_id \$(date +%s) \
+    --rdzv_backend c10d \
+    --rdzv_endpoint localhost:29510 \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_stanfordORB.yaml \
+    training.batch_size_per_gpu = 16 \
+    training.checkpoint_dir = \"$CKPT_DIR\" \
+    training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
+    training.wandb_exp_name = LVSM_edit_stanfordORB \
+    training.warmup = 1500 \
+    training.vis_every = 1000 \
+    training.lr = 0.0001 \
+    training.single_env_map = true \
+    training.freeze_reconstructor_renderer = true \
+    training.dataset_path = \"$DATA_LIST\" \
     inference.view_idx_file_path = \"$EVAL_IDX\"
 "
