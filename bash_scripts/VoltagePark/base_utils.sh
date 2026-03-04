@@ -13,7 +13,7 @@ rsync -avh --partial --inplace --progress \
 python3 preprocess_scripts/update_paths.py \
   --old-path /music-shared-disk/group/ct/yiwen/data/objaverse \
   --new-path /data \
-  --root-dir /data/lvsm_scenes_dense/test \
+  --root-dir /data/polyhaven_lvsm/test \
   --extensions json txt \
   --backup
 
@@ -32,7 +32,8 @@ python3 preprocess_scripts/remove_broken_scenes.py \
   --broken-scene preview_scenes/broken_scene.txt \
   --full-list /data/lvsmPlus_objaverse/test/full_list.txt
  
- scp ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/ckpt/LVSM_object_encoder_decoder_sparse/iter_00000001/supervision_2cb7026ffacf4889bb265099b8460c7f_env_2.jpg bash_scripts/VoltagePark/previews/
+scp ubuntu@147.185.41.15:~/Neural_Gaffer_exp/polyhaven_relighting_results result_previews/NeuralGaffer
+rsync -avz --progress ubuntu@147.185.41.15:~/Neural_Gaffer_exp/polyhaven_relighting_results result_previews/NeuralGaffer
 
 tmux new -s finetune
 

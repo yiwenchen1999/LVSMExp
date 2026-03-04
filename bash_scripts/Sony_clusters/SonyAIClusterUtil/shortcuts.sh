@@ -35,7 +35,7 @@ export PY_SITE=/scratch2/$USER/ng_py
 export PIP_CACHE_DIR=/scratch2/$USER/cache/pip
 export SIF_DIR=/scratch2/$USER/singularity_images
 export SIF=$SIF_DIR/pytorch_24.01-py3.sif
-export BIND="-B /group2,/scratch2,/data,/music-shared-disk"
+export BIND="-B /group2,/scratch2,/music-shared-disk"
 mkdir -p "$PY_SITE" "$PIP_CACHE_DIR"
 singularity exec --nv $BIND $SIF bash -lc "
 python3 -m pip install -U pip wheel setuptools --cache-dir $PIP_CACHE_DIR
@@ -67,7 +67,7 @@ srun --partition=ct --account=ct --gres=gpu:1 \
 #srun with venv:
 SRUN_OPTS="--account=ct --partition=ct --gres=gpu:1 --job-name=ng_test"
 SIF=/scratch2/$USER/singularity_images/pytorch_24.01-py3.sif
-BIND="-B /group2,/scratch2,/data"
+BIND="-B /group2,/scratch2,/music-shared-disk"
 
 srun ${SRUN_OPTS} singularity exec --nv ${BIND} ${SIF} \
   bash -lc "source /scratch2/$USER/ng_venv/bin/activate && cd /group2/ct/yiwen/src/Neural_Gaffer && python -c 'import torch; print(torch.cuda.get_device_name(0))'"
@@ -96,3 +96,14 @@ python train.py
 #   - Switch to SSH: git remote set-url origin git@github.com:yiwenchen1999/FLUX_finetune.git
 #   - Test connection: ssh -T git@github.com
 #   - Display public key: cat ~/.ssh/id_ed25519.pub
+
+#post-process stanford-ORB::
+cd /music-shared-disk/group/ct/yiwen/codes/LVSMExp
+singularity exec --nv $BIND $SIF bash -lc "
+python preprocess_scripts/preprocess_stanford_orb.py \
+  --input-root /music-shared-disk/group/ct/yiwen/data/blender_LDR \
+  --output-root /music-shared-disk/group/ct/yiwen/data/stanford_ORB_lvsm \
+  --env-gt-root /music-shared-disk/group/ct/yiwen/data/ground_truth \
+  --n-context 4 \
+  --n-target 8
+"

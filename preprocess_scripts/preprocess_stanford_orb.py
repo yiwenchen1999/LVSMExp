@@ -3,30 +3,41 @@
 Convert Stanford-ORB scenes to re10k-like metadata/image format.
 
 Output layout:
-  <output_root>/<split>/images/<scene_name>/<frame:05d>.png
-  <output_root>/<split>/metadata/<scene_name>.json
-  <output_root>/<split>/full_list.txt
+  <output_root>/test/images/<scene_name>/<frame:05d>.png
+  <output_root>/test/metadata/<scene_name>.json
+  <output_root>/test/envmaps/<scene_name>/<frame:05d>_ldr.png, _hdr.png (if available)
+  <output_root>/test/full_list.txt
+  <output_root>/test/eval_index.json
 
-Each metadata JSON contains:
-  {
-    "scene_name": "...",
-    "frames": [
-      {
-        "image_path": "/abs/path/to/image.png",
-        "fxfycxcy": [fx, fy, cx, cy],
-        "w2c": [[...], [...], [...], [...]]
-      }
-    ]
-  }
+Both train and test splits from the source are merged into the output "test" split.
+context indices are sampled from the original train frames, target from original test frames.
+
+Envmaps (if --env-gt-root is set): read from <env_gt_root>/<scene>/env_map/<frame_id>.exr
+(frames are already rotated per camera). Only process frames where the envmap file exists.
 """
 
 import argparse
 import json
 import math
+import random
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
+
+try:
+    import pyexr
+
+    HAS_PYEXR = True
+except ImportError:
+    HAS_PYEXR = False
+
+try:
+    import imageio
+
+    HAS_IMAGEIO = True
+except ImportError:
+    HAS_IMAGEIO = False
 
 
 def blender_to_opencv_c2w(c2w_blender: np.ndarray) -> np.ndarray:
@@ -182,6 +193,206 @@ def resize_to_square(rgb: np.ndarray, size: int) -> np.ndarray:
     return np.array(img, dtype=np.uint8)
 
 
+def read_env_hdr(path: Path) -> np.ndarray | None:
+    """Read HDR envmap (EXR or HDR). Returns RGB float array."""
+    if path.suffix.lower() == ".exr" and HAS_PYEXR:
+        try:
+            rgb = pyexr.read(str(path))
+            if rgb is not None and rgb.shape[-1] >= 3:
+                return rgb[:, :, :3].astype(np.float64)
+            return rgb
+        except Exception:
+            return None
+    if path.suffix.lower() in (".hdr", ".exr") and HAS_IMAGEIO:
+        try:
+            rgb = imageio.imread(str(path))
+            if rgb is not None and rgb.ndim >= 2:
+                if rgb.ndim == 2:
+                    rgb = np.stack([rgb] * 3, axis=-1)
+                return rgb[:, :, :3].astype(np.float64)
+            return None
+        except Exception:
+            return None
+    return None
+
+
+def split_envmap_ldr_hdr(env_raw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Split pre-rotated envmap into LDR and HDR PNG-ready arrays (0–255 uint8).
+    Same convention as preprocess_objaverse.
+    """
+    env_ldr = np.clip(env_raw, 0, 1) ** (1 / 2.2)
+    env_hdr = np.log1p(10 * env_raw)
+    max_val = np.max(env_hdr)
+    if max_val > 1e-8:
+        env_hdr = np.clip(env_hdr / max_val, 0, 1)
+    else:
+        env_hdr = np.clip(env_hdr, 0, 1)
+    return (np.uint8(env_ldr * 255), np.uint8(env_hdr * 255))
+
+
+def _process_frames_from_split(
+    scene_dir: Path,
+    tf_data: dict,
+    split: str,
+    output_idx_start: int,
+    out_images_dir: Path,
+    target_fov: float,
+    target_size: int,
+    adjust_fov: bool,
+) -> tuple[list[dict], list[tuple[int, str]]]:
+    """Process frames from one transforms JSON. Returns (frames_out, [(output_idx, frame_id), ...])."""
+    source_fov_deg = math.degrees(float(tf_data["camera_angle_x"]))
+    frames_out = []
+    frame_id_list = []
+
+    for idx, frame in enumerate(tf_data["frames"]):
+        frame_rel = frame["file_path"]
+        frame_id = Path(frame_rel).name
+        image_path = find_image_path(scene_dir, frame_rel)
+        mask_path = find_mask_path(scene_dir, frame_rel, image_path, split)
+        if mask_path is None:
+            raise FileNotFoundError(
+                f"Mask not found for frame '{frame_rel}' in scene {scene_dir}. "
+                f"Expected canonical path: {scene_dir / f'{split}_mask' / (frame_id + '.png')}"
+            )
+
+        mask = load_mask(image_path, mask_path)
+        rgb = apply_mask_white_background(image_path, mask)
+        src_h, src_w = rgb.shape[:2]
+        if adjust_fov:
+            rgb = expand_or_crop_to_target_fov(rgb, source_fov_deg, target_fov)
+            fxfycxcy = fov_to_fxfycxcy(target_fov, target_size, target_size)
+        else:
+            src_fxfycxcy = fov_to_fxfycxcy(source_fov_deg, src_w, src_h)
+            fxfycxcy = scale_intrinsics(
+                src_fxfycxcy,
+                scale_x=target_size / float(src_w),
+                scale_y=target_size / float(src_h),
+            )
+        rgb = resize_to_square(rgb, target_size)
+
+        output_idx = output_idx_start + idx
+        out_name = f"{output_idx:05d}.png"
+        out_path = out_images_dir / out_name
+        Image.fromarray(rgb).save(out_path)
+
+        c2w_blender = np.array(frame["transform_matrix"], dtype=np.float64)
+        c2w_opencv = blender_to_opencv_c2w(c2w_blender)
+        w2c = np.linalg.inv(c2w_opencv)
+
+        frames_out.append(
+            {
+                "image_path": str(out_path.resolve()),
+                "fxfycxcy": fxfycxcy,
+                "w2c": w2c.tolist(),
+            }
+        )
+        frame_id_list.append((output_idx, frame_id))
+
+    return frames_out, frame_id_list
+
+
+def process_scene_merged(
+    scene_dir: Path,
+    output_root: Path,
+    target_fov: float,
+    target_size: int,
+    adjust_fov: bool,
+    env_gt_root: Path | None,
+    n_context: int,
+    n_target: int,
+    seed: int,
+) -> dict | None:
+    """
+    Process both train and test into "test" split.
+    Frames order: train first, then test.
+    Creates eval_index entry: context from train range, target from test range.
+    Optionally processes envmaps from env_gt_root.
+    """
+    scene_name = scene_dir.name
+    out_images_dir = output_root / "test" / "images" / scene_name
+    out_meta_dir = output_root / "test" / "metadata"
+    out_envmaps_dir = output_root / "test" / "envmaps" / scene_name
+    out_images_dir.mkdir(parents=True, exist_ok=True)
+    out_meta_dir.mkdir(parents=True, exist_ok=True)
+
+    frames_out = []
+    frame_id_map = []  # [(output_idx, frame_id), ...]
+
+    # Process train
+    train_path = scene_dir / "transforms_train.json"
+    test_path = scene_dir / "transforms_test.json"
+    if not train_path.exists() or not test_path.exists():
+        print(f"[Skip] Missing transforms for {scene_name}")
+        return None
+
+    with open(train_path, "r") as f:
+        train_data = json.load(f)
+    with open(test_path, "r") as f:
+        test_data = json.load(f)
+
+    if "frames" not in train_data or len(train_data["frames"]) == 0:
+        print(f"[Skip] No train frames in {scene_name}")
+        return None
+    if "frames" not in test_data or len(test_data["frames"]) == 0:
+        print(f"[Skip] No test frames in {scene_name}")
+        return None
+
+    n_train = len(train_data["frames"])
+    n_test = len(test_data["frames"])
+
+    train_frames, train_ids = _process_frames_from_split(
+        scene_dir, train_data, "train", 0, out_images_dir, target_fov, target_size, adjust_fov
+    )
+    frames_out.extend(train_frames)
+    frame_id_map.extend(train_ids)
+
+    test_frames, test_ids = _process_frames_from_split(
+        scene_dir, test_data, "test", n_train, out_images_dir, target_fov, target_size, adjust_fov
+    )
+    frames_out.extend(test_frames)
+    frame_id_map.extend(test_ids)
+
+    # Create eval_index: context from train, target from test
+    scene_seed = seed + sum(ord(c) for c in scene_name) % (2**31)
+    rng = random.Random(scene_seed)
+    context_indices = sorted(rng.sample(range(n_train), min(n_context, n_train)))
+    target_indices = sorted(rng.sample(range(n_train, n_train + n_test), min(n_target, n_test)))
+    eval_entry = {"context": context_indices, "target": target_indices}
+
+    # Process envmaps (only for frames where file exists)
+    if env_gt_root is not None and (HAS_PYEXR or HAS_IMAGEIO):
+        env_scene_dir = env_gt_root / scene_name / "env_map"
+        if env_scene_dir.exists():
+            out_envmaps_dir.mkdir(parents=True, exist_ok=True)
+            n_env = 0
+            for output_idx, frame_id in frame_id_map:
+                for ext in [".exr", ".hdr"]:
+                    env_path = env_scene_dir / f"{frame_id}{ext}"
+                    if env_path.exists():
+                        env_raw = read_env_hdr(env_path)
+                        if env_raw is not None:
+                            # Stanford collection: rotate 90° to the right (left 1/4 warps to right)
+                            w = env_raw.shape[1]
+                            env_raw = np.roll(env_raw, shift=-w // 4, axis=1)
+                            env_ldr, env_hdr = split_envmap_ldr_hdr(env_raw)
+                            Image.fromarray(env_ldr).save(out_envmaps_dir / f"{output_idx:05d}_ldr.png")
+                            Image.fromarray(env_hdr).save(out_envmaps_dir / f"{output_idx:05d}_hdr.png")
+                            n_env += 1
+                        break
+            if n_env > 0:
+                print(f"  [Env] {scene_name}: {n_env} envmaps processed")
+
+    scene_meta = {"scene_name": scene_name, "frames": frames_out}
+    meta_path = out_meta_dir / f"{scene_name}.json"
+    with open(meta_path, "w") as f:
+        json.dump(scene_meta, f, indent=2)
+
+    print(f"[Done] {scene_name}: {n_train} train + {n_test} test frames")
+    return {"scene_name": scene_name, "eval_entry": eval_entry, "n_train": n_train, "n_test": n_test}
+
+
 def process_scene(
     scene_dir: Path,
     output_root: Path,
@@ -190,6 +401,7 @@ def process_scene(
     target_size: int,
     adjust_fov: bool,
 ):
+    """Legacy: process single split only (used when --merged is False)."""
     transforms_path = scene_dir / f"transforms_{split}.json"
     if not transforms_path.exists():
         return None
@@ -208,59 +420,16 @@ def process_scene(
     out_images_dir.mkdir(parents=True, exist_ok=True)
     out_meta_dir.mkdir(parents=True, exist_ok=True)
 
-    frames_out = []
-
-    for idx, frame in enumerate(tf_data["frames"]):
-        frame_rel = frame["file_path"]
-        image_path = find_image_path(scene_dir, frame_rel)
-        mask_path = find_mask_path(scene_dir, frame_rel, image_path, split)
-        if mask_path is None:
-            raise FileNotFoundError(
-                f"Mask not found for frame '{frame_rel}' in scene {scene_dir}. "
-                f"Expected canonical path: {scene_dir / f'{split}_mask' / (Path(frame_rel).name + '.png')}"
-            )
-
-        mask = load_mask(image_path, mask_path)
-        rgb = apply_mask_white_background(image_path, mask)
-        src_h, src_w = rgb.shape[:2]
-        if adjust_fov:
-            rgb = expand_or_crop_to_target_fov(rgb, source_fov_deg, target_fov)
-            fxfycxcy = fov_to_fxfycxcy(target_fov, target_size, target_size)
-        else:
-            src_fxfycxcy = fov_to_fxfycxcy(source_fov_deg, src_w, src_h)
-            fxfycxcy = scale_intrinsics(
-                src_fxfycxcy,
-                scale_x=target_size / float(src_w),
-                scale_y=target_size / float(src_h),
-            )
-        rgb = resize_to_square(rgb, target_size)
-
-        frame_stem = Path(frame_rel).name
-        out_name = f"{frame_stem}.png" if frame_stem.isdigit() else f"{idx:05d}.png"
-        out_path = out_images_dir / out_name
-        Image.fromarray(rgb).save(out_path)
-
-        c2w_blender = np.array(frame["transform_matrix"], dtype=np.float64)
-        c2w_opencv = blender_to_opencv_c2w(c2w_blender)
-        w2c = np.linalg.inv(c2w_opencv)
-
-        frames_out.append(
-            {
-                "image_path": str(out_path.resolve()),
-                "fxfycxcy": fxfycxcy,
-                "w2c": w2c.tolist(),
-            }
-        )
+    frames_out, _ = _process_frames_from_split(
+        scene_dir, tf_data, split, 0, out_images_dir, target_fov, target_size, adjust_fov
+    )
 
     scene_meta = {"scene_name": scene_name, "frames": frames_out}
     meta_path = out_meta_dir / f"{scene_name}.json"
     with open(meta_path, "w") as f:
         json.dump(scene_meta, f, indent=2)
 
-    print(
-        f"[Done] {scene_name} ({split}): {len(frames_out)} frames, "
-        f"source_fov={source_fov_deg:.3f}, target_fov={target_fov}"
-    )
+    print(f"[Done] {scene_name} ({split}): {len(frames_out)} frames")
     return scene_name
 
 
@@ -309,8 +478,40 @@ def parse_args():
         type=str,
         default="train",
         choices=["train", "test", "both"],
-        help="Which split(s) to process.",
+        help="Which split(s) to process (used only when --no-merged).",
     )
+    parser.add_argument(
+        "--merged",
+        action="store_true",
+        default=True,
+        help="Merge train+test into 'test' split and create eval_index.json (default: True).",
+    )
+    parser.add_argument(
+        "--no-merged",
+        action="store_false",
+        dest="merged",
+        help="Use legacy mode: process splits separately.",
+    )
+    parser.add_argument(
+        "--env-gt-root",
+        type=str,
+        default=None,
+        help="Root for envmaps (e.g. data_samples/stanford_gt). "
+        "Expects <env_gt_root>/<scene>/env_map/<frame_id>.exr. Only processes available frames.",
+    )
+    parser.add_argument(
+        "--n-context",
+        type=int,
+        default=4,
+        help="Number of context views to sample from train split (default: 4).",
+    )
+    parser.add_argument(
+        "--n-target",
+        type=int,
+        default=8,
+        help="Number of target views to sample from test split (default: 8).",
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for eval_index sampling.")
     parser.add_argument("--target-size", type=int, default=512, help="Output square image size.")
     parser.add_argument("--target-fov", type=float, default=30.0, help="Target horizontal FOV in degrees.")
     parser.add_argument(
@@ -331,23 +532,61 @@ def main():
     if not input_root.exists():
         raise FileNotFoundError(f"Input path does not exist: {input_root}")
 
-    splits = ["train", "test"] if args.split == "both" else [args.split]
-    for split in splits:
-        scene_dirs = collect_scene_dirs(input_root, split)
+    env_gt_root = None
+    if args.env_gt_root:
+        env_gt_root = Path(args.env_gt_root).expanduser().resolve()
+        if not env_gt_root.exists():
+            print(f"[Warn] env_gt_root does not exist: {env_gt_root}, skipping envmap processing")
+            env_gt_root = None
+        elif not (HAS_PYEXR or HAS_IMAGEIO):
+            print("[Warn] Neither pyexr nor imageio available, skipping envmap processing")
+            env_gt_root = None
+
+    if args.merged:
+        scene_dirs = collect_scene_dirs(input_root, "train")
+        scene_dirs = [d for d in scene_dirs if (d / "transforms_test.json").exists()]
         if not scene_dirs:
-            print(f"[Warn] No scenes found for split='{split}' under {input_root}")
-            continue
-        print(f"[Info] Processing split='{split}' with {len(scene_dirs)} scene(s)")
-        for scene_dir in scene_dirs:
-            process_scene(
-                scene_dir=scene_dir,
-                output_root=output_root,
-                split=split,
-                target_fov=args.target_fov,
-                target_size=args.target_size,
-                adjust_fov=args.adjust_fov,
-            )
-        write_full_list(output_root, split)
+            print("[Warn] No scenes with both train and test transforms found")
+        else:
+            print(f"[Info] Merged mode: processing {len(scene_dirs)} scene(s) -> test split")
+            eval_index = {}
+            for scene_dir in scene_dirs:
+                result = process_scene_merged(
+                    scene_dir=scene_dir,
+                    output_root=output_root,
+                    target_fov=args.target_fov,
+                    target_size=args.target_size,
+                    adjust_fov=args.adjust_fov,
+                    env_gt_root=env_gt_root,
+                    n_context=args.n_context,
+                    n_target=args.n_target,
+                    seed=args.seed,
+                )
+                if result:
+                    eval_index[result["scene_name"]] = result["eval_entry"]
+            write_full_list(output_root, "test")
+            eval_path = output_root / "test" / "eval_index.json"
+            with open(eval_path, "w") as f:
+                json.dump(eval_index, f, indent=2)
+            print(f"[Done] Wrote {eval_path} ({len(eval_index)} scenes)")
+    else:
+        splits = ["train", "test"] if args.split == "both" else [args.split]
+        for split in splits:
+            scene_dirs = collect_scene_dirs(input_root, split)
+            if not scene_dirs:
+                print(f"[Warn] No scenes found for split='{split}' under {input_root}")
+                continue
+            print(f"[Info] Processing split='{split}' with {len(scene_dirs)} scene(s)")
+            for scene_dir in scene_dirs:
+                process_scene(
+                    scene_dir=scene_dir,
+                    output_root=output_root,
+                    split=split,
+                    target_fov=args.target_fov,
+                    target_size=args.target_size,
+                    adjust_fov=args.adjust_fov,
+                )
+            write_full_list(output_root, split)
 
 
 if __name__ == "__main__":

@@ -198,3 +198,12 @@ python3 scripts/fetch_source_data.py \
     --metadata_dir  result_previews/polyhaven_dense_inference_same_pose_flat/metadata \
     --dataset_root  /path/to/polyhaven_lvsm/test \
     --out_dir       result_previews/polyhaven_dense_inference_same_pose_flat/source_data
+
+
+# preprocess stanford-ORB:
+python preprocess_scripts/preprocess_stanford_orb.py \
+  --input-root /music-shared-disk/group/ct/yiwen/data/blender_LDR \
+  --output-root /music-shared-disk/group/ct/yiwen/data/stanford_ORB_lvsm \
+  --env-gt-root /music-shared-disk/group/ct/yiwen/data/ground_truth \
+  --n-context 4 \
+  --n-target 8
