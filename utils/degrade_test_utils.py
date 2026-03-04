@@ -126,8 +126,8 @@ def save_step(step, rendered, gt_images, env_name, scene_dir, num_views):
     step_dir = os.path.join(scene_dir, f"step_{step:03d}")
     os.makedirs(step_dir, exist_ok=True)
 
-    rendered_cpu = rendered[0].detach().cpu()   # [v, 3, h, w]
-    gt_cpu = gt_images[0].detach().cpu()        # [v, 3, h, w]
+    rendered_cpu = rendered[0].detach().float().cpu()   # [v, 3, h, w]
+    gt_cpu = gt_images[0].detach().float().cpu()        # [v, 3, h, w]
 
     for vi in range(num_views):
         img = (rendered_cpu[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
