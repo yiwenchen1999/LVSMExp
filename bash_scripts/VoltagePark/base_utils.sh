@@ -39,8 +39,11 @@ python3 preprocess_scripts/remove_broken_scenes.py \
 scp ubuntu@147.185.41.15:~/Neural_Gaffer_exp/polyhaven_relighting_results result_previews/NeuralGaffer
 rsync -avz --progress ubuntu@147.185.41.15:~/Neural_Gaffer_exp/polyhaven_relighting_results result_previews/NeuralGaffer
 
-tmux new -s finetune
+tmux new -s finetune# 默认路径：result_previews/eval/gt_samples 和 result_previews/eval/lightSwitch
 
+
+
+python scripts/eval_gt_vs_lightswitch_masked.py result_previews/eval/gt_samples eval/lightSwitch --all 
 # 在 tmux 里运行
 cd ~/LVSMExp
 source /data/venv/lvsmexp/bin/activate
