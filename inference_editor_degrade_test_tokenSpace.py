@@ -220,8 +220,8 @@ for dataset_idx in candidate_indices:
             current_tokens = model.module.edit_scene_with_env(current_tokens, input_data)
             rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
 
-            if np.random.randint(0, 10) < 8 and step < 17:
-                current_tokens = 0.97*latent_tokens.detach().clone()+0.03*current_tokens.detach().clone()
+            if np.random.randint(0, 10) > step/3:
+                current_tokens = (1-step/30)*latent_tokens.detach().clone()+(step/30)*current_tokens.detach().clone()
             else:
                 latent_tokens = current_tokens
 
