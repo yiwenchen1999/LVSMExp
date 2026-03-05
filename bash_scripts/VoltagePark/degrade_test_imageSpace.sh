@@ -17,7 +17,6 @@ export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
 export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb.json}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
 
 if [[ -n "${NPROC:-}" ]]; then
     NPROC_PER_NODE="$NPROC"
@@ -42,8 +41,9 @@ if [ ! -f "$EVAL_INDEX" ]; then
   echo "ERROR: Evaluation index not found: $EVAL_INDEX"
   exit 1
 fi
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
 
-torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor_degrade_test_imageSpace.py \
     --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
@@ -55,7 +55,7 @@ torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
   training.num_views = 12 \
   training.square_crop = true \
   training.num_input_views = 4 \
-  training.num_target_views = 8 \
+  training.num_target_views = 4 \
   inference.if_inference = true \
   inference.compute_metrics = true \
   inference.render_video = false \

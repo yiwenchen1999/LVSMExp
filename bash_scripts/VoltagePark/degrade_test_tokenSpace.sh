@@ -43,7 +43,7 @@ if [ ! -f "$EVAL_INDEX" ]; then
   exit 1
 fi
 
-torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
+torchrun --nproc_per_node 1 --nnodes "$NNODES" \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor_degrade_test_tokenSpace.py \
     --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
@@ -55,7 +55,7 @@ torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
   training.num_views = 12 \
   training.square_crop = true \
   training.num_input_views = 4 \
-  training.num_target_views = 8 \
+  training.num_target_views = 4 \
   inference.if_inference = true \
   inference.compute_metrics = true \
   inference.render_video = false \
