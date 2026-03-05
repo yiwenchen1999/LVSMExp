@@ -221,7 +221,7 @@ for dataset_idx in candidate_indices:
             rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
 
             if np.random.randint(0, 10) > step/3:
-                current_tokens = (1-step/30)*latent_tokens.detach().clone()+(step/30)*current_tokens.detach().clone()
+                current_tokens = (1-0.1-step/30)*latent_tokens.detach().clone()+(0.1+step/30)*current_tokens.detach().clone()
             else:
                 latent_tokens = current_tokens
 
