@@ -136,14 +136,13 @@ with torch.no_grad(), torch.autocast(
 
         bs = input_data.image.shape[0]
 
-        view_idx_tensor = batch.get("index", None)
-        if view_idx_tensor is not None:
-            image_indices = view_idx_tensor[0, :, 0].cpu().tolist()
-        else:
-            image_indices = list(range(batch["image"].shape[1]))
-
         for b_idx in range(bs):
             scene_name = scene_names[b_idx] if b_idx < len(scene_names) else f"scene_{b_idx}"
+
+            if hasattr(input_data, "index") and input_data.index is not None:
+                image_indices = input_data.index[b_idx, :, 0].cpu().tolist()
+            else:
+                image_indices = list(range(input_data.image.shape[1]))
 
             scene_path = dataset.all_scene_paths[0]
             for sp in dataset.all_scene_paths:
