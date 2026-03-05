@@ -194,6 +194,9 @@ with torch.no_grad(), torch.autocast(
                     import random
                     if np.random.randint(0, 10) > step/3:
                         current_tokens = latent_tokens.detach().clone()
+                    elif np.random.randint(0, 10) > step/6:
+                        current_tokens = (1-step/30)*latent_tokens.detach().clone()+(step/30)*current_tokens.detach().clone()
+                    else:
                         latent_tokens = current_tokens.detach().clone()
 
                     current_tokens = model.module.edit_scene_with_env(
