@@ -74,6 +74,7 @@ def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_i
 
     result = []
     for candidate_name in candidates:
+        candidate_name = scene_name
         envmaps_dir = os.path.join(base_dir, "envmaps", candidate_name)
         ldr_files = sorted(f for f in os.listdir(envmaps_dir) if f.endswith("_ldr.png"))
         env_idx = int(ldr_files[0].split("_")[0])
