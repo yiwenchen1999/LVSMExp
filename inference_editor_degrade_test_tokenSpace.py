@@ -188,31 +188,44 @@ with torch.no_grad(), torch.autocast(
                     env_dir=inp.env_dir,
                 )
 
-                current_tokens = latent_tokens.clone()
+                # Step 0: apply editor once to get the "base" edited tokens.
+                base_tokens = model.module.edit_scene_with_env(
+                    latent_tokens.clone(), env_input,
+                )
+                current_tokens = base_tokens.clone()
 
                 for step in range(num_iterations):
-                    # randomly subsitute current_tokens with latent_tokens
-                    import random
-                    if np.random.randint(0, 10) > step/3 and step > 0:
-                        current_tokens = latent_tokens.detach().clone()
-                    else:
-                        latent_tokens = current_tokens.detach().clone()
-
-                    current_tokens = model.module.edit_scene_with_env(
+                    # Re-apply editor on current_tokens
+                    re_edited = model.module.edit_scene_with_env(
                         current_tokens, env_input,
                     )
+
+                    # Blend: at step 0 keep 100 % base, at last step
+                    # keep 100 % re-edited.  In between, each token
+                    # position is independently replaced with
+                    # probability = step / (num_iterations - 1).
+                    if step == 0:
+                        current_tokens = base_tokens.clone()
+                    else:
+                        replace_ratio = step / (num_iterations - 1)
+                        mask = (
+                            torch.rand(
+                                base_tokens.shape[:2],
+                                device=base_tokens.device,
+                            )
+                            < replace_ratio
+                        ).unsqueeze(-1)  # [b, n_tokens, 1]
+                        current_tokens = torch.where(mask, re_edited, base_tokens)
 
                     rendered = model.module.renderer(current_tokens, tgt, n_patches, d)
                     rendered = rendered.clamp(0, 1)
 
                     save_imgs = (step % 5 == 0) or (step == num_iterations - 1)
-                    gt_image = input_data.image[b_idx, :, :, :]
                     metrics = save_step(
                         step, rendered, gt_images, env_name,
                         scene_dir, num_input_views,
                         save_images=save_imgs,
                     )
-
 
                     step_psnrs[step].append(metrics["psnr"])
                     step_ssims[step].append(metrics["ssim"])
