@@ -191,7 +191,14 @@ with torch.no_grad(), torch.autocast(
                 current_tokens = latent_tokens.clone()
 
                 for step in range(num_iterations):
-                    # randomly
+                    # randomly subsitute current_tokens with latent_tokens
+                    import random
+                    if random.random() > step/20:
+                        current_tokens = latent_tokens.clone()
+                    else:
+                        latent_tokens = current_tokens.clone()
+                        current_tokens = current_tokens.clone()
+
                     current_tokens = model.module.edit_scene_with_env(
                         current_tokens, env_input,
                     )
