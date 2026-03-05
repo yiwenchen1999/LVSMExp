@@ -5,8 +5,13 @@
 #   bash scripts/eval_all_gt_vs_lightswitch.sh /path/to/gt_samples /path/to/lightSwitch [--tone-map] [-o out.json]
 set -e
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GT_SAMPLES="$REPO/result_previews/eval/gt_samples"
-LIGHT_SWITCH="$REPO/result_previews/eval/lightSwitch"
+if [[ -d "$REPO/result_previews/eval/gt_samples" ]]; then
+  GT_SAMPLES="$REPO/result_previews/eval/gt_samples"
+  LIGHT_SWITCH="$REPO/result_previews/eval/lightSwitch"
+else
+  GT_SAMPLES="$REPO/eval/gt_samples"
+  LIGHT_SWITCH="$REPO/eval/lightSwitch"
+fi
 if [[ -d "${1:-}" && -d "${2:-}" ]]; then
   GT_SAMPLES="$1"
   LIGHT_SWITCH="$2"
