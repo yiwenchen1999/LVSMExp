@@ -46,7 +46,34 @@ class Dataset(Dataset):
             self.all_scene_paths = filtered_scene_paths
             print(f"whiteEnvInput enabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'white_env_0' (from {total_scenes_before} total)")
         elif self.condition_reverse:
-            print(f"condition_reverse enabled: Keeping all {len(self.all_scene_paths)} scenes (relit candidates restricted to envmap scenes)")
+            total_scenes_before = len(self.all_scene_paths)
+            # Build per-metadata-dir index of object_id -> envmap scene names
+            # so we can discard scenes that have zero envmap relit candidates.
+            _envmap_by_dir = {}  # metadata_dir -> {object_id -> set(envmap scene names)}
+            for scene_path in self.all_scene_paths:
+                metadata_dir = os.path.dirname(scene_path)
+                if metadata_dir not in _envmap_by_dir:
+                    _envmap_by_dir[metadata_dir] = {}
+                    for fn in os.listdir(metadata_dir):
+                        if not fn.endswith('.json'):
+                            continue
+                        cand_name = fn[:-5]
+                        if self._scene_lighting_type(cand_name) == "envmap":
+                            cand_obj = self._extract_object_id(cand_name)
+                            _envmap_by_dir[metadata_dir].setdefault(cand_obj, set()).add(cand_name)
+
+            filtered_scene_paths = []
+            for scene_path in self.all_scene_paths:
+                metadata_dir = os.path.dirname(scene_path)
+                scene_name = os.path.basename(scene_path).replace('.json', '')
+                object_id = self._extract_object_id(scene_name)
+                envmap_candidates = _envmap_by_dir[metadata_dir].get(object_id, set()) - {scene_name}
+                # combined_candidates = _combined_by_dir[metadata_dir].get(object_id, set()) - {scene_name}
+                # point_light_candidates = _point_light_by_dir[metadata_dir].get(object_id, set()) - {scene_name}
+                if envmap_candidates:
+                    filtered_scene_paths.append(scene_path)
+            self.all_scene_paths = filtered_scene_paths
+            print(f"condition_reverse enabled: Filtered to {len(self.all_scene_paths)} scenes with envmap relit candidates (from {total_scenes_before} total)")
         else:
             total_scenes_before = len(self.all_scene_paths)
             _valid_tags = ("_env_", "_white_env_", "_area_", "_multi_pl_", "_combined_")
