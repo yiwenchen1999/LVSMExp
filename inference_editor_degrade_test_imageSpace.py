@@ -196,6 +196,7 @@ with torch.no_grad(), torch.autocast(
 
                     rendered = model.module.renderer(edited_tokens, tgt, n_patches, d)
                     rendered = rendered.clamp(0, 1)
+                    gt_image = input_data.image[b_idx, :, :, :]
 
                     save_imgs = (step % 5 == 0) or (step == num_iterations - 1)
                     metrics = save_step(
