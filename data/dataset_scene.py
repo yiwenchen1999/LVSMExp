@@ -26,6 +26,10 @@ class Dataset(Dataset):
             print(f"Error reading dataset paths from '{self.config.training.dataset_path}'")
             raise e
         
+        # Condition reverse: swap input/relit sources so input comes from relit scene
+        # and relit supervision + lighting comes from the current scene
+        self.condition_reverse = self.config.training.get("condition_reverse", False)
+
         # Filter scenes if whiteEnvInput is enabled
         # Only keep scenes ending with "white_env_0" as input images
         self.whiteEnvInput = self.config.training.get("whiteEnvInput", False)
@@ -41,6 +45,8 @@ class Dataset(Dataset):
                     filtered_scene_paths.append(scene_path)
             self.all_scene_paths = filtered_scene_paths
             print(f"whiteEnvInput enabled: Filtered to {len(self.all_scene_paths)} scenes ending with 'white_env_0' (from {total_scenes_before} total)")
+        elif self.condition_reverse:
+            print(f"condition_reverse enabled: Keeping all {len(self.all_scene_paths)} scenes (relit candidates restricted to envmap scenes)")
         else:
             total_scenes_before = len(self.all_scene_paths)
             _valid_tags = ("_env_", "_white_env_", "_area_", "_multi_pl_", "_combined_")
@@ -87,10 +93,6 @@ class Dataset(Dataset):
         
         # Check if we should use white_env_0 scene images as albedo instead of loading from albedos folder
         self.white_env_as_albedo = self.config.training.get("white_env_as_albedo", False)
-
-        # Condition reverse: swap input/relit sources so input comes from relit scene
-        # and relit supervision + lighting comes from the current scene
-        self.condition_reverse = self.config.training.get("condition_reverse", False)
 
 
     def __len__(self):
@@ -397,11 +399,14 @@ class Dataset(Dataset):
                     enabled_signal_types = ["envmap"]
 
                 candidate_scenes = []
-                for sig in enabled_signal_types:
-                    candidate_scenes.extend(candidate_scenes_by_type[sig])
-                # Combined scenes are valid targets whenever either signal type is enabled
-                if self.use_relight_envmap or self.use_relight_point_light:
-                    candidate_scenes.extend(candidate_scenes_by_type["combined"])
+                if self.condition_reverse:
+                    candidate_scenes = list(candidate_scenes_by_type["envmap"])
+                else:
+                    for sig in enabled_signal_types:
+                        candidate_scenes.extend(candidate_scenes_by_type[sig])
+                    # Combined scenes are valid targets whenever either signal type is enabled
+                    if self.use_relight_envmap or self.use_relight_point_light:
+                        candidate_scenes.extend(candidate_scenes_by_type["combined"])
 
                 if not candidate_scenes:
                     error_msg = (

@@ -14,11 +14,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # VoltagePark paths
 ############################
 export PROJ="${PROJ:-$REPO_ROOT}"
-export DATA_LIST="${DATA_LIST:-/data/lvsmPlus_objaverse/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
+export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_scenes}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
 export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb.json}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_dense_condition_reverse}"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_scenes}"
 
 # Detect GPU count (override with NPROC env var)
 if [[ -n "${NPROC:-}" ]]; then
