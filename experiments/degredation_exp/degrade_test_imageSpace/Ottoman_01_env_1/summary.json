@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 29.16766357421875,
+    "ssim": 0.9392580986022949,
+    "lpips": 0.11328125
+  },
+  {
+    "step": 1,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 27.725479125976562,
+    "ssim": 0.9140991568565369,
+    "lpips": 0.14453125
+  },
+  {
+    "step": 2,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 32.48371887207031,
+    "ssim": 0.952049970626831,
+    "lpips": 0.126953125
+  },
+  {
+    "step": 3,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 30.287776947021484,
+    "ssim": 0.9323617219924927,
+    "lpips": 0.1435546875
+  },
+  {
+    "step": 4,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 27.922712326049805,
+    "ssim": 0.9072741270065308,
+    "lpips": 0.177734375
+  },
+  {
+    "step": 5,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 30.2091121673584,
+    "ssim": 0.9393386840820312,
+    "lpips": 0.1640625
+  },
+  {
+    "step": 6,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 29.150150299072266,
+    "ssim": 0.9228299856185913,
+    "lpips": 0.1728515625
+  },
+  {
+    "step": 7,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 26.5968017578125,
+    "ssim": 0.8969270586967468,
+    "lpips": 0.2099609375
+  },
+  {
+    "step": 8,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 27.3592586517334,
+    "ssim": 0.9260098338127136,
+    "lpips": 0.2021484375
+  },
+  {
+    "step": 9,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 27.03594207763672,
+    "ssim": 0.9114668369293213,
+    "lpips": 0.2080078125
+  },
+  {
+    "step": 10,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 24.390491485595703,
+    "ssim": 0.8813508749008179,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 11,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 24.618698120117188,
+    "ssim": 0.9096362590789795,
+    "lpips": 0.2490234375
+  },
+  {
+    "step": 12,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 24.47069549560547,
+    "ssim": 0.8939482569694519,
+    "lpips": 0.24609375
+  },
+  {
+    "step": 13,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 22.02179527282715,
+    "ssim": 0.8607491850852966,
+    "lpips": 0.296875
+  },
+  {
+    "step": 14,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 22.297985076904297,
+    "ssim": 0.8901076912879944,
+    "lpips": 0.298828125
+  },
+  {
+    "step": 15,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 22.15674591064453,
+    "ssim": 0.8719549775123596,
+    "lpips": 0.2890625
+  },
+  {
+    "step": 16,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 20.40888214111328,
+    "ssim": 0.8404070138931274,
+    "lpips": 0.337890625
+  },
+  {
+    "step": 17,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 20.843708038330078,
+    "ssim": 0.8715159893035889,
+    "lpips": 0.34375
+  },
+  {
+    "step": 18,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 20.691986083984375,
+    "ssim": 0.8506695032119751,
+    "lpips": 0.326171875
+  },
+  {
+    "step": 19,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 18.914913177490234,
+    "ssim": 0.8187655806541443,
+    "lpips": 0.35546875
+  },
+  {
+    "step": 20,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 19.4404296875,
+    "ssim": 0.8549932837486267,
+    "lpips": 0.361328125
+  },
+  {
+    "step": 21,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 19.087215423583984,
+    "ssim": 0.8273812532424927,
+    "lpips": 0.341796875
+  },
+  {
+    "step": 22,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 17.152790069580078,
+    "ssim": 0.7919226884841919,
+    "lpips": 0.357421875
+  },
+  {
+    "step": 23,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 17.874361038208008,
+    "ssim": 0.8318723440170288,
+    "lpips": 0.33984375
+  },
+  {
+    "step": 24,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 17.234390258789062,
+    "ssim": 0.7903375625610352,
+    "lpips": 0.328125
+  },
+  {
+    "step": 25,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 15.583639144897461,
+    "ssim": 0.7558742165565491,
+    "lpips": 0.326171875
+  },
+  {
+    "step": 26,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 15.869354248046875,
+    "ssim": 0.7956012487411499,
+    "lpips": 0.30859375
+  },
+  {
+    "step": 27,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 14.368110656738281,
+    "ssim": 0.7369787693023682,
+    "lpips": 0.30859375
+  },
+  {
+    "step": 28,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 12.477051734924316,
+    "ssim": 0.7074458599090576,
+    "lpips": 0.32421875
+  },
+  {
+    "step": 29,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 12.425506591796875,
+    "ssim": 0.7523223161697388,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 30,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 11.519420623779297,
+    "ssim": 0.6949591040611267,
+    "lpips": 0.33203125
+  },
+  {
+    "step": 31,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 11.11551570892334,
+    "ssim": 0.6839281916618347,
+    "lpips": 0.34375
+  },
+  {
+    "step": 32,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 11.748143196105957,
+    "ssim": 0.7360177636146545,
+    "lpips": 0.3359375
+  },
+  {
+    "step": 33,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 10.995267868041992,
+    "ssim": 0.6805869340896606,
+    "lpips": 0.33984375
+  },
+  {
+    "step": 34,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 10.801361083984375,
+    "ssim": 0.6709804534912109,
+    "lpips": 0.353515625
+  },
+  {
+    "step": 35,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 11.62732982635498,
+    "ssim": 0.7209528088569641,
+    "lpips": 0.34375
+  },
+  {
+    "step": 36,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 10.921875,
+    "ssim": 0.667983889579773,
+    "lpips": 0.345703125
+  },
+  {
+    "step": 37,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 10.750696182250977,
+    "ssim": 0.6582107543945312,
+    "lpips": 0.36328125
+  },
+  {
+    "step": 38,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 11.51856517791748,
+    "ssim": 0.7052326202392578,
+    "lpips": 0.353515625
+  },
+  {
+    "step": 39,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 10.877556800842285,
+    "ssim": 0.6564606428146362,
+    "lpips": 0.353515625
+  },
+  {
+    "step": 40,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 10.684444427490234,
+    "ssim": 0.6474405527114868,
+    "lpips": 0.373046875
+  },
+  {
+    "step": 41,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 11.50765323638916,
+    "ssim": 0.6926892995834351,
+    "lpips": 0.3671875
+  },
+  {
+    "step": 42,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 10.887289047241211,
+    "ssim": 0.6456684470176697,
+    "lpips": 0.36328125
+  },
+  {
+    "step": 43,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 10.702852249145508,
+    "ssim": 0.6366631984710693,
+    "lpips": 0.3828125
+  },
+  {
+    "step": 44,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 11.543119430541992,
+    "ssim": 0.6809481978416443,
+    "lpips": 0.37890625
+  },
+  {
+    "step": 45,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 10.906001091003418,
+    "ssim": 0.6361202597618103,
+    "lpips": 0.375
+  },
+  {
+    "step": 46,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 10.677337646484375,
+    "ssim": 0.6262545585632324,
+    "lpips": 0.396484375
+  },
+  {
+    "step": 47,
+    "envmap_name": "Ottoman_01_white_env_0",
+    "psnr": 11.518680572509766,
+    "ssim": 0.6710696220397949,
+    "lpips": 0.390625
+  },
+  {
+    "step": 48,
+    "envmap_name": "Ottoman_01_env_0",
+    "psnr": 10.898551940917969,
+    "ssim": 0.6269751787185669,
+    "lpips": 0.384765625
+  },
+  {
+    "step": 49,
+    "envmap_name": "Ottoman_01_env_2",
+    "psnr": 10.669410705566406,
+    "ssim": 0.617648184299469,
+    "lpips": 0.40625
+  }
+]

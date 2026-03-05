@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 20.563541412353516,
+    "ssim": 0.8589058518409729,
+    "lpips": 0.09521484375
+  },
+  {
+    "step": 1,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 28.43389892578125,
+    "ssim": 0.9565554261207581,
+    "lpips": 0.05322265625
+  },
+  {
+    "step": 2,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 34.42925262451172,
+    "ssim": 0.9741399884223938,
+    "lpips": 0.0341796875
+  },
+  {
+    "step": 3,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 20.544639587402344,
+    "ssim": 0.8590162396430969,
+    "lpips": 0.09521484375
+  },
+  {
+    "step": 4,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 28.427776336669922,
+    "ssim": 0.9565418362617493,
+    "lpips": 0.05322265625
+  },
+  {
+    "step": 5,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 34.415462493896484,
+    "ssim": 0.9741286039352417,
+    "lpips": 0.0341796875
+  },
+  {
+    "step": 6,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 20.536880493164062,
+    "ssim": 0.8589257001876831,
+    "lpips": 0.09521484375
+  },
+  {
+    "step": 7,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 28.414894104003906,
+    "ssim": 0.9564815759658813,
+    "lpips": 0.05322265625
+  },
+  {
+    "step": 8,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 34.41116714477539,
+    "ssim": 0.9741208553314209,
+    "lpips": 0.0341796875
+  },
+  {
+    "step": 9,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 20.53470230102539,
+    "ssim": 0.8589230179786682,
+    "lpips": 0.09521484375
+  },
+  {
+    "step": 10,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 28.423755645751953,
+    "ssim": 0.9565263986587524,
+    "lpips": 0.05322265625
+  },
+  {
+    "step": 11,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 34.415122985839844,
+    "ssim": 0.9741287231445312,
+    "lpips": 0.0341796875
+  },
+  {
+    "step": 12,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 20.546825408935547,
+    "ssim": 0.859032154083252,
+    "lpips": 0.09521484375
+  },
+  {
+    "step": 13,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 28.428516387939453,
+    "ssim": 0.9565412402153015,
+    "lpips": 0.05322265625
+  },
+  {
+    "step": 14,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 30.830392837524414,
+    "ssim": 0.9674923419952393,
+    "lpips": 0.044189453125
+  },
+  {
+    "step": 15,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 21.26095962524414,
+    "ssim": 0.8638697862625122,
+    "lpips": 0.0810546875
+  },
+  {
+    "step": 16,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 26.470943450927734,
+    "ssim": 0.944170355796814,
+    "lpips": 0.06640625
+  },
+  {
+    "step": 17,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 30.478330612182617,
+    "ssim": 0.9664695858955383,
+    "lpips": 0.045654296875
+  },
+  {
+    "step": 18,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 21.116989135742188,
+    "ssim": 0.8650859594345093,
+    "lpips": 0.08203125
+  },
+  {
+    "step": 19,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 18.47882080078125,
+    "ssim": 0.8573775887489319,
+    "lpips": 0.10205078125
+  },
+  {
+    "step": 20,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 14.827682495117188,
+    "ssim": 0.7903300523757935,
+    "lpips": 0.162109375
+  },
+  {
+    "step": 21,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 11.45339298248291,
+    "ssim": 0.6990771293640137,
+    "lpips": 0.2138671875
+  },
+  {
+    "step": 22,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 11.321722984313965,
+    "ssim": 0.727118968963623,
+    "lpips": 0.240234375
+  },
+  {
+    "step": 23,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 12.113524436950684,
+    "ssim": 0.7414653897285461,
+    "lpips": 0.259765625
+  },
+  {
+    "step": 24,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 9.432025909423828,
+    "ssim": 0.6710948944091797,
+    "lpips": 0.28515625
+  },
+  {
+    "step": 25,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 10.188596725463867,
+    "ssim": 0.709479808807373,
+    "lpips": 0.3046875
+  },
+  {
+    "step": 26,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 11.196880340576172,
+    "ssim": 0.7267581224441528,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 27,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 8.962806701660156,
+    "ssim": 0.6640074849128723,
+    "lpips": 0.33203125
+  },
+  {
+    "step": 28,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 10.628711700439453,
+    "ssim": 0.6890564560890198,
+    "lpips": 0.3671875
+  },
+  {
+    "step": 29,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 11.782588958740234,
+    "ssim": 0.6904845833778381,
+    "lpips": 0.427734375
+  },
+  {
+    "step": 30,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 9.1890230178833,
+    "ssim": 0.6095691919326782,
+    "lpips": 0.44921875
+  },
+  {
+    "step": 31,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 10.232869148254395,
+    "ssim": 0.5907379388809204,
+    "lpips": 0.46875
+  },
+  {
+    "step": 32,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 10.821822166442871,
+    "ssim": 0.5929405093193054,
+    "lpips": 0.48046875
+  },
+  {
+    "step": 33,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 8.924027442932129,
+    "ssim": 0.5255935192108154,
+    "lpips": 0.484375
+  },
+  {
+    "step": 34,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 10.090600967407227,
+    "ssim": 0.5617974996566772,
+    "lpips": 0.49609375
+  },
+  {
+    "step": 35,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 10.89633560180664,
+    "ssim": 0.6037499904632568,
+    "lpips": 0.5234375
+  },
+  {
+    "step": 36,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 8.818689346313477,
+    "ssim": 0.541481614112854,
+    "lpips": 0.546875
+  },
+  {
+    "step": 37,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 9.719569206237793,
+    "ssim": 0.5334210395812988,
+    "lpips": 0.609375
+  },
+  {
+    "step": 38,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 10.258583068847656,
+    "ssim": 0.5038953423500061,
+    "lpips": 0.671875
+  },
+  {
+    "step": 39,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 8.478290557861328,
+    "ssim": 0.40692904591560364,
+    "lpips": 0.73046875
+  },
+  {
+    "step": 40,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 8.84586238861084,
+    "ssim": 0.466655969619751,
+    "lpips": 0.765625
+  },
+  {
+    "step": 41,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 9.506489753723145,
+    "ssim": 0.49956971406936646,
+    "lpips": 0.7421875
+  },
+  {
+    "step": 42,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 8.213513374328613,
+    "ssim": 0.4417332410812378,
+    "lpips": 0.7890625
+  },
+  {
+    "step": 43,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 8.649819374084473,
+    "ssim": 0.5052236318588257,
+    "lpips": 0.80078125
+  },
+  {
+    "step": 44,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 9.17206859588623,
+    "ssim": 0.5290237069129944,
+    "lpips": 0.765625
+  },
+  {
+    "step": 45,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 7.986241340637207,
+    "ssim": 0.46311861276626587,
+    "lpips": 0.80859375
+  },
+  {
+    "step": 46,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 8.409554481506348,
+    "ssim": 0.5229921936988831,
+    "lpips": 0.83203125
+  },
+  {
+    "step": 47,
+    "envmap_name": "GreenChair_01_white_env_0",
+    "psnr": 8.961942672729492,
+    "ssim": 0.5436590909957886,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 48,
+    "envmap_name": "GreenChair_01_env_0",
+    "psnr": 7.824524879455566,
+    "ssim": 0.4638727307319641,
+    "lpips": 0.83203125
+  },
+  {
+    "step": 49,
+    "envmap_name": "GreenChair_01_env_2",
+    "psnr": 8.346994400024414,
+    "ssim": 0.5163508653640747,
+    "lpips": 0.83984375
+  }
+]

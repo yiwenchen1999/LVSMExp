@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 21.6990966796875,
+    "ssim": 0.9082448482513428,
+    "lpips": 0.05078125
+  },
+  {
+    "step": 1,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 16.267253875732422,
+    "ssim": 0.8462586402893066,
+    "lpips": 0.0771484375
+  },
+  {
+    "step": 2,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 20.74615478515625,
+    "ssim": 0.9045619964599609,
+    "lpips": 0.05517578125
+  },
+  {
+    "step": 3,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 20.055973052978516,
+    "ssim": 0.8878237009048462,
+    "lpips": 0.0595703125
+  },
+  {
+    "step": 4,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 15.533629417419434,
+    "ssim": 0.8325183391571045,
+    "lpips": 0.0849609375
+  },
+  {
+    "step": 5,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 20.760604858398438,
+    "ssim": 0.9042603373527527,
+    "lpips": 0.0556640625
+  },
+  {
+    "step": 6,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 20.032302856445312,
+    "ssim": 0.8874962329864502,
+    "lpips": 0.059814453125
+  },
+  {
+    "step": 7,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 15.536150932312012,
+    "ssim": 0.8325246572494507,
+    "lpips": 0.0849609375
+  },
+  {
+    "step": 8,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 17.680564880371094,
+    "ssim": 0.8348718881607056,
+    "lpips": 0.083984375
+  },
+  {
+    "step": 9,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.576534271240234,
+    "ssim": 0.8038360476493835,
+    "lpips": 0.099609375
+  },
+  {
+    "step": 10,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 14.594345092773438,
+    "ssim": 0.7757098078727722,
+    "lpips": 0.11962890625
+  },
+  {
+    "step": 11,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 17.202781677246094,
+    "ssim": 0.821890115737915,
+    "lpips": 0.091796875
+  },
+  {
+    "step": 12,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.543426513671875,
+    "ssim": 0.8029847145080566,
+    "lpips": 0.099609375
+  },
+  {
+    "step": 13,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 14.594470977783203,
+    "ssim": 0.7757506966590881,
+    "lpips": 0.1201171875
+  },
+  {
+    "step": 14,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 17.1903018951416,
+    "ssim": 0.8215846419334412,
+    "lpips": 0.091796875
+  },
+  {
+    "step": 15,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.54427146911621,
+    "ssim": 0.8031736612319946,
+    "lpips": 0.099609375
+  },
+  {
+    "step": 16,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 14.027654647827148,
+    "ssim": 0.7473326921463013,
+    "lpips": 0.15234375
+  },
+  {
+    "step": 17,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 15.450616836547852,
+    "ssim": 0.766157865524292,
+    "lpips": 0.1455078125
+  },
+  {
+    "step": 18,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 13.925155639648438,
+    "ssim": 0.7300392389297485,
+    "lpips": 0.1875
+  },
+  {
+    "step": 19,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 12.699370384216309,
+    "ssim": 0.7141580581665039,
+    "lpips": 0.2265625
+  },
+  {
+    "step": 20,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 13.535110473632812,
+    "ssim": 0.7081910967826843,
+    "lpips": 0.2578125
+  },
+  {
+    "step": 21,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 13.185047149658203,
+    "ssim": 0.6963139176368713,
+    "lpips": 0.283203125
+  },
+  {
+    "step": 22,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 12.227165222167969,
+    "ssim": 0.6987832188606262,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 23,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 14.133153915405273,
+    "ssim": 0.7036846876144409,
+    "lpips": 0.34765625
+  },
+  {
+    "step": 24,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 13.328079223632812,
+    "ssim": 0.6486330032348633,
+    "lpips": 0.4375
+  },
+  {
+    "step": 25,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 11.781291961669922,
+    "ssim": 0.6043403744697571,
+    "lpips": 0.52734375
+  },
+  {
+    "step": 26,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 13.33043098449707,
+    "ssim": 0.5717164278030396,
+    "lpips": 0.578125
+  },
+  {
+    "step": 27,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 11.53626823425293,
+    "ssim": 0.4949267506599426,
+    "lpips": 0.6328125
+  },
+  {
+    "step": 28,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 8.975303649902344,
+    "ssim": 0.4374110996723175,
+    "lpips": 0.703125
+  },
+  {
+    "step": 29,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 8.406984329223633,
+    "ssim": 0.43504470586776733,
+    "lpips": 0.75
+  },
+  {
+    "step": 30,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 7.033563613891602,
+    "ssim": 0.45939040184020996,
+    "lpips": 0.7890625
+  },
+  {
+    "step": 31,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 6.377307891845703,
+    "ssim": 0.5015144348144531,
+    "lpips": 0.80859375
+  },
+  {
+    "step": 32,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 6.313425064086914,
+    "ssim": 0.5225731730461121,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 33,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 6.024539947509766,
+    "ssim": 0.5295939445495605,
+    "lpips": 0.828125
+  },
+  {
+    "step": 34,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.861486911773682,
+    "ssim": 0.5350227952003479,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 35,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 5.849920272827148,
+    "ssim": 0.5416176915168762,
+    "lpips": 0.83203125
+  },
+  {
+    "step": 36,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 5.695438385009766,
+    "ssim": 0.5418542623519897,
+    "lpips": 0.83203125
+  },
+  {
+    "step": 37,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.615984916687012,
+    "ssim": 0.5452433824539185,
+    "lpips": 0.828125
+  },
+  {
+    "step": 38,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 5.616778373718262,
+    "ssim": 0.544712483882904,
+    "lpips": 0.828125
+  },
+  {
+    "step": 39,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 5.498775959014893,
+    "ssim": 0.5386256575584412,
+    "lpips": 0.828125
+  },
+  {
+    "step": 40,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.421792984008789,
+    "ssim": 0.5369800329208374,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 41,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 5.456879615783691,
+    "ssim": 0.5345717072486877,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 42,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 5.3815107345581055,
+    "ssim": 0.5299322605133057,
+    "lpips": 0.82421875
+  },
+  {
+    "step": 43,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.344041347503662,
+    "ssim": 0.5309810638427734,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 44,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 5.414917945861816,
+    "ssim": 0.529779314994812,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 45,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 5.421453952789307,
+    "ssim": 0.527233362197876,
+    "lpips": 0.8125
+  },
+  {
+    "step": 46,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.461019992828369,
+    "ssim": 0.5299755334854126,
+    "lpips": 0.8046875
+  },
+  {
+    "step": 47,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 5.653297424316406,
+    "ssim": 0.530117392539978,
+    "lpips": 0.8046875
+  },
+  {
+    "step": 48,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 5.739688873291016,
+    "ssim": 0.5276311635971069,
+    "lpips": 0.796875
+  },
+  {
+    "step": 49,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.803946495056152,
+    "ssim": 0.5271645784378052,
+    "lpips": 0.79296875
+  }
+]

@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 21.908920288085938,
+    "ssim": 0.8926874399185181,
+    "lpips": 0.0751953125
+  },
+  {
+    "step": 1,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 21.500276565551758,
+    "ssim": 0.8637184500694275,
+    "lpips": 0.09619140625
+  },
+  {
+    "step": 2,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 28.008337020874023,
+    "ssim": 0.9386888742446899,
+    "lpips": 0.06689453125
+  },
+  {
+    "step": 3,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 21.075942993164062,
+    "ssim": 0.8760917782783508,
+    "lpips": 0.10400390625
+  },
+  {
+    "step": 4,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 19.495670318603516,
+    "ssim": 0.8414874076843262,
+    "lpips": 0.11865234375
+  },
+  {
+    "step": 5,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 26.929210662841797,
+    "ssim": 0.9196824431419373,
+    "lpips": 0.08447265625
+  },
+  {
+    "step": 6,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 20.13480567932129,
+    "ssim": 0.8699716329574585,
+    "lpips": 0.1181640625
+  },
+  {
+    "step": 7,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 18.108022689819336,
+    "ssim": 0.8289502859115601,
+    "lpips": 0.1318359375
+  },
+  {
+    "step": 8,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 23.445941925048828,
+    "ssim": 0.8920588493347168,
+    "lpips": 0.1005859375
+  },
+  {
+    "step": 9,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 19.299869537353516,
+    "ssim": 0.8461235165596008,
+    "lpips": 0.1328125
+  },
+  {
+    "step": 10,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 17.726547241210938,
+    "ssim": 0.8169395923614502,
+    "lpips": 0.1455078125
+  },
+  {
+    "step": 11,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 23.21240234375,
+    "ssim": 0.8672977089881897,
+    "lpips": 0.1142578125
+  },
+  {
+    "step": 12,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 19.061321258544922,
+    "ssim": 0.8312232494354248,
+    "lpips": 0.1474609375
+  },
+  {
+    "step": 13,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 17.824575424194336,
+    "ssim": 0.8120572566986084,
+    "lpips": 0.1611328125
+  },
+  {
+    "step": 14,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 22.241024017333984,
+    "ssim": 0.8528220057487488,
+    "lpips": 0.1328125
+  },
+  {
+    "step": 15,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 18.6324405670166,
+    "ssim": 0.8284814953804016,
+    "lpips": 0.1630859375
+  },
+  {
+    "step": 16,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 17.668121337890625,
+    "ssim": 0.811432957649231,
+    "lpips": 0.173828125
+  },
+  {
+    "step": 17,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 20.956539154052734,
+    "ssim": 0.8443586230278015,
+    "lpips": 0.150390625
+  },
+  {
+    "step": 18,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 18.546302795410156,
+    "ssim": 0.8277856111526489,
+    "lpips": 0.17578125
+  },
+  {
+    "step": 19,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 17.42827033996582,
+    "ssim": 0.8111860156059265,
+    "lpips": 0.1875
+  },
+  {
+    "step": 20,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 19.953462600708008,
+    "ssim": 0.837807297706604,
+    "lpips": 0.1669921875
+  },
+  {
+    "step": 21,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 18.302120208740234,
+    "ssim": 0.8255531787872314,
+    "lpips": 0.189453125
+  },
+  {
+    "step": 22,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 17.46068572998047,
+    "ssim": 0.8123548626899719,
+    "lpips": 0.197265625
+  },
+  {
+    "step": 23,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 18.402156829833984,
+    "ssim": 0.8314895629882812,
+    "lpips": 0.181640625
+  },
+  {
+    "step": 24,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 16.584762573242188,
+    "ssim": 0.8138547539710999,
+    "lpips": 0.2001953125
+  },
+  {
+    "step": 25,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 16.111103057861328,
+    "ssim": 0.8033981323242188,
+    "lpips": 0.20703125
+  },
+  {
+    "step": 26,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 17.142871856689453,
+    "ssim": 0.8233330249786377,
+    "lpips": 0.193359375
+  },
+  {
+    "step": 27,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 15.775108337402344,
+    "ssim": 0.8068217039108276,
+    "lpips": 0.208984375
+  },
+  {
+    "step": 28,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 15.793768882751465,
+    "ssim": 0.8011107444763184,
+    "lpips": 0.2158203125
+  },
+  {
+    "step": 29,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 16.670778274536133,
+    "ssim": 0.8175184726715088,
+    "lpips": 0.203125
+  },
+  {
+    "step": 30,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 15.512943267822266,
+    "ssim": 0.8034206032752991,
+    "lpips": 0.2138671875
+  },
+  {
+    "step": 31,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 15.57911491394043,
+    "ssim": 0.7961936593055725,
+    "lpips": 0.220703125
+  },
+  {
+    "step": 32,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 16.123607635498047,
+    "ssim": 0.8062796592712402,
+    "lpips": 0.20703125
+  },
+  {
+    "step": 33,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 15.172073364257812,
+    "ssim": 0.7914566397666931,
+    "lpips": 0.220703125
+  },
+  {
+    "step": 34,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 15.245573043823242,
+    "ssim": 0.7883256077766418,
+    "lpips": 0.2265625
+  },
+  {
+    "step": 35,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 15.626301765441895,
+    "ssim": 0.7972413301467896,
+    "lpips": 0.2119140625
+  },
+  {
+    "step": 36,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 14.783897399902344,
+    "ssim": 0.7838265299797058,
+    "lpips": 0.2265625
+  },
+  {
+    "step": 37,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 14.826976776123047,
+    "ssim": 0.7831834554672241,
+    "lpips": 0.232421875
+  },
+  {
+    "step": 38,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 14.98503303527832,
+    "ssim": 0.7927203178405762,
+    "lpips": 0.216796875
+  },
+  {
+    "step": 39,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 14.324665069580078,
+    "ssim": 0.7807521820068359,
+    "lpips": 0.2314453125
+  },
+  {
+    "step": 40,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 14.386388778686523,
+    "ssim": 0.781569242477417,
+    "lpips": 0.2353515625
+  },
+  {
+    "step": 41,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 14.31264591217041,
+    "ssim": 0.7876904606819153,
+    "lpips": 0.220703125
+  },
+  {
+    "step": 42,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 13.899765014648438,
+    "ssim": 0.7796075940132141,
+    "lpips": 0.232421875
+  },
+  {
+    "step": 43,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 13.87860107421875,
+    "ssim": 0.7793095707893372,
+    "lpips": 0.236328125
+  },
+  {
+    "step": 44,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 13.62297248840332,
+    "ssim": 0.7863245010375977,
+    "lpips": 0.22265625
+  },
+  {
+    "step": 45,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 13.322230339050293,
+    "ssim": 0.7790157794952393,
+    "lpips": 0.234375
+  },
+  {
+    "step": 46,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 13.330719947814941,
+    "ssim": 0.7753615379333496,
+    "lpips": 0.2392578125
+  },
+  {
+    "step": 47,
+    "envmap_name": "GothicCabinet_01_env_2",
+    "psnr": 13.037736892700195,
+    "ssim": 0.7844858765602112,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 48,
+    "envmap_name": "GothicCabinet_01_env_0",
+    "psnr": 12.911988258361816,
+    "ssim": 0.776964545249939,
+    "lpips": 0.236328125
+  },
+  {
+    "step": 49,
+    "envmap_name": "GothicCabinet_01_env_1",
+    "psnr": 12.915882110595703,
+    "ssim": 0.7717101573944092,
+    "lpips": 0.240234375
+  }
+]

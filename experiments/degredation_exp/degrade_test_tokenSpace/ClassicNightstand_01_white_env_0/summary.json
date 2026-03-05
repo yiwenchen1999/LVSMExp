@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 22.340208053588867,
+    "ssim": 0.8068760633468628,
+    "lpips": 0.1328125
+  },
+  {
+    "step": 1,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 17.856910705566406,
+    "ssim": 0.8205471038818359,
+    "lpips": 0.130859375
+  },
+  {
+    "step": 2,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 18.33739471435547,
+    "ssim": 0.7432414889335632,
+    "lpips": 0.1435546875
+  },
+  {
+    "step": 3,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 17.9668025970459,
+    "ssim": 0.6957511901855469,
+    "lpips": 0.154296875
+  },
+  {
+    "step": 4,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 21.01055908203125,
+    "ssim": 0.8484596014022827,
+    "lpips": 0.11767578125
+  },
+  {
+    "step": 5,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 17.978946685791016,
+    "ssim": 0.7445930242538452,
+    "lpips": 0.154296875
+  },
+  {
+    "step": 6,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 18.037145614624023,
+    "ssim": 0.7081396579742432,
+    "lpips": 0.16796875
+  },
+  {
+    "step": 7,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 18.087589263916016,
+    "ssim": 0.8047525882720947,
+    "lpips": 0.138671875
+  },
+  {
+    "step": 8,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 15.131366729736328,
+    "ssim": 0.6776901483535767,
+    "lpips": 0.20703125
+  },
+  {
+    "step": 9,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 14.112083435058594,
+    "ssim": 0.6649847626686096,
+    "lpips": 0.22265625
+  },
+  {
+    "step": 10,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 13.760364532470703,
+    "ssim": 0.6989216804504395,
+    "lpips": 0.19921875
+  },
+  {
+    "step": 11,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 14.000629425048828,
+    "ssim": 0.6648737192153931,
+    "lpips": 0.236328125
+  },
+  {
+    "step": 12,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 12.71607494354248,
+    "ssim": 0.633758544921875,
+    "lpips": 0.25
+  },
+  {
+    "step": 13,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 11.279450416564941,
+    "ssim": 0.6459111571311951,
+    "lpips": 0.271484375
+  },
+  {
+    "step": 14,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 12.149508476257324,
+    "ssim": 0.6443702578544617,
+    "lpips": 0.28515625
+  },
+  {
+    "step": 15,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 11.02576732635498,
+    "ssim": 0.6105594635009766,
+    "lpips": 0.29296875
+  },
+  {
+    "step": 16,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 11.18613052368164,
+    "ssim": 0.6434488296508789,
+    "lpips": 0.275390625
+  },
+  {
+    "step": 17,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 12.13660717010498,
+    "ssim": 0.6442301869392395,
+    "lpips": 0.28515625
+  },
+  {
+    "step": 18,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 10.268181800842285,
+    "ssim": 0.6120463013648987,
+    "lpips": 0.31640625
+  },
+  {
+    "step": 19,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 10.194049835205078,
+    "ssim": 0.6250433921813965,
+    "lpips": 0.337890625
+  },
+  {
+    "step": 20,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 10.484621047973633,
+    "ssim": 0.6580682992935181,
+    "lpips": 0.369140625
+  },
+  {
+    "step": 21,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 8.934250831604004,
+    "ssim": 0.585019588470459,
+    "lpips": 0.390625
+  },
+  {
+    "step": 22,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 9.47347354888916,
+    "ssim": 0.5955141186714172,
+    "lpips": 0.443359375
+  },
+  {
+    "step": 23,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 10.595218658447266,
+    "ssim": 0.5901453495025635,
+    "lpips": 0.49609375
+  },
+  {
+    "step": 24,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 9.401042938232422,
+    "ssim": 0.42964279651641846,
+    "lpips": 0.6328125
+  },
+  {
+    "step": 25,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 9.015329360961914,
+    "ssim": 0.39391058683395386,
+    "lpips": 0.69921875
+  },
+  {
+    "step": 26,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 9.04050064086914,
+    "ssim": 0.38571813702583313,
+    "lpips": 0.72265625
+  },
+  {
+    "step": 27,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.701573371887207,
+    "ssim": 0.2843121886253357,
+    "lpips": 0.75390625
+  },
+  {
+    "step": 28,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 7.4372687339782715,
+    "ssim": 0.31930530071258545,
+    "lpips": 0.74609375
+  },
+  {
+    "step": 29,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 7.61482048034668,
+    "ssim": 0.3861880898475647,
+    "lpips": 0.73046875
+  },
+  {
+    "step": 30,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 6.881687164306641,
+    "ssim": 0.32764554023742676,
+    "lpips": 0.75
+  },
+  {
+    "step": 31,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 6.817840576171875,
+    "ssim": 0.38383811712265015,
+    "lpips": 0.75390625
+  },
+  {
+    "step": 32,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 7.486810684204102,
+    "ssim": 0.47000283002853394,
+    "lpips": 0.73828125
+  },
+  {
+    "step": 33,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.022032737731934,
+    "ssim": 0.3884999454021454,
+    "lpips": 0.765625
+  },
+  {
+    "step": 34,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 6.994675636291504,
+    "ssim": 0.4290253818035126,
+    "lpips": 0.75
+  },
+  {
+    "step": 35,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 7.619989395141602,
+    "ssim": 0.49897271394729614,
+    "lpips": 0.73828125
+  },
+  {
+    "step": 36,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.061326503753662,
+    "ssim": 0.39874616265296936,
+    "lpips": 0.76171875
+  },
+  {
+    "step": 37,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 7.058694362640381,
+    "ssim": 0.43244171142578125,
+    "lpips": 0.75390625
+  },
+  {
+    "step": 38,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 7.796897888183594,
+    "ssim": 0.49404168128967285,
+    "lpips": 0.75
+  },
+  {
+    "step": 39,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.238887310028076,
+    "ssim": 0.3996609151363373,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 40,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 7.441773414611816,
+    "ssim": 0.4395904541015625,
+    "lpips": 0.76953125
+  },
+  {
+    "step": 41,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 8.346400260925293,
+    "ssim": 0.4929841160774231,
+    "lpips": 0.75390625
+  },
+  {
+    "step": 42,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.5834150314331055,
+    "ssim": 0.3925769329071045,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 43,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 7.893172264099121,
+    "ssim": 0.4094933867454529,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 44,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 8.868383407592773,
+    "ssim": 0.44515934586524963,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 45,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.750260829925537,
+    "ssim": 0.3569885194301605,
+    "lpips": 0.76953125
+  },
+  {
+    "step": 46,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 7.954549312591553,
+    "ssim": 0.378778338432312,
+    "lpips": 0.765625
+  },
+  {
+    "step": 47,
+    "envmap_name": "ClassicNightstand_01_env_2",
+    "psnr": 8.916088104248047,
+    "ssim": 0.42095446586608887,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 48,
+    "envmap_name": "ClassicNightstand_01_env_0",
+    "psnr": 7.702419281005859,
+    "ssim": 0.34996771812438965,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 49,
+    "envmap_name": "ClassicNightstand_01_env_1",
+    "psnr": 7.894531726837158,
+    "ssim": 0.3859137296676636,
+    "lpips": 0.7734375
+  }
+]

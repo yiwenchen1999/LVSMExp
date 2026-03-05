@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 21.543048858642578,
+    "ssim": 0.9074306488037109,
+    "lpips": 0.055419921875
+  },
+  {
+    "step": 1,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 16.308364868164062,
+    "ssim": 0.8409786224365234,
+    "lpips": 0.0810546875
+  },
+  {
+    "step": 2,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 27.969921112060547,
+    "ssim": 0.9470404386520386,
+    "lpips": 0.03955078125
+  },
+  {
+    "step": 3,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 21.495853424072266,
+    "ssim": 0.9031383395195007,
+    "lpips": 0.057373046875
+  },
+  {
+    "step": 4,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 16.851001739501953,
+    "ssim": 0.848251461982727,
+    "lpips": 0.0771484375
+  },
+  {
+    "step": 5,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 23.51434326171875,
+    "ssim": 0.8868902921676636,
+    "lpips": 0.06640625
+  },
+  {
+    "step": 6,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 17.992841720581055,
+    "ssim": 0.8263984322547913,
+    "lpips": 0.09375
+  },
+  {
+    "step": 7,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 15.223485946655273,
+    "ssim": 0.7905838489532471,
+    "lpips": 0.109375
+  },
+  {
+    "step": 8,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 18.202747344970703,
+    "ssim": 0.7972742319107056,
+    "lpips": 0.1318359375
+  },
+  {
+    "step": 9,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 15.29990005493164,
+    "ssim": 0.7593773603439331,
+    "lpips": 0.1474609375
+  },
+  {
+    "step": 10,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 13.13806438446045,
+    "ssim": 0.7230613231658936,
+    "lpips": 0.189453125
+  },
+  {
+    "step": 11,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 16.811450958251953,
+    "ssim": 0.7610915899276733,
+    "lpips": 0.1865234375
+  },
+  {
+    "step": 12,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 14.206887245178223,
+    "ssim": 0.7297011017799377,
+    "lpips": 0.189453125
+  },
+  {
+    "step": 13,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 13.050825119018555,
+    "ssim": 0.7211626768112183,
+    "lpips": 0.193359375
+  },
+  {
+    "step": 14,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 16.812517166137695,
+    "ssim": 0.7609922885894775,
+    "lpips": 0.1865234375
+  },
+  {
+    "step": 15,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 14.21057415008545,
+    "ssim": 0.7297242879867554,
+    "lpips": 0.189453125
+  },
+  {
+    "step": 16,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 13.045245170593262,
+    "ssim": 0.7211652994155884,
+    "lpips": 0.193359375
+  },
+  {
+    "step": 17,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 16.804458618164062,
+    "ssim": 0.7609570026397705,
+    "lpips": 0.1865234375
+  },
+  {
+    "step": 18,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 14.012356758117676,
+    "ssim": 0.7258521318435669,
+    "lpips": 0.21875
+  },
+  {
+    "step": 19,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 12.308126449584961,
+    "ssim": 0.711463451385498,
+    "lpips": 0.25
+  },
+  {
+    "step": 20,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 15.760966300964355,
+    "ssim": 0.7362198829650879,
+    "lpips": 0.267578125
+  },
+  {
+    "step": 21,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 13.43410587310791,
+    "ssim": 0.7215642333030701,
+    "lpips": 0.28515625
+  },
+  {
+    "step": 22,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 11.756669998168945,
+    "ssim": 0.7056587934494019,
+    "lpips": 0.328125
+  },
+  {
+    "step": 23,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 15.755069732666016,
+    "ssim": 0.6938362717628479,
+    "lpips": 0.419921875
+  },
+  {
+    "step": 24,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 13.12509536743164,
+    "ssim": 0.6258077621459961,
+    "lpips": 0.5234375
+  },
+  {
+    "step": 25,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 11.203878402709961,
+    "ssim": 0.5683449506759644,
+    "lpips": 0.5703125
+  },
+  {
+    "step": 26,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 12.965497970581055,
+    "ssim": 0.5444213151931763,
+    "lpips": 0.625
+  },
+  {
+    "step": 27,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 10.191825866699219,
+    "ssim": 0.5146892070770264,
+    "lpips": 0.67578125
+  },
+  {
+    "step": 28,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 8.533576011657715,
+    "ssim": 0.4777662754058838,
+    "lpips": 0.75
+  },
+  {
+    "step": 29,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 8.368001937866211,
+    "ssim": 0.5250272154808044,
+    "lpips": 0.796875
+  },
+  {
+    "step": 30,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 6.743394374847412,
+    "ssim": 0.5275182723999023,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 31,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 6.137911796569824,
+    "ssim": 0.523288369178772,
+    "lpips": 0.8125
+  },
+  {
+    "step": 32,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 5.852287292480469,
+    "ssim": 0.5460342764854431,
+    "lpips": 0.83203125
+  },
+  {
+    "step": 33,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 5.422560691833496,
+    "ssim": 0.5223096609115601,
+    "lpips": 0.83203125
+  },
+  {
+    "step": 34,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 5.277506351470947,
+    "ssim": 0.5191919207572937,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 35,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 5.156083583831787,
+    "ssim": 0.52376389503479,
+    "lpips": 0.828125
+  },
+  {
+    "step": 36,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 4.973875999450684,
+    "ssim": 0.5066429972648621,
+    "lpips": 0.828125
+  },
+  {
+    "step": 37,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 4.959085464477539,
+    "ssim": 0.5094988346099854,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 38,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 4.8967485427856445,
+    "ssim": 0.5086287260055542,
+    "lpips": 0.828125
+  },
+  {
+    "step": 39,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 4.782626152038574,
+    "ssim": 0.4939119219779968,
+    "lpips": 0.82421875
+  },
+  {
+    "step": 40,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 4.8039937019348145,
+    "ssim": 0.4989609122276306,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 41,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 4.757897853851318,
+    "ssim": 0.49729979038238525,
+    "lpips": 0.828125
+  },
+  {
+    "step": 42,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 4.695491313934326,
+    "ssim": 0.48589739203453064,
+    "lpips": 0.82421875
+  },
+  {
+    "step": 43,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 4.7575907707214355,
+    "ssim": 0.4936366379261017,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 44,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 4.733207702636719,
+    "ssim": 0.49288851022720337,
+    "lpips": 0.82421875
+  },
+  {
+    "step": 45,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 4.684985160827637,
+    "ssim": 0.4824528694152832,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 46,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 4.741402626037598,
+    "ssim": 0.4898485243320465,
+    "lpips": 0.8125
+  },
+  {
+    "step": 47,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 4.75465202331543,
+    "ssim": 0.4910357594490051,
+    "lpips": 0.8203125
+  },
+  {
+    "step": 48,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 4.722023010253906,
+    "ssim": 0.48201924562454224,
+    "lpips": 0.81640625
+  },
+  {
+    "step": 49,
+    "envmap_name": "CoffeeTable_01_env_1",
+    "psnr": 4.800766468048096,
+    "ssim": 0.4904171824455261,
+    "lpips": 0.80859375
+  }
+]

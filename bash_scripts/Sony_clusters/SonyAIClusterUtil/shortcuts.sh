@@ -16,6 +16,11 @@ rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
   /music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense \
   chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/
+
+rsync -avh --partial --inplace --progress \
+  -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
+  mfml1:/music-shared-disk/group/ct/yiwen/codes/LVSMExp/experiments/degrade_test_tokenSpace \
+  experiments/degredation_exp/
   
 
 # 直接运行命令

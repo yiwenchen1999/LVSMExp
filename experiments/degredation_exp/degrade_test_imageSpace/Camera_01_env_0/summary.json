@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 16.369007110595703,
+    "ssim": 0.8234277963638306,
+    "lpips": 0.12451171875
+  },
+  {
+    "step": 1,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 15.475692749023438,
+    "ssim": 0.7812894582748413,
+    "lpips": 0.1650390625
+  },
+  {
+    "step": 2,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 14.602377891540527,
+    "ssim": 0.768248438835144,
+    "lpips": 0.203125
+  },
+  {
+    "step": 3,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 12.979070663452148,
+    "ssim": 0.7347559928894043,
+    "lpips": 0.234375
+  },
+  {
+    "step": 4,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 13.2628173828125,
+    "ssim": 0.7396597862243652,
+    "lpips": 0.2421875
+  },
+  {
+    "step": 5,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.989198684692383,
+    "ssim": 0.7551196813583374,
+    "lpips": 0.244140625
+  },
+  {
+    "step": 6,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 12.37857437133789,
+    "ssim": 0.7289370894432068,
+    "lpips": 0.263671875
+  },
+  {
+    "step": 7,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 12.877994537353516,
+    "ssim": 0.736115574836731,
+    "lpips": 0.263671875
+  },
+  {
+    "step": 8,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.665994644165039,
+    "ssim": 0.750188946723938,
+    "lpips": 0.2578125
+  },
+  {
+    "step": 9,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 11.971080780029297,
+    "ssim": 0.7194632291793823,
+    "lpips": 0.279296875
+  },
+  {
+    "step": 10,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 12.521688461303711,
+    "ssim": 0.7263834476470947,
+    "lpips": 0.27734375
+  },
+  {
+    "step": 11,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.491949081420898,
+    "ssim": 0.7406594753265381,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 12,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 11.588563919067383,
+    "ssim": 0.7132773995399475,
+    "lpips": 0.291015625
+  },
+  {
+    "step": 13,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 12.03573989868164,
+    "ssim": 0.7194379568099976,
+    "lpips": 0.2890625
+  },
+  {
+    "step": 14,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.202493667602539,
+    "ssim": 0.7372408509254456,
+    "lpips": 0.27734375
+  },
+  {
+    "step": 15,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 11.15215015411377,
+    "ssim": 0.7071634531021118,
+    "lpips": 0.30078125
+  },
+  {
+    "step": 16,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 11.85987377166748,
+    "ssim": 0.7170410752296448,
+    "lpips": 0.29296875
+  },
+  {
+    "step": 17,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.134021759033203,
+    "ssim": 0.7296355962753296,
+    "lpips": 0.28125
+  },
+  {
+    "step": 18,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 11.300820350646973,
+    "ssim": 0.6993106603622437,
+    "lpips": 0.302734375
+  },
+  {
+    "step": 19,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 12.068185806274414,
+    "ssim": 0.7094230651855469,
+    "lpips": 0.298828125
+  },
+  {
+    "step": 20,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.327491760253906,
+    "ssim": 0.7303466200828552,
+    "lpips": 0.2890625
+  },
+  {
+    "step": 21,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 11.520004272460938,
+    "ssim": 0.6989324688911438,
+    "lpips": 0.3125
+  },
+  {
+    "step": 22,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 12.057544708251953,
+    "ssim": 0.704692006111145,
+    "lpips": 0.3125
+  },
+  {
+    "step": 23,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 13.259931564331055,
+    "ssim": 0.7241277694702148,
+    "lpips": 0.302734375
+  },
+  {
+    "step": 24,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 11.038045883178711,
+    "ssim": 0.6849957704544067,
+    "lpips": 0.326171875
+  },
+  {
+    "step": 25,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 11.717161178588867,
+    "ssim": 0.6975230574607849,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 26,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 12.962018966674805,
+    "ssim": 0.7211712598800659,
+    "lpips": 0.30859375
+  },
+  {
+    "step": 27,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 10.871639251708984,
+    "ssim": 0.6883144378662109,
+    "lpips": 0.328125
+  },
+  {
+    "step": 28,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 11.349237442016602,
+    "ssim": 0.6950894594192505,
+    "lpips": 0.32421875
+  },
+  {
+    "step": 29,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 12.775543212890625,
+    "ssim": 0.7191058993339539,
+    "lpips": 0.314453125
+  },
+  {
+    "step": 30,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 10.564528465270996,
+    "ssim": 0.6834420561790466,
+    "lpips": 0.333984375
+  },
+  {
+    "step": 31,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 11.00441837310791,
+    "ssim": 0.6876484751701355,
+    "lpips": 0.328125
+  },
+  {
+    "step": 32,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 12.361172676086426,
+    "ssim": 0.7077411413192749,
+    "lpips": 0.326171875
+  },
+  {
+    "step": 33,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 9.956367492675781,
+    "ssim": 0.6624295115470886,
+    "lpips": 0.330078125
+  },
+  {
+    "step": 34,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 10.573076248168945,
+    "ssim": 0.6733359098434448,
+    "lpips": 0.328125
+  },
+  {
+    "step": 35,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 11.699413299560547,
+    "ssim": 0.6905640363693237,
+    "lpips": 0.32421875
+  },
+  {
+    "step": 36,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 9.896286010742188,
+    "ssim": 0.659402072429657,
+    "lpips": 0.328125
+  },
+  {
+    "step": 37,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 10.602807998657227,
+    "ssim": 0.6753529906272888,
+    "lpips": 0.328125
+  },
+  {
+    "step": 38,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 11.614805221557617,
+    "ssim": 0.6913118958473206,
+    "lpips": 0.322265625
+  },
+  {
+    "step": 39,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 10.034507751464844,
+    "ssim": 0.6674866080284119,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 40,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 10.746589660644531,
+    "ssim": 0.6851001977920532,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 41,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 11.986335754394531,
+    "ssim": 0.7069240212440491,
+    "lpips": 0.31640625
+  },
+  {
+    "step": 42,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 10.33865737915039,
+    "ssim": 0.6831475496292114,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 43,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 11.045915603637695,
+    "ssim": 0.6911161541938782,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 44,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 12.151625633239746,
+    "ssim": 0.6955945491790771,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 45,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 10.50281810760498,
+    "ssim": 0.6688663363456726,
+    "lpips": 0.330078125
+  },
+  {
+    "step": 46,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 10.96489429473877,
+    "ssim": 0.6839700937271118,
+    "lpips": 0.33203125
+  },
+  {
+    "step": 47,
+    "envmap_name": "Camera_01_white_env_0",
+    "psnr": 12.008319854736328,
+    "ssim": 0.7010490894317627,
+    "lpips": 0.328125
+  },
+  {
+    "step": 48,
+    "envmap_name": "Camera_01_env_1",
+    "psnr": 10.289095878601074,
+    "ssim": 0.6728631854057312,
+    "lpips": 0.3359375
+  },
+  {
+    "step": 49,
+    "envmap_name": "Camera_01_env_2",
+    "psnr": 10.842928886413574,
+    "ssim": 0.6829349994659424,
+    "lpips": 0.333984375
+  }
+]

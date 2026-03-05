@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 19.865528106689453,
+    "ssim": 0.867778480052948,
+    "lpips": 0.0703125
+  },
+  {
+    "step": 1,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 26.0559024810791,
+    "ssim": 0.9261246919631958,
+    "lpips": 0.04833984375
+  },
+  {
+    "step": 2,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 26.433902740478516,
+    "ssim": 0.9349173307418823,
+    "lpips": 0.056884765625
+  },
+  {
+    "step": 3,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 18.454734802246094,
+    "ssim": 0.8349963426589966,
+    "lpips": 0.0888671875
+  },
+  {
+    "step": 4,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 22.720844268798828,
+    "ssim": 0.8915846347808838,
+    "lpips": 0.0693359375
+  },
+  {
+    "step": 5,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 20.19681739807129,
+    "ssim": 0.8475169539451599,
+    "lpips": 0.1064453125
+  },
+  {
+    "step": 6,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 15.200281143188477,
+    "ssim": 0.7425809502601624,
+    "lpips": 0.173828125
+  },
+  {
+    "step": 7,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 15.273173332214355,
+    "ssim": 0.766700267791748,
+    "lpips": 0.1748046875
+  },
+  {
+    "step": 8,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 15.194355010986328,
+    "ssim": 0.763243556022644,
+    "lpips": 0.2109375
+  },
+  {
+    "step": 9,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 13.624893188476562,
+    "ssim": 0.7215200066566467,
+    "lpips": 0.22265625
+  },
+  {
+    "step": 10,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 13.720046997070312,
+    "ssim": 0.7468243837356567,
+    "lpips": 0.220703125
+  },
+  {
+    "step": 11,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 15.066940307617188,
+    "ssim": 0.7618327736854553,
+    "lpips": 0.21484375
+  },
+  {
+    "step": 12,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 13.207350730895996,
+    "ssim": 0.723391592502594,
+    "lpips": 0.251953125
+  },
+  {
+    "step": 13,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 12.88878345489502,
+    "ssim": 0.7430591583251953,
+    "lpips": 0.25
+  },
+  {
+    "step": 14,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 14.15898323059082,
+    "ssim": 0.7586474418640137,
+    "lpips": 0.24609375
+  },
+  {
+    "step": 15,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 13.114402770996094,
+    "ssim": 0.7233358025550842,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 16,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 12.151800155639648,
+    "ssim": 0.7373627424240112,
+    "lpips": 0.275390625
+  },
+  {
+    "step": 17,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 13.3751220703125,
+    "ssim": 0.7530289888381958,
+    "lpips": 0.275390625
+  },
+  {
+    "step": 18,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 12.01009750366211,
+    "ssim": 0.7127256393432617,
+    "lpips": 0.30859375
+  },
+  {
+    "step": 19,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 11.031557083129883,
+    "ssim": 0.7073293328285217,
+    "lpips": 0.345703125
+  },
+  {
+    "step": 20,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 11.464092254638672,
+    "ssim": 0.7015185952186584,
+    "lpips": 0.4140625
+  },
+  {
+    "step": 21,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 10.987092018127441,
+    "ssim": 0.6443413496017456,
+    "lpips": 0.50390625
+  },
+  {
+    "step": 22,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 10.255435943603516,
+    "ssim": 0.575109601020813,
+    "lpips": 0.58984375
+  },
+  {
+    "step": 23,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 10.907747268676758,
+    "ssim": 0.5730246305465698,
+    "lpips": 0.5859375
+  },
+  {
+    "step": 24,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 9.914137840270996,
+    "ssim": 0.5075663924217224,
+    "lpips": 0.625
+  },
+  {
+    "step": 25,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 9.109600067138672,
+    "ssim": 0.46908754110336304,
+    "lpips": 0.65234375
+  },
+  {
+    "step": 26,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 9.86872673034668,
+    "ssim": 0.49055197834968567,
+    "lpips": 0.66796875
+  },
+  {
+    "step": 27,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 9.220014572143555,
+    "ssim": 0.440656840801239,
+    "lpips": 0.68359375
+  },
+  {
+    "step": 28,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 8.892499923706055,
+    "ssim": 0.43477678298950195,
+    "lpips": 0.69140625
+  },
+  {
+    "step": 29,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 9.852150917053223,
+    "ssim": 0.4449559450149536,
+    "lpips": 0.703125
+  },
+  {
+    "step": 30,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 9.190343856811523,
+    "ssim": 0.44946566224098206,
+    "lpips": 0.7265625
+  },
+  {
+    "step": 31,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 8.709047317504883,
+    "ssim": 0.4972960352897644,
+    "lpips": 0.7265625
+  },
+  {
+    "step": 32,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 9.142538070678711,
+    "ssim": 0.5308674573898315,
+    "lpips": 0.73828125
+  },
+  {
+    "step": 33,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 8.531621932983398,
+    "ssim": 0.529899537563324,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 34,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 8.0506010055542,
+    "ssim": 0.5505780577659607,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 35,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 8.133663177490234,
+    "ssim": 0.5783119201660156,
+    "lpips": 0.765625
+  },
+  {
+    "step": 36,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 7.534513473510742,
+    "ssim": 0.5532748699188232,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 37,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 7.231236457824707,
+    "ssim": 0.5578861236572266,
+    "lpips": 0.76953125
+  },
+  {
+    "step": 38,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 7.394972324371338,
+    "ssim": 0.5760473608970642,
+    "lpips": 0.76953125
+  },
+  {
+    "step": 39,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 7.047967910766602,
+    "ssim": 0.5354489088058472,
+    "lpips": 0.78125
+  },
+  {
+    "step": 40,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 6.911966323852539,
+    "ssim": 0.5385224223136902,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 41,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 7.091204643249512,
+    "ssim": 0.5612926483154297,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 42,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 6.856754779815674,
+    "ssim": 0.5229931473731995,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 43,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 6.742417335510254,
+    "ssim": 0.5318151116371155,
+    "lpips": 0.76953125
+  },
+  {
+    "step": 44,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 6.897339820861816,
+    "ssim": 0.5602982044219971,
+    "lpips": 0.765625
+  },
+  {
+    "step": 45,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 6.68921422958374,
+    "ssim": 0.5240330696105957,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 46,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 6.606241226196289,
+    "ssim": 0.5368263721466064,
+    "lpips": 0.765625
+  },
+  {
+    "step": 47,
+    "envmap_name": "Drill_01_white_env_0",
+    "psnr": 6.732943058013916,
+    "ssim": 0.5661258101463318,
+    "lpips": 0.765625
+  },
+  {
+    "step": 48,
+    "envmap_name": "Drill_01_env_0",
+    "psnr": 6.551019668579102,
+    "ssim": 0.5297742486000061,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 49,
+    "envmap_name": "Drill_01_env_1",
+    "psnr": 6.561881065368652,
+    "ssim": 0.5427714586257935,
+    "lpips": 0.765625
+  }
+]

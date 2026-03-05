@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 17.820804595947266,
+    "ssim": 0.6389260292053223,
+    "lpips": 0.2265625
+  },
+  {
+    "step": 1,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 26.79582977294922,
+    "ssim": 0.9135510325431824,
+    "lpips": 0.1083984375
+  },
+  {
+    "step": 2,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 27.817773818969727,
+    "ssim": 0.8941994905471802,
+    "lpips": 0.1103515625
+  },
+  {
+    "step": 3,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 18.014511108398438,
+    "ssim": 0.6560496091842651,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 4,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 26.79018783569336,
+    "ssim": 0.9136261940002441,
+    "lpips": 0.10791015625
+  },
+  {
+    "step": 5,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 27.830265045166016,
+    "ssim": 0.8942723870277405,
+    "lpips": 0.1103515625
+  },
+  {
+    "step": 6,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 18.016136169433594,
+    "ssim": 0.6562371850013733,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 7,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 26.787086486816406,
+    "ssim": 0.9136726260185242,
+    "lpips": 0.10791015625
+  },
+  {
+    "step": 8,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 27.83047866821289,
+    "ssim": 0.8942968845367432,
+    "lpips": 0.1103515625
+  },
+  {
+    "step": 9,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 18.02005386352539,
+    "ssim": 0.6562544107437134,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 10,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 26.794599533081055,
+    "ssim": 0.9135961532592773,
+    "lpips": 0.1083984375
+  },
+  {
+    "step": 11,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 27.836097717285156,
+    "ssim": 0.8942395448684692,
+    "lpips": 0.1103515625
+  },
+  {
+    "step": 12,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 18.016897201538086,
+    "ssim": 0.6560763716697693,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 13,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 26.79714584350586,
+    "ssim": 0.9136321544647217,
+    "lpips": 0.1083984375
+  },
+  {
+    "step": 14,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 27.82433319091797,
+    "ssim": 0.8942070007324219,
+    "lpips": 0.11083984375
+  },
+  {
+    "step": 15,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 20.58062744140625,
+    "ssim": 0.757875919342041,
+    "lpips": 0.2333984375
+  },
+  {
+    "step": 16,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 24.83230209350586,
+    "ssim": 0.8794393539428711,
+    "lpips": 0.12890625
+  },
+  {
+    "step": 17,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 27.98107147216797,
+    "ssim": 0.8868839144706726,
+    "lpips": 0.11962890625
+  },
+  {
+    "step": 18,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 20.61366844177246,
+    "ssim": 0.7379562854766846,
+    "lpips": 0.255859375
+  },
+  {
+    "step": 19,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 17.954418182373047,
+    "ssim": 0.7353240251541138,
+    "lpips": 0.2236328125
+  },
+  {
+    "step": 20,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 15.169378280639648,
+    "ssim": 0.6951449513435364,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 21,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 12.084907531738281,
+    "ssim": 0.6084453463554382,
+    "lpips": 0.423828125
+  },
+  {
+    "step": 22,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 11.415264129638672,
+    "ssim": 0.6431504487991333,
+    "lpips": 0.37890625
+  },
+  {
+    "step": 23,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 11.927919387817383,
+    "ssim": 0.6576921939849854,
+    "lpips": 0.3828125
+  },
+  {
+    "step": 24,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 9.216493606567383,
+    "ssim": 0.5598928332328796,
+    "lpips": 0.5
+  },
+  {
+    "step": 25,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 8.819160461425781,
+    "ssim": 0.5572558641433716,
+    "lpips": 0.46875
+  },
+  {
+    "step": 26,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 10.115266799926758,
+    "ssim": 0.6096358895301819,
+    "lpips": 0.4765625
+  },
+  {
+    "step": 27,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 8.213974952697754,
+    "ssim": 0.49087056517601013,
+    "lpips": 0.578125
+  },
+  {
+    "step": 28,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 8.77745532989502,
+    "ssim": 0.49152296781539917,
+    "lpips": 0.55859375
+  },
+  {
+    "step": 29,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 9.895271301269531,
+    "ssim": 0.553081750869751,
+    "lpips": 0.59375
+  },
+  {
+    "step": 30,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 7.606986045837402,
+    "ssim": 0.4344920516014099,
+    "lpips": 0.6875
+  },
+  {
+    "step": 31,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 7.328200340270996,
+    "ssim": 0.4160875678062439,
+    "lpips": 0.6484375
+  },
+  {
+    "step": 32,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 8.710939407348633,
+    "ssim": 0.46653687953948975,
+    "lpips": 0.65234375
+  },
+  {
+    "step": 33,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 7.1553826332092285,
+    "ssim": 0.35725685954093933,
+    "lpips": 0.73828125
+  },
+  {
+    "step": 34,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 7.034699440002441,
+    "ssim": 0.3609287142753601,
+    "lpips": 0.69140625
+  },
+  {
+    "step": 35,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 8.12028980255127,
+    "ssim": 0.47000178694725037,
+    "lpips": 0.671875
+  },
+  {
+    "step": 36,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 6.5215229988098145,
+    "ssim": 0.3814017176628113,
+    "lpips": 0.7421875
+  },
+  {
+    "step": 37,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 6.6172895431518555,
+    "ssim": 0.3883852958679199,
+    "lpips": 0.69921875
+  },
+  {
+    "step": 38,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 8.245662689208984,
+    "ssim": 0.4848906695842743,
+    "lpips": 0.6796875
+  },
+  {
+    "step": 39,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 6.965024948120117,
+    "ssim": 0.36863040924072266,
+    "lpips": 0.7421875
+  },
+  {
+    "step": 40,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 7.1059041023254395,
+    "ssim": 0.35394465923309326,
+    "lpips": 0.71875
+  },
+  {
+    "step": 41,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 8.728105545043945,
+    "ssim": 0.43070468306541443,
+    "lpips": 0.6953125
+  },
+  {
+    "step": 42,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 7.267414093017578,
+    "ssim": 0.3150376081466675,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 43,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 7.267224311828613,
+    "ssim": 0.3117387294769287,
+    "lpips": 0.73828125
+  },
+  {
+    "step": 44,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 8.836396217346191,
+    "ssim": 0.39635029435157776,
+    "lpips": 0.7265625
+  },
+  {
+    "step": 45,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 6.977765083312988,
+    "ssim": 0.30850014090538025,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 46,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 6.9044389724731445,
+    "ssim": 0.3228909373283386,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 47,
+    "envmap_name": "GothicCommode_01_white_env_0",
+    "psnr": 8.538538932800293,
+    "ssim": 0.40628552436828613,
+    "lpips": 0.74609375
+  },
+  {
+    "step": 48,
+    "envmap_name": "GothicCommode_01_env_0",
+    "psnr": 6.752037048339844,
+    "ssim": 0.31928396224975586,
+    "lpips": 0.78125
+  },
+  {
+    "step": 49,
+    "envmap_name": "GothicCommode_01_env_2",
+    "psnr": 6.886190414428711,
+    "ssim": 0.3331703841686249,
+    "lpips": 0.765625
+  }
+]

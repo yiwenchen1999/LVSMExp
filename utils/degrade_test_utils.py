@@ -25,7 +25,8 @@ def load_envmap_image(path):
     return torch.from_numpy(arr).permute(2, 0, 1).float()
 
 
-def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_input_views, device):
+def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_input_views, device,
+                          exclude_white_env=False):
     """
     Collect all envmap-type lighting variations for the same object.
 
@@ -36,6 +37,7 @@ def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_i
         image_indices: List of frame indices (context views) to load GT images at
         num_input_views: Number of input (context) views to load GT for
         device: torch device
+        exclude_white_env: If True, skip candidates whose name contains 'white_env'
 
     Returns:
         Sorted list of (env_ldr, env_hdr, gt_images, candidate_name) tuples.
@@ -57,6 +59,8 @@ def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_i
         if candidate_name == scene_name:
             continue
         if dataset._extract_object_id(candidate_name) != object_id:
+            continue
+        if exclude_white_env and "white_env" in candidate_name:
             continue
         envmaps_dir = os.path.join(base_dir, "envmaps", candidate_name)
         if not os.path.exists(envmaps_dir):

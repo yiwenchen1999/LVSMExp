@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 28.979965209960938,
+    "ssim": 0.9558753371238708,
+    "lpips": 0.06689453125
+  },
+  {
+    "step": 1,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 21.795862197875977,
+    "ssim": 0.8809376955032349,
+    "lpips": 0.1337890625
+  },
+  {
+    "step": 2,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 23.50130844116211,
+    "ssim": 0.9359635710716248,
+    "lpips": 0.111328125
+  },
+  {
+    "step": 3,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 23.94969367980957,
+    "ssim": 0.9300388693809509,
+    "lpips": 0.0927734375
+  },
+  {
+    "step": 4,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 19.482681274414062,
+    "ssim": 0.8544233441352844,
+    "lpips": 0.1669921875
+  },
+  {
+    "step": 5,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 20.0198974609375,
+    "ssim": 0.9047157764434814,
+    "lpips": 0.1591796875
+  },
+  {
+    "step": 6,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 19.956506729125977,
+    "ssim": 0.8978618383407593,
+    "lpips": 0.1220703125
+  },
+  {
+    "step": 7,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 18.002368927001953,
+    "ssim": 0.8301194906234741,
+    "lpips": 0.19140625
+  },
+  {
+    "step": 8,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 18.594921112060547,
+    "ssim": 0.87638258934021,
+    "lpips": 0.1982421875
+  },
+  {
+    "step": 9,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 18.714500427246094,
+    "ssim": 0.8725793361663818,
+    "lpips": 0.1455078125
+  },
+  {
+    "step": 10,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 17.278507232666016,
+    "ssim": 0.8066984415054321,
+    "lpips": 0.2119140625
+  },
+  {
+    "step": 11,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 18.23965072631836,
+    "ssim": 0.8568339943885803,
+    "lpips": 0.2265625
+  },
+  {
+    "step": 12,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 18.259605407714844,
+    "ssim": 0.8487656712532043,
+    "lpips": 0.16796875
+  },
+  {
+    "step": 13,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 16.89338493347168,
+    "ssim": 0.7855735421180725,
+    "lpips": 0.2333984375
+  },
+  {
+    "step": 14,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 17.863414764404297,
+    "ssim": 0.8397743105888367,
+    "lpips": 0.25
+  },
+  {
+    "step": 15,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 17.68069076538086,
+    "ssim": 0.8270655870437622,
+    "lpips": 0.1953125
+  },
+  {
+    "step": 16,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 16.556957244873047,
+    "ssim": 0.7694422006607056,
+    "lpips": 0.25
+  },
+  {
+    "step": 17,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 17.349613189697266,
+    "ssim": 0.8273907899856567,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 18,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 16.899110794067383,
+    "ssim": 0.8120021820068359,
+    "lpips": 0.22265625
+  },
+  {
+    "step": 19,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 16.15771484375,
+    "ssim": 0.7586473226547241,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 20,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.834644317626953,
+    "ssim": 0.8180077075958252,
+    "lpips": 0.28515625
+  },
+  {
+    "step": 21,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 16.295162200927734,
+    "ssim": 0.803110659122467,
+    "lpips": 0.240234375
+  },
+  {
+    "step": 22,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 15.798867225646973,
+    "ssim": 0.7510883808135986,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 23,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.538938522338867,
+    "ssim": 0.8074566125869751,
+    "lpips": 0.29296875
+  },
+  {
+    "step": 24,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 15.946931838989258,
+    "ssim": 0.7943274974822998,
+    "lpips": 0.2470703125
+  },
+  {
+    "step": 25,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 15.536079406738281,
+    "ssim": 0.7439817190170288,
+    "lpips": 0.275390625
+  },
+  {
+    "step": 26,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.342674255371094,
+    "ssim": 0.7985472083091736,
+    "lpips": 0.296875
+  },
+  {
+    "step": 27,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 15.631169319152832,
+    "ssim": 0.7849876284599304,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 28,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 15.32839298248291,
+    "ssim": 0.7372127175331116,
+    "lpips": 0.28125
+  },
+  {
+    "step": 29,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.241310119628906,
+    "ssim": 0.7907249927520752,
+    "lpips": 0.302734375
+  },
+  {
+    "step": 30,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 15.473945617675781,
+    "ssim": 0.7773101329803467,
+    "lpips": 0.2578125
+  },
+  {
+    "step": 31,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 15.18446159362793,
+    "ssim": 0.7313929200172424,
+    "lpips": 0.291015625
+  },
+  {
+    "step": 32,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.202510833740234,
+    "ssim": 0.7842919230461121,
+    "lpips": 0.30859375
+  },
+  {
+    "step": 33,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 15.328490257263184,
+    "ssim": 0.770301342010498,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 34,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 15.01132869720459,
+    "ssim": 0.7240900993347168,
+    "lpips": 0.30078125
+  },
+  {
+    "step": 35,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.18282127380371,
+    "ssim": 0.7798245549201965,
+    "lpips": 0.3203125
+  },
+  {
+    "step": 36,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 15.26412582397461,
+    "ssim": 0.7642263770103455,
+    "lpips": 0.265625
+  },
+  {
+    "step": 37,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 14.869348526000977,
+    "ssim": 0.7173195481300354,
+    "lpips": 0.31640625
+  },
+  {
+    "step": 38,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.13372039794922,
+    "ssim": 0.7724071741104126,
+    "lpips": 0.328125
+  },
+  {
+    "step": 39,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 15.127613067626953,
+    "ssim": 0.7574460506439209,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 40,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 14.728803634643555,
+    "ssim": 0.7121822834014893,
+    "lpips": 0.32421875
+  },
+  {
+    "step": 41,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 16.026042938232422,
+    "ssim": 0.7666681408882141,
+    "lpips": 0.333984375
+  },
+  {
+    "step": 42,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 14.970494270324707,
+    "ssim": 0.7507752180099487,
+    "lpips": 0.2734375
+  },
+  {
+    "step": 43,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 14.567205429077148,
+    "ssim": 0.708257257938385,
+    "lpips": 0.3359375
+  },
+  {
+    "step": 44,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 15.862565994262695,
+    "ssim": 0.7615923285484314,
+    "lpips": 0.33984375
+  },
+  {
+    "step": 45,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 14.793057441711426,
+    "ssim": 0.7468242645263672,
+    "lpips": 0.27734375
+  },
+  {
+    "step": 46,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 14.345443725585938,
+    "ssim": 0.7034562826156616,
+    "lpips": 0.345703125
+  },
+  {
+    "step": 47,
+    "envmap_name": "GothicBed_01_white_env_0",
+    "psnr": 15.638874053955078,
+    "ssim": 0.755743145942688,
+    "lpips": 0.34765625
+  },
+  {
+    "step": 48,
+    "envmap_name": "GothicBed_01_env_0",
+    "psnr": 14.47755241394043,
+    "ssim": 0.7388896942138672,
+    "lpips": 0.28515625
+  },
+  {
+    "step": 49,
+    "envmap_name": "GothicBed_01_env_2",
+    "psnr": 13.985954284667969,
+    "ssim": 0.6950086951255798,
+    "lpips": 0.35546875
+  }
+]

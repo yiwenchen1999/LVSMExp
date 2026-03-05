@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 19.34687042236328,
+    "ssim": 0.8851487636566162,
+    "lpips": 0.0830078125
+  },
+  {
+    "step": 1,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 22.43273162841797,
+    "ssim": 0.9242087006568909,
+    "lpips": 0.05859375
+  },
+  {
+    "step": 2,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 29.048717498779297,
+    "ssim": 0.9632589817047119,
+    "lpips": 0.044189453125
+  },
+  {
+    "step": 3,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 19.153657913208008,
+    "ssim": 0.8795907497406006,
+    "lpips": 0.0849609375
+  },
+  {
+    "step": 4,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 20.843280792236328,
+    "ssim": 0.9017555713653564,
+    "lpips": 0.076171875
+  },
+  {
+    "step": 5,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 25.756332397460938,
+    "ssim": 0.942681074142456,
+    "lpips": 0.0654296875
+  },
+  {
+    "step": 6,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 17.68490219116211,
+    "ssim": 0.8555819988250732,
+    "lpips": 0.1015625
+  },
+  {
+    "step": 7,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 19.74261474609375,
+    "ssim": 0.8846761584281921,
+    "lpips": 0.0830078125
+  },
+  {
+    "step": 8,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 23.51323890686035,
+    "ssim": 0.9221875667572021,
+    "lpips": 0.0791015625
+  },
+  {
+    "step": 9,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 16.828624725341797,
+    "ssim": 0.8396399021148682,
+    "lpips": 0.11474609375
+  },
+  {
+    "step": 10,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 19.10101318359375,
+    "ssim": 0.8693385124206543,
+    "lpips": 0.091796875
+  },
+  {
+    "step": 11,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 21.964935302734375,
+    "ssim": 0.9023674726486206,
+    "lpips": 0.0947265625
+  },
+  {
+    "step": 12,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 16.194854736328125,
+    "ssim": 0.8253685235977173,
+    "lpips": 0.126953125
+  },
+  {
+    "step": 13,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 18.750919342041016,
+    "ssim": 0.8573733568191528,
+    "lpips": 0.10205078125
+  },
+  {
+    "step": 14,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 20.611360549926758,
+    "ssim": 0.8864226937294006,
+    "lpips": 0.11083984375
+  },
+  {
+    "step": 15,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 15.62919807434082,
+    "ssim": 0.8125123977661133,
+    "lpips": 0.138671875
+  },
+  {
+    "step": 16,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 18.33447265625,
+    "ssim": 0.845863401889801,
+    "lpips": 0.1123046875
+  },
+  {
+    "step": 17,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 19.571048736572266,
+    "ssim": 0.8701609373092651,
+    "lpips": 0.12451171875
+  },
+  {
+    "step": 18,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 15.089033126831055,
+    "ssim": 0.7992314100265503,
+    "lpips": 0.1484375
+  },
+  {
+    "step": 19,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 17.745817184448242,
+    "ssim": 0.8339798450469971,
+    "lpips": 0.12255859375
+  },
+  {
+    "step": 20,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 18.376028060913086,
+    "ssim": 0.8521873950958252,
+    "lpips": 0.1416015625
+  },
+  {
+    "step": 21,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 14.500611305236816,
+    "ssim": 0.7845013737678528,
+    "lpips": 0.158203125
+  },
+  {
+    "step": 22,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 17.19951629638672,
+    "ssim": 0.8198832273483276,
+    "lpips": 0.1396484375
+  },
+  {
+    "step": 23,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 17.481124877929688,
+    "ssim": 0.8339684009552002,
+    "lpips": 0.15625
+  },
+  {
+    "step": 24,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 13.866059303283691,
+    "ssim": 0.7670387029647827,
+    "lpips": 0.169921875
+  },
+  {
+    "step": 25,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 16.968461990356445,
+    "ssim": 0.8088816404342651,
+    "lpips": 0.1572265625
+  },
+  {
+    "step": 26,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 16.846960067749023,
+    "ssim": 0.8180196285247803,
+    "lpips": 0.173828125
+  },
+  {
+    "step": 27,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 13.381153106689453,
+    "ssim": 0.7551007270812988,
+    "lpips": 0.18359375
+  },
+  {
+    "step": 28,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 16.443798065185547,
+    "ssim": 0.7976508736610413,
+    "lpips": 0.1728515625
+  },
+  {
+    "step": 29,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 16.438060760498047,
+    "ssim": 0.8073006868362427,
+    "lpips": 0.189453125
+  },
+  {
+    "step": 30,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 13.101815223693848,
+    "ssim": 0.7458894848823547,
+    "lpips": 0.1943359375
+  },
+  {
+    "step": 31,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 15.712237358093262,
+    "ssim": 0.7829252481460571,
+    "lpips": 0.1943359375
+  },
+  {
+    "step": 32,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 15.619009971618652,
+    "ssim": 0.789893388748169,
+    "lpips": 0.20703125
+  },
+  {
+    "step": 33,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 12.778813362121582,
+    "ssim": 0.7371100187301636,
+    "lpips": 0.212890625
+  },
+  {
+    "step": 34,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 14.686363220214844,
+    "ssim": 0.7676567435264587,
+    "lpips": 0.2197265625
+  },
+  {
+    "step": 35,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 14.90684700012207,
+    "ssim": 0.774579644203186,
+    "lpips": 0.2275390625
+  },
+  {
+    "step": 36,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 12.443328857421875,
+    "ssim": 0.7281146049499512,
+    "lpips": 0.228515625
+  },
+  {
+    "step": 37,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 14.448502540588379,
+    "ssim": 0.758036732673645,
+    "lpips": 0.232421875
+  },
+  {
+    "step": 38,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 14.79039192199707,
+    "ssim": 0.7639371156692505,
+    "lpips": 0.23828125
+  },
+  {
+    "step": 39,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 12.442068099975586,
+    "ssim": 0.7222192287445068,
+    "lpips": 0.23828125
+  },
+  {
+    "step": 40,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 14.159353256225586,
+    "ssim": 0.748041033744812,
+    "lpips": 0.2421875
+  },
+  {
+    "step": 41,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 14.655013084411621,
+    "ssim": 0.7555981874465942,
+    "lpips": 0.2470703125
+  },
+  {
+    "step": 42,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 12.382152557373047,
+    "ssim": 0.7173688411712646,
+    "lpips": 0.2470703125
+  },
+  {
+    "step": 43,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 13.933131217956543,
+    "ssim": 0.7391481399536133,
+    "lpips": 0.248046875
+  },
+  {
+    "step": 44,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 14.493536949157715,
+    "ssim": 0.7476627826690674,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 45,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 12.329651832580566,
+    "ssim": 0.7113714218139648,
+    "lpips": 0.255859375
+  },
+  {
+    "step": 46,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 13.892796516418457,
+    "ssim": 0.7325879335403442,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 47,
+    "envmap_name": "Rockingchair_01_white_env_0",
+    "psnr": 14.510860443115234,
+    "ssim": 0.7407224178314209,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 48,
+    "envmap_name": "Rockingchair_01_env_0",
+    "psnr": 12.428892135620117,
+    "ssim": 0.7078360319137573,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 49,
+    "envmap_name": "Rockingchair_01_env_2",
+    "psnr": 13.811744689941406,
+    "ssim": 0.7254377007484436,
+    "lpips": 0.265625
+  }
+]

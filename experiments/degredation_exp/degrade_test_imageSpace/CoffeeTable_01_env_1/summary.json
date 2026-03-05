@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 20.496562957763672,
+    "ssim": 0.8965784907341003,
+    "lpips": 0.056640625
+  },
+  {
+    "step": 1,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 19.052555084228516,
+    "ssim": 0.8833876252174377,
+    "lpips": 0.06787109375
+  },
+  {
+    "step": 2,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 28.32826042175293,
+    "ssim": 0.9467699527740479,
+    "lpips": 0.052978515625
+  },
+  {
+    "step": 3,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 20.84950065612793,
+    "ssim": 0.8914414644241333,
+    "lpips": 0.078125
+  },
+  {
+    "step": 4,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 19.188901901245117,
+    "ssim": 0.8790171146392822,
+    "lpips": 0.091796875
+  },
+  {
+    "step": 5,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 27.495872497558594,
+    "ssim": 0.9321023225784302,
+    "lpips": 0.08642578125
+  },
+  {
+    "step": 6,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 20.506006240844727,
+    "ssim": 0.8788108825683594,
+    "lpips": 0.111328125
+  },
+  {
+    "step": 7,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 19.34735870361328,
+    "ssim": 0.8743054866790771,
+    "lpips": 0.1240234375
+  },
+  {
+    "step": 8,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 25.138912200927734,
+    "ssim": 0.9121787548065186,
+    "lpips": 0.12890625
+  },
+  {
+    "step": 9,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 19.839954376220703,
+    "ssim": 0.8669837713241577,
+    "lpips": 0.1435546875
+  },
+  {
+    "step": 10,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 18.942440032958984,
+    "ssim": 0.8617483377456665,
+    "lpips": 0.16015625
+  },
+  {
+    "step": 11,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 22.913471221923828,
+    "ssim": 0.8894237875938416,
+    "lpips": 0.1640625
+  },
+  {
+    "step": 12,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 18.98175811767578,
+    "ssim": 0.8515992164611816,
+    "lpips": 0.1748046875
+  },
+  {
+    "step": 13,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 18.3548583984375,
+    "ssim": 0.8468874096870422,
+    "lpips": 0.1845703125
+  },
+  {
+    "step": 14,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 20.969863891601562,
+    "ssim": 0.8668836355209351,
+    "lpips": 0.189453125
+  },
+  {
+    "step": 15,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 18.150074005126953,
+    "ssim": 0.8361286520957947,
+    "lpips": 0.19921875
+  },
+  {
+    "step": 16,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 17.71575927734375,
+    "ssim": 0.8328448534011841,
+    "lpips": 0.20703125
+  },
+  {
+    "step": 17,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 19.691837310791016,
+    "ssim": 0.8484435081481934,
+    "lpips": 0.2099609375
+  },
+  {
+    "step": 18,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 17.411067962646484,
+    "ssim": 0.8213622570037842,
+    "lpips": 0.21875
+  },
+  {
+    "step": 19,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 17.11237144470215,
+    "ssim": 0.8182623982429504,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 20,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 18.893783569335938,
+    "ssim": 0.8331365585327148,
+    "lpips": 0.224609375
+  },
+  {
+    "step": 21,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.92974281311035,
+    "ssim": 0.8087416291236877,
+    "lpips": 0.23046875
+  },
+  {
+    "step": 22,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 16.836444854736328,
+    "ssim": 0.8074730634689331,
+    "lpips": 0.2353515625
+  },
+  {
+    "step": 23,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 18.543123245239258,
+    "ssim": 0.8219114542007446,
+    "lpips": 0.2333984375
+  },
+  {
+    "step": 24,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.626789093017578,
+    "ssim": 0.7997188568115234,
+    "lpips": 0.2373046875
+  },
+  {
+    "step": 25,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 16.721813201904297,
+    "ssim": 0.8001241087913513,
+    "lpips": 0.2421875
+  },
+  {
+    "step": 26,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 18.332639694213867,
+    "ssim": 0.8134093880653381,
+    "lpips": 0.240234375
+  },
+  {
+    "step": 27,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.330669403076172,
+    "ssim": 0.7903612852096558,
+    "lpips": 0.2451171875
+  },
+  {
+    "step": 28,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 16.565879821777344,
+    "ssim": 0.7915403842926025,
+    "lpips": 0.25
+  },
+  {
+    "step": 29,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 18.247642517089844,
+    "ssim": 0.804894208908081,
+    "lpips": 0.248046875
+  },
+  {
+    "step": 30,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 16.09825897216797,
+    "ssim": 0.7814376354217529,
+    "lpips": 0.251953125
+  },
+  {
+    "step": 31,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 16.487215042114258,
+    "ssim": 0.7833506464958191,
+    "lpips": 0.2578125
+  },
+  {
+    "step": 32,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 18.124282836914062,
+    "ssim": 0.7951664924621582,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 33,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 15.835439682006836,
+    "ssim": 0.7733131647109985,
+    "lpips": 0.25390625
+  },
+  {
+    "step": 34,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 16.294118881225586,
+    "ssim": 0.775255024433136,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 35,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 17.911312103271484,
+    "ssim": 0.7869269251823425,
+    "lpips": 0.255859375
+  },
+  {
+    "step": 36,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 15.53951644897461,
+    "ssim": 0.7677133083343506,
+    "lpips": 0.259765625
+  },
+  {
+    "step": 37,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 16.082229614257812,
+    "ssim": 0.7697727680206299,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 38,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 17.620283126831055,
+    "ssim": 0.7789198160171509,
+    "lpips": 0.255859375
+  },
+  {
+    "step": 39,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 15.198598861694336,
+    "ssim": 0.7615389227867126,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 40,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 15.782523155212402,
+    "ssim": 0.7627341747283936,
+    "lpips": 0.265625
+  },
+  {
+    "step": 41,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 17.195850372314453,
+    "ssim": 0.7706231474876404,
+    "lpips": 0.2578125
+  },
+  {
+    "step": 42,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 14.809541702270508,
+    "ssim": 0.7551177144050598,
+    "lpips": 0.265625
+  },
+  {
+    "step": 43,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 15.430205345153809,
+    "ssim": 0.7550320625305176,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 44,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 16.798110961914062,
+    "ssim": 0.7623813152313232,
+    "lpips": 0.26171875
+  },
+  {
+    "step": 45,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 14.423786163330078,
+    "ssim": 0.7491615414619446,
+    "lpips": 0.26953125
+  },
+  {
+    "step": 46,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 15.09660530090332,
+    "ssim": 0.7481340169906616,
+    "lpips": 0.271484375
+  },
+  {
+    "step": 47,
+    "envmap_name": "CoffeeTable_01_white_env_0",
+    "psnr": 16.36646842956543,
+    "ssim": 0.7544066309928894,
+    "lpips": 0.265625
+  },
+  {
+    "step": 48,
+    "envmap_name": "CoffeeTable_01_env_0",
+    "psnr": 14.02005386352539,
+    "ssim": 0.7426146268844604,
+    "lpips": 0.2734375
+  },
+  {
+    "step": 49,
+    "envmap_name": "CoffeeTable_01_env_2",
+    "psnr": 14.722929000854492,
+    "ssim": 0.7408566474914551,
+    "lpips": 0.27734375
+  }
+]

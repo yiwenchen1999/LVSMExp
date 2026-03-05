@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 25.515933990478516,
+    "ssim": 0.9510486125946045,
+    "lpips": 0.041259765625
+  },
+  {
+    "step": 1,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 26.427459716796875,
+    "ssim": 0.9409892559051514,
+    "lpips": 0.05126953125
+  },
+  {
+    "step": 2,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 24.94188690185547,
+    "ssim": 0.937317967414856,
+    "lpips": 0.04345703125
+  },
+  {
+    "step": 3,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 25.91858673095703,
+    "ssim": 0.9526270031929016,
+    "lpips": 0.04052734375
+  },
+  {
+    "step": 4,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 26.44552993774414,
+    "ssim": 0.941012978553772,
+    "lpips": 0.05126953125
+  },
+  {
+    "step": 5,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 24.945432662963867,
+    "ssim": 0.9373182058334351,
+    "lpips": 0.04345703125
+  },
+  {
+    "step": 6,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 28.328414916992188,
+    "ssim": 0.9604125022888184,
+    "lpips": 0.041015625
+  },
+  {
+    "step": 7,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 26.62006950378418,
+    "ssim": 0.9433692693710327,
+    "lpips": 0.052734375
+  },
+  {
+    "step": 8,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 23.874290466308594,
+    "ssim": 0.9284376502037048,
+    "lpips": 0.04736328125
+  },
+  {
+    "step": 9,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 28.340118408203125,
+    "ssim": 0.9603662490844727,
+    "lpips": 0.04150390625
+  },
+  {
+    "step": 10,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 26.611190795898438,
+    "ssim": 0.9433661699295044,
+    "lpips": 0.052978515625
+  },
+  {
+    "step": 11,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 23.871801376342773,
+    "ssim": 0.9284241199493408,
+    "lpips": 0.04736328125
+  },
+  {
+    "step": 12,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 26.625213623046875,
+    "ssim": 0.9539996385574341,
+    "lpips": 0.048095703125
+  },
+  {
+    "step": 13,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 20.453983306884766,
+    "ssim": 0.8813203573226929,
+    "lpips": 0.0810546875
+  },
+  {
+    "step": 14,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 17.833030700683594,
+    "ssim": 0.847892701625824,
+    "lpips": 0.0830078125
+  },
+  {
+    "step": 15,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 18.523731231689453,
+    "ssim": 0.8609879612922668,
+    "lpips": 0.08349609375
+  },
+  {
+    "step": 16,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 19.619924545288086,
+    "ssim": 0.868942379951477,
+    "lpips": 0.0859375
+  },
+  {
+    "step": 17,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 17.839553833007812,
+    "ssim": 0.8476553559303284,
+    "lpips": 0.0830078125
+  },
+  {
+    "step": 18,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 14.674673080444336,
+    "ssim": 0.7984723448753357,
+    "lpips": 0.125
+  },
+  {
+    "step": 19,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 13.69844913482666,
+    "ssim": 0.780539870262146,
+    "lpips": 0.15234375
+  },
+  {
+    "step": 20,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 12.828544616699219,
+    "ssim": 0.7722049951553345,
+    "lpips": 0.166015625
+  },
+  {
+    "step": 21,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 13.005035400390625,
+    "ssim": 0.7704792022705078,
+    "lpips": 0.1865234375
+  },
+  {
+    "step": 22,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 12.283221244812012,
+    "ssim": 0.7579789757728577,
+    "lpips": 0.220703125
+  },
+  {
+    "step": 23,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 11.644088745117188,
+    "ssim": 0.7544055581092834,
+    "lpips": 0.25
+  },
+  {
+    "step": 24,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 12.308782577514648,
+    "ssim": 0.7598578333854675,
+    "lpips": 0.27734375
+  },
+  {
+    "step": 25,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 11.602228164672852,
+    "ssim": 0.7467794418334961,
+    "lpips": 0.3046875
+  },
+  {
+    "step": 26,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 11.108697891235352,
+    "ssim": 0.7058254480361938,
+    "lpips": 0.384765625
+  },
+  {
+    "step": 27,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 10.78792667388916,
+    "ssim": 0.5876943469047546,
+    "lpips": 0.55859375
+  },
+  {
+    "step": 28,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 9.130309104919434,
+    "ssim": 0.49165254831314087,
+    "lpips": 0.65625
+  },
+  {
+    "step": 29,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 7.827478408813477,
+    "ssim": 0.5002198815345764,
+    "lpips": 0.703125
+  },
+  {
+    "step": 30,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 7.398637771606445,
+    "ssim": 0.5370150804519653,
+    "lpips": 0.7265625
+  },
+  {
+    "step": 31,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 6.754237174987793,
+    "ssim": 0.537306547164917,
+    "lpips": 0.75
+  },
+  {
+    "step": 32,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 6.264798641204834,
+    "ssim": 0.5296114683151245,
+    "lpips": 0.765625
+  },
+  {
+    "step": 33,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 6.055454730987549,
+    "ssim": 0.5389353036880493,
+    "lpips": 0.765625
+  },
+  {
+    "step": 34,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 5.738690376281738,
+    "ssim": 0.5327097773551941,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 35,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 5.48836612701416,
+    "ssim": 0.5318098664283752,
+    "lpips": 0.78125
+  },
+  {
+    "step": 36,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 5.471624374389648,
+    "ssim": 0.5384215712547302,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 37,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 5.353321552276611,
+    "ssim": 0.5267246961593628,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 38,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 5.2373247146606445,
+    "ssim": 0.5262001752853394,
+    "lpips": 0.78125
+  },
+  {
+    "step": 39,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 5.28817892074585,
+    "ssim": 0.5314093828201294,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 40,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 5.245187759399414,
+    "ssim": 0.5197552442550659,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 41,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 5.235237121582031,
+    "ssim": 0.5197035670280457,
+    "lpips": 0.77734375
+  },
+  {
+    "step": 42,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 5.369013786315918,
+    "ssim": 0.5253140926361084,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 43,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 5.393962860107422,
+    "ssim": 0.5137594938278198,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 44,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 5.412349700927734,
+    "ssim": 0.5122300982475281,
+    "lpips": 0.7734375
+  },
+  {
+    "step": 45,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 5.574488639831543,
+    "ssim": 0.5171781778335571,
+    "lpips": 0.765625
+  },
+  {
+    "step": 46,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 5.575159072875977,
+    "ssim": 0.5058106184005737,
+    "lpips": 0.76171875
+  },
+  {
+    "step": 47,
+    "envmap_name": "ClassicConsole_01_env_2",
+    "psnr": 5.597292423248291,
+    "ssim": 0.505295991897583,
+    "lpips": 0.765625
+  },
+  {
+    "step": 48,
+    "envmap_name": "ClassicConsole_01_env_0",
+    "psnr": 5.769154071807861,
+    "ssim": 0.5134593844413757,
+    "lpips": 0.7578125
+  },
+  {
+    "step": 49,
+    "envmap_name": "ClassicConsole_01_env_1",
+    "psnr": 5.759096622467041,
+    "ssim": 0.5043995380401611,
+    "lpips": 0.75390625
+  }
+]

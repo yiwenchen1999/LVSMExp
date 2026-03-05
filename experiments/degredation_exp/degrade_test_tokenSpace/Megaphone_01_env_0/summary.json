@@ -1,0 +1,352 @@
+[
+  {
+    "step": 0,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 22.533876419067383,
+    "ssim": 0.9291297197341919,
+    "lpips": 0.0556640625
+  },
+  {
+    "step": 1,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 21.145877838134766,
+    "ssim": 0.896204948425293,
+    "lpips": 0.060791015625
+  },
+  {
+    "step": 2,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 23.294185638427734,
+    "ssim": 0.9415757656097412,
+    "lpips": 0.05615234375
+  },
+  {
+    "step": 3,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 21.375999450683594,
+    "ssim": 0.9166685342788696,
+    "lpips": 0.0732421875
+  },
+  {
+    "step": 4,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 21.658782958984375,
+    "ssim": 0.9041041135787964,
+    "lpips": 0.0615234375
+  },
+  {
+    "step": 5,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 20.33588218688965,
+    "ssim": 0.9047878980636597,
+    "lpips": 0.078125
+  },
+  {
+    "step": 6,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 17.887073516845703,
+    "ssim": 0.83887779712677,
+    "lpips": 0.11767578125
+  },
+  {
+    "step": 7,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 15.163359642028809,
+    "ssim": 0.7936206459999084,
+    "lpips": 0.13671875
+  },
+  {
+    "step": 8,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 15.376800537109375,
+    "ssim": 0.7946262359619141,
+    "lpips": 0.173828125
+  },
+  {
+    "step": 9,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 14.246190071105957,
+    "ssim": 0.7733429074287415,
+    "lpips": 0.216796875
+  },
+  {
+    "step": 10,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 11.068140029907227,
+    "ssim": 0.7278714179992676,
+    "lpips": 0.2490234375
+  },
+  {
+    "step": 11,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 13.538933753967285,
+    "ssim": 0.772296130657196,
+    "lpips": 0.2490234375
+  },
+  {
+    "step": 12,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 13.553457260131836,
+    "ssim": 0.766058087348938,
+    "lpips": 0.255859375
+  },
+  {
+    "step": 13,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 10.965824127197266,
+    "ssim": 0.7263116836547852,
+    "lpips": 0.251953125
+  },
+  {
+    "step": 14,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 13.526098251342773,
+    "ssim": 0.7722570896148682,
+    "lpips": 0.2490234375
+  },
+  {
+    "step": 15,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 13.549427032470703,
+    "ssim": 0.7661048173904419,
+    "lpips": 0.255859375
+  },
+  {
+    "step": 16,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 10.963380813598633,
+    "ssim": 0.72630375623703,
+    "lpips": 0.251953125
+  },
+  {
+    "step": 17,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 12.990555763244629,
+    "ssim": 0.7709239721298218,
+    "lpips": 0.271484375
+  },
+  {
+    "step": 18,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 12.843382835388184,
+    "ssim": 0.7652366161346436,
+    "lpips": 0.287109375
+  },
+  {
+    "step": 19,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 9.604852676391602,
+    "ssim": 0.7063839435577393,
+    "lpips": 0.3125
+  },
+  {
+    "step": 20,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 11.834300994873047,
+    "ssim": 0.754863977432251,
+    "lpips": 0.3515625
+  },
+  {
+    "step": 21,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 12.182549476623535,
+    "ssim": 0.7302831411361694,
+    "lpips": 0.384765625
+  },
+  {
+    "step": 22,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.99277400970459,
+    "ssim": 0.6609888076782227,
+    "lpips": 0.40234375
+  },
+  {
+    "step": 23,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 11.68155574798584,
+    "ssim": 0.706879198551178,
+    "lpips": 0.419921875
+  },
+  {
+    "step": 24,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 12.114266395568848,
+    "ssim": 0.678004264831543,
+    "lpips": 0.4609375
+  },
+  {
+    "step": 25,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 9.100852966308594,
+    "ssim": 0.5772346258163452,
+    "lpips": 0.546875
+  },
+  {
+    "step": 26,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 11.229094505310059,
+    "ssim": 0.6039561629295349,
+    "lpips": 0.609375
+  },
+  {
+    "step": 27,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 11.246927261352539,
+    "ssim": 0.5830274820327759,
+    "lpips": 0.6171875
+  },
+  {
+    "step": 28,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.716014862060547,
+    "ssim": 0.52940434217453,
+    "lpips": 0.6328125
+  },
+  {
+    "step": 29,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 10.462767601013184,
+    "ssim": 0.587722659111023,
+    "lpips": 0.64453125
+  },
+  {
+    "step": 30,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 10.550174713134766,
+    "ssim": 0.5905120372772217,
+    "lpips": 0.65625
+  },
+  {
+    "step": 31,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.508491516113281,
+    "ssim": 0.5561515092849731,
+    "lpips": 0.67578125
+  },
+  {
+    "step": 32,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 9.983232498168945,
+    "ssim": 0.6186419725418091,
+    "lpips": 0.6796875
+  },
+  {
+    "step": 33,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 9.992674827575684,
+    "ssim": 0.610849916934967,
+    "lpips": 0.67578125
+  },
+  {
+    "step": 34,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.236495971679688,
+    "ssim": 0.5579906702041626,
+    "lpips": 0.69140625
+  },
+  {
+    "step": 35,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 9.651872634887695,
+    "ssim": 0.6096282005310059,
+    "lpips": 0.6875
+  },
+  {
+    "step": 36,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 9.753966331481934,
+    "ssim": 0.5926579236984253,
+    "lpips": 0.68359375
+  },
+  {
+    "step": 37,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.256536483764648,
+    "ssim": 0.5433762073516846,
+    "lpips": 0.6875
+  },
+  {
+    "step": 38,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 9.850664138793945,
+    "ssim": 0.5864703059196472,
+    "lpips": 0.6796875
+  },
+  {
+    "step": 39,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 10.215559005737305,
+    "ssim": 0.5807775855064392,
+    "lpips": 0.6796875
+  },
+  {
+    "step": 40,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.35155963897705,
+    "ssim": 0.5363167524337769,
+    "lpips": 0.66796875
+  },
+  {
+    "step": 41,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 10.4935302734375,
+    "ssim": 0.5850233435630798,
+    "lpips": 0.6484375
+  },
+  {
+    "step": 42,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 11.026033401489258,
+    "ssim": 0.6003140807151794,
+    "lpips": 0.63671875
+  },
+  {
+    "step": 43,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.368095397949219,
+    "ssim": 0.5850919485092163,
+    "lpips": 0.58984375
+  },
+  {
+    "step": 44,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 10.773408889770508,
+    "ssim": 0.6467357873916626,
+    "lpips": 0.57421875
+  },
+  {
+    "step": 45,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 11.336057662963867,
+    "ssim": 0.6548410654067993,
+    "lpips": 0.55859375
+  },
+  {
+    "step": 46,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.436588287353516,
+    "ssim": 0.6089609265327454,
+    "lpips": 0.5234375
+  },
+  {
+    "step": 47,
+    "envmap_name": "Megaphone_01_white_env_0",
+    "psnr": 10.952592849731445,
+    "ssim": 0.6657198667526245,
+    "lpips": 0.515625
+  },
+  {
+    "step": 48,
+    "envmap_name": "Megaphone_01_env_1",
+    "psnr": 11.507486343383789,
+    "ssim": 0.663175106048584,
+    "lpips": 0.515625
+  },
+  {
+    "step": 49,
+    "envmap_name": "Megaphone_01_env_2",
+    "psnr": 8.458477020263672,
+    "ssim": 0.610967755317688,
+    "lpips": 0.49609375
+  }
+]

@@ -98,7 +98,7 @@ model.eval()
 # ---------------------------------------------------------------------------
 
 num_scenes = config.inference.get("degrade_num_scenes", 1)
-num_iterations = config.inference.get("degrade_num_iterations", 100)
+num_iterations = config.inference.get("degrade_num_iterations", 20)
 save_images = config.inference.get("degrade_save_images", num_scenes == 1)
 
 single_scene_idx = config.inference.get("degrade_test_scene_idx", None)
@@ -161,7 +161,8 @@ for dataset_idx in candidate_indices:
     image_indices = input_data.index[0, :, 0].cpu().tolist()
 
     envmaps = collect_envmaps_and_gt(
-        dataset, scene_path, scene_name, image_indices, num_input_views, ddp_info.device
+        dataset, scene_path, scene_name, image_indices, num_input_views, ddp_info.device,
+        exclude_white_env=True,
     )
 
     if len(envmaps) == 0:
@@ -188,13 +189,19 @@ for dataset_idx in candidate_indices:
                 img = (orig[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
                 Image.fromarray(img).save(os.path.join(scene_dir, f"original_input_v{vi}.png"))
 
-        seq = [{"step": i, "envmap_name": envmaps[i % len(envmaps)][3]} for i in range(num_iterations)]
+        scene_rng = np.random.RandomState(hash(scene_name) % (2**31))
+        envmap_order = [scene_rng.randint(0, len(envmaps)) for _ in range(num_iterations)]
+
+        seq = [{"step": i, "envmap_name": envmaps[envmap_order[i]][3]} for i in range(num_iterations)]
         with open(os.path.join(scene_dir, "envmap_sequence.json"), "w") as f:
             json.dump(seq, f, indent=2)
 
     dist.barrier()
 
     # --- Iterative loop for this scene ---
+    scene_rng = np.random.RandomState(hash(scene_name) % (2**31))
+    envmap_order = [scene_rng.randint(0, len(envmaps)) for _ in range(num_iterations)]
+
     scene_metrics = []
 
     with torch.no_grad(), torch.autocast(
@@ -206,7 +213,7 @@ for dataset_idx in candidate_indices:
         current_tokens = latent_tokens.detach().clone()
 
         for step in range(num_iterations):
-            env_ldr, env_hdr, gt_images, env_name = envmaps[step % len(envmaps)]
+            env_ldr, env_hdr, gt_images, env_name = envmaps[envmap_order[step]]
             input_data.env_ldr = env_ldr
             input_data.env_hdr = env_hdr
 
@@ -214,7 +221,7 @@ for dataset_idx in candidate_indices:
             rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
 
             if np.random.randint(0, 10) < 8 and step < 17:
-                current_tokens = 0.9*latent_tokens.detach().clone()+0.1*current_tokens.detach().clone()
+                current_tokens = 0.97*latent_tokens.detach().clone()+0.03*current_tokens.detach().clone()
             else:
                 latent_tokens = current_tokens
 

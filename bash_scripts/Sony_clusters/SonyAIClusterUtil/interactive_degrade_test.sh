@@ -19,7 +19,7 @@ set -euo pipefail
 # Tunables
 ############################
 NUM_SCENES="${NUM_SCENES:-50}"
-NUM_ITER="${NUM_ITER:-50}"
+NUM_ITER="${NUM_ITER:-20}"
 NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-4}"
 SAVE_IMAGES="${SAVE_IMAGES:-false}"
 
