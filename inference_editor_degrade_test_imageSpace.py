@@ -99,6 +99,7 @@ num_iterations = config.training.get("degrade_num_iterations", 20)
 num_input_views = config.training.num_input_views
 out_dir = config.inference_out_dir
 exclude_white_env = config.training.get("degrade_exclude_white_env", False)
+max_entries = config.training.get("degrade_max_entries", 50)
 
 datasampler.set_epoch(0)
 model.eval()
@@ -107,6 +108,7 @@ step_psnrs = [[] for _ in range(num_iterations)]
 step_ssims = [[] for _ in range(num_iterations)]
 step_lpipss = [[] for _ in range(num_iterations)]
 per_scene_rows = []
+entry_count = 0
 
 with torch.no_grad(), torch.autocast(
     enabled=config.training.use_amp,
@@ -114,6 +116,8 @@ with torch.no_grad(), torch.autocast(
     dtype=amp_dtype_mapping[config.training.amp_dtype],
 ):
     for batch in dataloader:
+        if entry_count >= max_entries:
+            break
         batch = {
             k: v.to(ddp_info.device) if isinstance(v, torch.Tensor) else v
             for k, v in batch.items()
@@ -169,6 +173,9 @@ with torch.no_grad(), torch.autocast(
                 continue
 
             for env_ldr, env_hdr, gt_images, env_name in envmap_list:
+                if entry_count >= max_entries:
+                    break
+
                 scene_dir = os.path.join(out_dir, f"{scene_name}__{env_name}")
                 os.makedirs(scene_dir, exist_ok=True)
 
@@ -221,6 +228,14 @@ with torch.no_grad(), torch.autocast(
                     current_images = rendered.detach()
 
                 create_flattened_views(scene_dir, num_iterations, num_input_views)
+
+                entry_count += 1
+                if ddp_info.is_main_process:
+                    print(f"  [entry {entry_count}/{max_entries}] done: {scene_name} / {env_name}")
+                if entry_count >= max_entries:
+                    if ddp_info.is_main_process:
+                        print(f"Early stop: reached {max_entries} entries")
+                    break
 
     torch.cuda.empty_cache()
 

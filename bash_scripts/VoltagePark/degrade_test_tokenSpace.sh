@@ -47,21 +47,24 @@ torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor_degrade_test_tokenSpace.py \
     --config configs/LVSM_scene_encoder_decoder_wEditor_envmap_pointlight.yaml \
-  training.dataset_path = /data/polyhaven_lvsm/test/full_list.txt \
-  training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4_singleMap \
-  training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
-  training.batch_size_per_gpu = 4 \
-  training.target_has_input = false \
-  training.num_views = 8 \
-  training.square_crop = true \
-  training.num_input_views = 4 \
-  training.num_target_views = 4 \
-  inference.if_inference = true \
-  inference.compute_metrics = true \
-  inference.render_video = false \
-  inference.same_pose = True \
-  inference.view_idx_file_path = data/evaluation_index_polyhaven.json \
-  inference_out_dir = experiments/evaluation/test_scenes_dense_same_pose
+    training.dataset_path = "$DATA_LIST" \
+    training.checkpoint_dir = "$CKPT_DIR" \
+    training.LVSM_checkpoint_dir = "$LVSM_CKPT_DIR" \
+    training.batch_size_per_gpu = 1 \
+    training.target_has_input = false \
+    training.num_views = 12 \
+    training.square_crop = true \
+    training.num_input_views = 4 \
+    training.num_target_views = 4 \
+    training.single_env_map = true \
+    training.degrade_num_iterations = 20 \
+    training.degrade_max_entries = "${MAX_ENTRIES:-50}" \
+    inference.if_inference = true \
+    inference.compute_metrics = true \
+    inference.render_video = false \
+    inference.same_pose = true \
+    inference.view_idx_file_path = "$EVAL_INDEX" \
+    inference_out_dir = "$OUTPUT_DIR"
 
 echo ""
 echo "=============================================="
