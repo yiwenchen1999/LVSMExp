@@ -116,28 +116,29 @@ def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_i
     return result
 
 
-def save_step(step, rendered, gt_images, env_name, scene_dir, num_views):
+def save_step(step, rendered, gt_images, env_name, scene_dir, num_views, save_images=True):
     """
-    Save rendered images, GT images, and metrics for one iteration step.
+    Compute metrics for one iteration step, optionally saving images.
 
     Returns:
         dict with summary metrics for this step.
     """
-    step_dir = os.path.join(scene_dir, f"step_{step:03d}")
-    os.makedirs(step_dir, exist_ok=True)
-
-    rendered_cpu = rendered[0].detach().float().cpu()   # [v, 3, h, w]
-    gt_cpu = gt_images[0].detach().float().cpu()        # [v, 3, h, w]
-
-    for vi in range(num_views):
-        img = (rendered_cpu[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
-        Image.fromarray(img).save(os.path.join(step_dir, f"rendered_v{vi}.png"))
-
-        gt_img = (gt_cpu[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
-        Image.fromarray(gt_img).save(os.path.join(step_dir, f"gt_relit_v{vi}.png"))
-
     rendered_f = rendered[0].detach().float()
     gt_f = gt_images[0].detach().float()
+
+    if save_images:
+        step_dir = os.path.join(scene_dir, f"step_{step:03d}")
+        os.makedirs(step_dir, exist_ok=True)
+
+        rendered_cpu = rendered_f.cpu()
+        gt_cpu = gt_f.cpu()
+
+        for vi in range(num_views):
+            img = (rendered_cpu[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
+            Image.fromarray(img).save(os.path.join(step_dir, f"rendered_v{vi}.png"))
+
+            gt_img = (gt_cpu[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
+            Image.fromarray(gt_img).save(os.path.join(step_dir, f"gt_relit_v{vi}.png"))
 
     psnr_vals = compute_psnr(gt_f, rendered_f)
     lpips_vals = compute_lpips(gt_f, rendered_f)
@@ -149,7 +150,10 @@ def save_step(step, rendered, gt_images, env_name, scene_dir, num_views):
         "psnr": float(psnr_vals.mean()),
         "ssim": float(ssim_vals.mean()),
         "lpips": float(lpips_vals.mean()),
-        "per_view": [
+    }
+
+    if save_images:
+        metrics["per_view"] = [
             {
                 "view": vi,
                 "psnr": float(psnr_vals[vi]),
@@ -157,10 +161,9 @@ def save_step(step, rendered, gt_images, env_name, scene_dir, num_views):
                 "lpips": float(lpips_vals[vi]),
             }
             for vi in range(num_views)
-        ],
-    }
-    with open(os.path.join(step_dir, "metrics.json"), "w") as f:
-        json.dump(metrics, f, indent=2)
+        ]
+        with open(os.path.join(step_dir, "metrics.json"), "w") as f:
+            json.dump(metrics, f, indent=2)
 
     return metrics
 

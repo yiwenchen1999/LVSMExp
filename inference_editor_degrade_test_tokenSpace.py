@@ -1,6 +1,7 @@
 """
 Token-space iterative editing degradation test.
 
+Supports single-scene (backward compat) and multi-scene modes.
 At each iteration:
   1. Edit *previous* latent tokens with the next envmap (no re-encoding)
   2. Render at context views (for saving / metrics only)
@@ -42,7 +43,6 @@ amp_dtype_mapping = {
     "tf32": torch.float32,
 }
 
-# Force same_pose so target views == context views
 config.inference.same_pose = True
 
 dataset_name = config.training.get("dataset_name", "data.dataset.Dataset")
@@ -86,7 +86,7 @@ elif not has_checkpoint:
 model = DDP(model, device_ids=[ddp_info.local_rank])
 
 if ddp_info.is_main_process:
-    import lpips  # noqa: F401  — pre-download weights on main process
+    import lpips  # noqa: F401
     import warnings
     warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -97,140 +97,185 @@ model.eval()
 # Degradation test parameters
 # ---------------------------------------------------------------------------
 
-scene_idx = config.inference.get("degrade_test_scene_idx", 0)
+num_scenes = config.inference.get("degrade_num_scenes", 1)
 num_iterations = config.inference.get("degrade_num_iterations", 100)
+save_images = config.inference.get("degrade_save_images", num_scenes == 1)
+
+single_scene_idx = config.inference.get("degrade_test_scene_idx", None)
 
 if ddp_info.is_main_process:
     print(f"\n=== Token-Space Degradation Test ===")
-    print(f"Scene index: {scene_idx}  |  Iterations: {num_iterations}")
+    print(f"Scenes: {num_scenes}  |  Iterations: {num_iterations}  |  Save images: {save_images}")
     print(f"Output dir : {config.inference_out_dir}")
+    os.makedirs(config.inference_out_dir, exist_ok=True)
 
 # ---------------------------------------------------------------------------
-# Load one scene and build batch
+# Build list of scene indices to process
 # ---------------------------------------------------------------------------
 
-sample = dataset[scene_idx]
-batch = {}
-for k, v in sample.items():
-    if isinstance(v, torch.Tensor):
-        batch[k] = v.unsqueeze(0).to(ddp_info.device)
-    else:
-        batch[k] = [v]
-
-scene_name = sample["scene_name"]
-scene_path = dataset.all_scene_paths[scene_idx].strip()
+if num_scenes == 1 and single_scene_idx is not None:
+    candidate_indices = [single_scene_idx]
+else:
+    candidate_indices = list(range(len(dataset)))
 
 # ---------------------------------------------------------------------------
-# Process data → input_data / target_data with rays and env_dir
+# Multi-scene loop
 # ---------------------------------------------------------------------------
 
-with torch.no_grad():
-    input_data, target_data = model.module.process_data(
-        batch, has_target_image=True, target_has_input=True, compute_rays=True
+step_psnrs = [[] for _ in range(num_iterations)]
+step_ssims = [[] for _ in range(num_iterations)]
+step_lpipss = [[] for _ in range(num_iterations)]
+all_records = []
+
+processed = 0
+skipped = 0
+
+for dataset_idx in candidate_indices:
+    if processed >= num_scenes:
+        break
+
+    try:
+        sample = dataset[dataset_idx]
+    except Exception as e:
+        if ddp_info.is_main_process:
+            print(f"  Skip idx {dataset_idx}: {e}")
+        skipped += 1
+        continue
+
+    scene_name = sample["scene_name"]
+    scene_path = dataset.all_scene_paths[dataset_idx].strip()
+
+    batch = {}
+    for k, v in sample.items():
+        if isinstance(v, torch.Tensor):
+            batch[k] = v.unsqueeze(0).to(ddp_info.device)
+        else:
+            batch[k] = [v]
+
+    with torch.no_grad():
+        input_data, target_data = model.module.process_data(
+            batch, has_target_image=True, target_has_input=True, compute_rays=True
+        )
+
+    num_input_views = input_data.image.shape[1]
+    image_indices = input_data.index[0, :, 0].cpu().tolist()
+
+    envmaps = collect_envmaps_and_gt(
+        dataset, scene_path, scene_name, image_indices, num_input_views, ddp_info.device
     )
 
-num_input_views = input_data.image.shape[1]
-image_indices = input_data.index[0, :, 0].cpu().tolist()
-
-if ddp_info.is_main_process:
-    print(f"Scene       : {scene_name}")
-    print(f"Context views: {num_input_views}  frame indices: {image_indices}")
-
-# ---------------------------------------------------------------------------
-# Collect envmaps + GT images (deterministic order — same as image-space)
-# ---------------------------------------------------------------------------
-
-envmaps = collect_envmaps_and_gt(
-    dataset, scene_path, scene_name, image_indices, num_input_views, ddp_info.device
-)
-
-if ddp_info.is_main_process:
-    print(f"Collected {len(envmaps)} envmap variations:")
-    for i, (_, _, _, name) in enumerate(envmaps):
-        print(f"  [{i}] {name}")
-
-assert len(envmaps) > 0, f"No envmap variations found for object in scene '{scene_name}'"
-
-# ---------------------------------------------------------------------------
-# Prepare output directory
-# ---------------------------------------------------------------------------
-
-safe_name = "".join(c for c in scene_name if c.isalnum() or c in ("_", "-"))[:100]
-scene_dir = os.path.join(config.inference_out_dir, safe_name)
-
-if ddp_info.is_main_process:
-    os.makedirs(scene_dir, exist_ok=True)
-
-    # Save original input images
-    orig = input_data.image[0].detach().cpu()
-    for vi in range(num_input_views):
-        img = (orig[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
-        Image.fromarray(img).save(os.path.join(scene_dir, f"original_input_v{vi}.png"))
-
-    # Save envmap sequence (identical ordering to image-space script)
-    seq = [{"step": i, "envmap_name": envmaps[i % len(envmaps)][3]} for i in range(num_iterations)]
-    with open(os.path.join(scene_dir, "envmap_sequence.json"), "w") as f:
-        json.dump(seq, f, indent=2)
-
-dist.barrier()
-
-# ---------------------------------------------------------------------------
-# Iterative loop
-# ---------------------------------------------------------------------------
-
-all_metrics = []
-
-with torch.no_grad(), torch.autocast(
-    enabled=config.training.use_amp,
-    device_type="cuda",
-    dtype=amp_dtype_mapping[config.training.amp_dtype],
-):
-    # Reconstruct ONCE from original input images
-    latent_tokens, n_patches, d = model.module.reconstructor(input_data)
-    current_tokens = latent_tokens.detach().clone()
-
-    for step in range(num_iterations):
-        # 1. Pick envmap for this step (same cycle as image-space)
-        env_ldr, env_hdr, gt_images, env_name = envmaps[step % len(envmaps)]
-        input_data.env_ldr = env_ldr
-        input_data.env_hdr = env_hdr
-
-        # 2. Edit current tokens (NOT re-encoded from pixels)
-        current_tokens = model.module.edit_scene_with_env(current_tokens, input_data)
-
-        # 3. Render for visualisation and metrics
-        rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
-
-        if np.random.randint(0, 10) <8 and step <17:
-            current_tokens = latent_tokens.detach().clone()
-        else:
-            latent_tokens = current_tokens
-            
-
-        # 4. Save results + compute metrics vs GT relit images
+    if len(envmaps) == 0:
         if ddp_info.is_main_process:
-            metrics = save_step(step, rendered, gt_images, env_name, scene_dir, num_input_views)
-            all_metrics.append(metrics)
-            if step % 10 == 0 or step == num_iterations - 1:
+            print(f"  Skip '{scene_name}': no envmap variations")
+        skipped += 1
+        del batch, input_data, target_data
+        torch.cuda.empty_cache()
+        continue
+
+    processed += 1
+
+    safe_name = "".join(c for c in scene_name if c.isalnum() or c in ("_", "-"))[:100]
+    scene_dir = os.path.join(config.inference_out_dir, safe_name)
+
+    if ddp_info.is_main_process:
+        print(f"\n[{processed}/{num_scenes}] {scene_name} "
+              f"(idx={dataset_idx}, {len(envmaps)} envmaps, views={image_indices})")
+        os.makedirs(scene_dir, exist_ok=True)
+
+        if save_images:
+            orig = input_data.image[0].detach().cpu()
+            for vi in range(num_input_views):
+                img = (orig[vi].permute(1, 2, 0).numpy() * 255).clip(0, 255).astype(np.uint8)
+                Image.fromarray(img).save(os.path.join(scene_dir, f"original_input_v{vi}.png"))
+
+        seq = [{"step": i, "envmap_name": envmaps[i % len(envmaps)][3]} for i in range(num_iterations)]
+        with open(os.path.join(scene_dir, "envmap_sequence.json"), "w") as f:
+            json.dump(seq, f, indent=2)
+
+    dist.barrier()
+
+    # --- Iterative loop for this scene ---
+    scene_metrics = []
+
+    with torch.no_grad(), torch.autocast(
+        enabled=config.training.use_amp,
+        device_type="cuda",
+        dtype=amp_dtype_mapping[config.training.amp_dtype],
+    ):
+        latent_tokens, n_patches, d = model.module.reconstructor(input_data)
+        current_tokens = latent_tokens.detach().clone()
+
+        for step in range(num_iterations):
+            env_ldr, env_hdr, gt_images, env_name = envmaps[step % len(envmaps)]
+            input_data.env_ldr = env_ldr
+            input_data.env_hdr = env_hdr
+
+            current_tokens = model.module.edit_scene_with_env(current_tokens, input_data)
+            rendered = model.module.renderer(current_tokens, target_data, n_patches, d)
+
+            if np.random.randint(0, 10) < 8 and step < 17:
+                current_tokens = latent_tokens.detach().clone()
+            else:
+                latent_tokens = current_tokens
+
+            if ddp_info.is_main_process:
+                metrics = save_step(
+                    step, rendered, gt_images, env_name,
+                    scene_dir, num_input_views, save_images=save_images,
+                )
+                scene_metrics.append(metrics)
+                step_psnrs[step].append(metrics["psnr"])
+                step_ssims[step].append(metrics["ssim"])
+                step_lpipss[step].append(metrics["lpips"])
+                all_records.append(
+                    f"{scene_name},{step},{metrics['psnr']:.4f},"
+                    f"{metrics['ssim']:.6f},{metrics['lpips']:.6f},{env_name}"
+                )
                 print(
                     f"  Step {step:03d}: PSNR={metrics['psnr']:.2f}  "
                     f"SSIM={metrics['ssim']:.4f}  LPIPS={metrics['lpips']:.4f}  "
                     f"(env: {env_name})"
                 )
 
+    # Per-scene summary
+    if ddp_info.is_main_process:
+        with open(os.path.join(scene_dir, "summary.json"), "w") as f:
+            json.dump(scene_metrics, f, indent=2)
+        if save_images:
+            create_flattened_views(scene_dir, num_iterations, num_input_views)
+
+    del batch, input_data, target_data
+    torch.cuda.empty_cache()
+    dist.barrier()
+
 # ---------------------------------------------------------------------------
-# Summary + flattened views
+# Aggregated results
 # ---------------------------------------------------------------------------
 
 if ddp_info.is_main_process:
-    with open(os.path.join(scene_dir, "summary.json"), "w") as f:
-        json.dump(all_metrics, f, indent=2)
+    print(f"\n=== Done: {processed} scenes processed, {skipped} skipped ===")
 
-    create_flattened_views(scene_dir, num_iterations, num_input_views)
-    print(f"\nFlattened view folders created in {os.path.join(scene_dir, 'flattened')}")
-    print(f"=== Done. Results saved to {scene_dir} ===")
+    avg_path = os.path.join(config.inference_out_dir, "all_scenes_avg.csv")
+    with open(avg_path, "w") as f:
+        f.write("step,avg_psnr,avg_ssim,avg_lpips,num_scenes\n")
+        for s in range(num_iterations):
+            if step_psnrs[s]:
+                f.write(
+                    f"{s},{np.mean(step_psnrs[s]):.4f},"
+                    f"{np.mean(step_ssims[s]):.6f},"
+                    f"{np.mean(step_lpipss[s]):.6f},"
+                    f"{len(step_psnrs[s])}\n"
+                )
 
-torch.cuda.empty_cache()
+    detail_path = os.path.join(config.inference_out_dir, "per_scene_step_metrics.csv")
+    with open(detail_path, "w") as f:
+        f.write("scene_name,step,psnr,ssim,lpips,envmap_name\n")
+        for rec in all_records:
+            f.write(rec + "\n")
+
+    print(f"Average metrics: {avg_path}")
+    print(f"Per-scene metrics: {detail_path}")
+
 dist.barrier()
 dist.destroy_process_group()
 exit(0)
