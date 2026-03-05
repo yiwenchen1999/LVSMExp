@@ -12,6 +12,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ############################
 # VoltagePark paths
 ############################
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
+
 export PROJ="${PROJ:-$REPO_ROOT}"
 export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
@@ -41,7 +43,6 @@ if [ ! -f "$EVAL_INDEX" ]; then
   echo "ERROR: Evaluation index not found: $EVAL_INDEX"
   exit 1
 fi
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
 
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
