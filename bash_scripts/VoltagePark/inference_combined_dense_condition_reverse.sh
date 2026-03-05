@@ -17,8 +17,8 @@ export PROJ="${PROJ:-$REPO_ROOT}"
 export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_scenes}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
-export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb.json}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_scenes}"
+export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb_long.json}"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_scenes_long}"
 
 # Detect GPU count (override with NPROC env var)
 if [[ -n "${NPROC:-}" ]]; then
@@ -60,7 +60,7 @@ fi
 ############################
 echo "Starting condition_reverse inference..."
 
-torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_envmap_pointlight.yaml \
     training.dataset_path = "$DATA_LIST" \
