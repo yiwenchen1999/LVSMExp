@@ -199,6 +199,7 @@ with torch.no_grad(), torch.autocast(
                     gt_image = input_data.image[b_idx, :, :, :]
 
                     save_imgs = (step % 5 == 0) or (step == num_iterations - 1)
+                    gt_image = input_data.image[b_idx, :, :, :]
                     metrics = save_step(
                         step, rendered, gt_images, env_name,
                         scene_dir, num_input_views,
