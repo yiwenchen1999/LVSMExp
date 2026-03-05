@@ -46,7 +46,7 @@ fi
 torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor_degrade_test_tokenSpace.py \
-    --config configs/LVSM_scene_encoder_decoder_wEditor_envmap_pointlight.yaml \
+    --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
   training.dataset_path = /data/polyhaven_lvsm/test/full_list.txt \
   training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4_singleMap \
   training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
