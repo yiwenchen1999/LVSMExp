@@ -43,7 +43,7 @@ if [ ! -f "$EVAL_INDEX" ]; then
   exit 1
 fi
 
-torchrun --nproc_per_node 1 --nnodes "$NNODES" \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor_degrade_test_tokenSpace.py \
     --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
@@ -61,7 +61,7 @@ torchrun --nproc_per_node 1 --nnodes "$NNODES" \
   inference.render_video = false \
   inference.same_pose = True \
   inference.view_idx_file_path = data/evaluation_index_polyhaven.json \
- inference_out_dir = "$OUTPUT_DIR"
+ inference_out_dir = experiments/degradation_exp/token_space
 
 echo ""
 echo "=============================================="
