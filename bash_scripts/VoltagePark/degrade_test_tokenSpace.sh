@@ -52,7 +52,7 @@ torchrun --nproc_per_node 1 --nnodes "$NNODES" \
   training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
   training.batch_size_per_gpu = 4 \
   training.target_has_input = false \
-  training.num_views = 12 \
+  training.num_views = 8 \
   training.square_crop = true \
   training.num_input_views = 4 \
   training.num_target_views = 4 \

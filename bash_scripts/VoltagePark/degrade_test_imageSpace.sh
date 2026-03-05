@@ -12,9 +12,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ############################
 # VoltagePark paths
 ############################
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
 
 export PROJ="${PROJ:-$REPO_ROOT}"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
+
 export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
@@ -62,7 +63,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
   inference.render_video = false \
   inference.same_pose = True \
   inference.view_idx_file_path = data/evaluation_index_polyhaven.json \
-    inference_out_dir = "$OUTPUT_DIR"
+    inference_out_dir = experiments/degradation_exp/image_space
 
 echo ""
 echo "=============================================="

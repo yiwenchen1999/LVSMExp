@@ -176,7 +176,7 @@ with torch.no_grad(), torch.autocast(
                 if entry_count >= max_entries:
                     break
 
-                scene_dir = os.path.join(out_dir, f"{scene_name}__{env_name}")
+                scene_dir = os.path.join(out_dir, f"{entry_count:04d}__{scene_name}__{env_name}")
                 os.makedirs(scene_dir, exist_ok=True)
 
                 current_images = inp.image.clone()  # [1, v, 3, h, w]

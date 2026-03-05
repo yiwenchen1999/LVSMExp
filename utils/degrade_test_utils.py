@@ -74,7 +74,7 @@ def collect_envmaps_and_gt(dataset, scene_path, scene_name, image_indices, num_i
 
     result = []
     for candidate_name in candidates:
-        candidate_name = scene_name
+        # candidate_name = scene_name
         envmaps_dir = os.path.join(base_dir, "envmaps", candidate_name)
         ldr_files = sorted(f for f in os.listdir(envmaps_dir) if f.endswith("_ldr.png"))
         env_idx = int(ldr_files[0].split("_")[0])
@@ -183,6 +183,8 @@ def create_flattened_views(scene_dir, num_steps, num_views):
             src = os.path.join(scene_dir, f"step_{step:03d}", f"rendered_v{vi}.png")
             dst = os.path.join(view_dir, f"step_{step:03d}.png")
             if os.path.exists(src):
+                if os.path.exists(dst) or os.path.islink(dst):
+                    os.remove(dst)
                 try:
                     os.symlink(os.path.abspath(src), dst)
                 except OSError:
