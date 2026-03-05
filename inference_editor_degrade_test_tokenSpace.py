@@ -173,6 +173,7 @@ with torch.no_grad(), torch.autocast(
 
             # Reconstruct once from original images
             latent_tokens, n_patches, d = model.module.reconstructor(inp)
+            latent_tokens = latent_tokens.detach().clone()
 
             for env_ldr, env_hdr, gt_images, env_name in envmap_list:
                 if entry_count >= max_entries:
@@ -209,9 +210,9 @@ with torch.no_grad(), torch.autocast(
                     )
 
                 if np.random.randint(0, 10) > step/3 and step > 0:
-                    current_tokens = (1-step/30)*latent_tokens.detach().clone()+(step/30)*current_tokens.detach().clone()
+                    current_tokens = latent_tokens.detach().clone()
                 else:
-                    latent_tokens = current_tokens
+                    current_tokens = latent_tokens.detach().clone()
 
 
                     step_psnrs[step].append(metrics["psnr"])
