@@ -4,6 +4,10 @@ rsync -avh --partial --inplace --progress \
   chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsm_scenes_dense \
     .
 
+rsync -avh --partial --inplace --progress \
+  -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
+  ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/experiments/evaluation/combined_scenes \
+    result_previews
 
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
