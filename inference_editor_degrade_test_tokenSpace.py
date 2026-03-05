@@ -200,14 +200,13 @@ with torch.no_grad(), torch.autocast(
                         current_tokens, env_input,
                     )
 
-                    # Blend: at step 0 keep 100 % base, at last step
-                    # keep 100 % re-edited.  In between, each token
-                    # position is independently replaced with
-                    # probability = step / (num_iterations - 1).
+                    ramp_steps = 12
                     if step == 0:
                         current_tokens = base_tokens.clone()
-                    else:
-                        replace_ratio = step / (num_iterations - 1)
+                    elif step < ramp_steps:
+                        # Linear ramp: replace_ratio grows from 0 to 1
+                        # over steps 1..ramp_steps-1
+                        replace_ratio = step / (ramp_steps - 1)
                         mask = (
                             torch.rand(
                                 base_tokens.shape[:2],
@@ -216,6 +215,13 @@ with torch.no_grad(), torch.autocast(
                             < replace_ratio
                         ).unsqueeze(-1)  # [b, n_tokens, 1]
                         current_tokens = torch.where(mask, re_edited, base_tokens)
+                        # Where we chose the edited token, commit that
+                        # decision into base_tokens for future steps.
+                        base_tokens = torch.where(mask, re_edited, base_tokens)
+                    else:
+                        # Step >= ramp_steps: fully use re-edited tokens
+                        current_tokens = re_edited
+                        base_tokens = re_edited.clone()
 
                     rendered = model.module.renderer(current_tokens, tgt, n_patches, d)
                     rendered = rendered.clamp(0, 1)
