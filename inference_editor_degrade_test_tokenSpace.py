@@ -193,6 +193,10 @@ with torch.no_grad(), torch.autocast(
                 for step in range(num_iterations):
                     # randomly subsitute current_tokens with latent_tokens
                     import random
+                    if np.random.randint(0, 10) > step/3 and step > 0:
+                        current_tokens = latent_tokens.detach().clone()
+                    else:
+                        latent_tokens = current_tokens.detach().clone()
 
                     current_tokens = model.module.edit_scene_with_env(
                         current_tokens, env_input,
@@ -208,11 +212,6 @@ with torch.no_grad(), torch.autocast(
                         scene_dir, num_input_views,
                         save_images=save_imgs,
                     )
-
-                if np.random.randint(0, 10) > step/3 and step > 0:
-                    current_tokens = latent_tokens.detach().clone()
-                else:
-                    current_tokens = latent_tokens.detach().clone()
 
 
                     step_psnrs[step].append(metrics["psnr"])
