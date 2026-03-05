@@ -27,14 +27,14 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /scratch/chen.yiwe/temp_objaverse/lvsm_scenes/test/full_list.txt \
-    --output data/evaluation_index_scenes.json \
+    --full-list /data/lvsm_scenes_dense/test/full_list.txt \
+    --output data/evaluation_index_scenes_comb.json \
     --n-input 4 \
     --n-target 8 \
     --min-frame-dist 13 \
     --max-frame-dist 20 \
     --max-scenes 5000 \
-    --seed 48
+    --seed 42
 
 #
 
