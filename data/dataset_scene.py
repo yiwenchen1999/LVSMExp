@@ -401,6 +401,7 @@ class Dataset(Dataset):
                 candidate_scenes = []
                 if self.condition_reverse:
                     candidate_scenes = list(candidate_scenes_by_type["envmap"])
+                    candidate_scenes.extend(candidate_scenes_by_type["combined"])
                 else:
                     for sig in enabled_signal_types:
                         candidate_scenes.extend(candidate_scenes_by_type[sig])
