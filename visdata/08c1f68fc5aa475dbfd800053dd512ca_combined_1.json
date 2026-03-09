@@ -1,0 +1,20 @@
+{
+  "scene_name": "08c1f68fc5aa475dbfd800053dd512ca_combined_1",
+  "context_view_indices": [
+    28,
+    29,
+    35,
+    40
+  ],
+  "target_view_indices": [
+    27,
+    30,
+    31,
+    33,
+    36,
+    37,
+    38,
+    44
+  ],
+  "relit_scene_name": "08c1f68fc5aa475dbfd800053dd512ca_env_0"
+}
