@@ -55,4 +55,5 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.batch_size_per_gpu = 4 \
     training.dataset_path = "$DATA_LIST" \
     training.checkpoint_dir = "$CKPT_DIR" \
+    training.vis_every = 2 \
     training.grad_accum_steps = 1
