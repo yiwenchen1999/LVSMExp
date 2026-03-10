@@ -51,7 +51,7 @@ echo "----------------------------------"
 
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-    train.py --config configs/LVSM_scene_encoder_decoder_sparse.yaml \
+    train.py --config configs/LVSM_scene_encoder_decoder.yaml \
     training.batch_size_per_gpu = 4 \
     training.dataset_path = "$DATA_LIST" \
     training.checkpoint_dir = "$CKPT_DIR" \
