@@ -49,10 +49,10 @@ echo "----------------------------------"
 # Run training
 ############################
 
-torchrun --nproc_per_node "$NPROC_PER_NODE" --nnodes "$NNODES" \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
     train.py --config configs/LVSM_scene_encoder_decoder_sparse.yaml \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 4 \
     training.dataset_path = "$DATA_LIST" \
     training.checkpoint_dir = "$CKPT_DIR" \
     training.grad_accum_steps = 1
