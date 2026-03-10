@@ -12,8 +12,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # # VoltagePark paths
 # ############################
 export PROJ="${PROJ:-$REPO_ROOT}"
-export DATA_LIST="${DATA_LIST:-/data/benchmark_tensoIR_processed/train/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_sparse/}"
+export DATA_LIST="${DATA_LIST:-/data/benchmark_tensoIR_processed/test/full_list.txt}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense/}"
 
 # # Caches (use $HOME on clean machine)
 # export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
