@@ -78,3 +78,10 @@ python3 preprocess_scripts/preprocess_obj_with_light.py \
     --metadata_dir  metadata_polyhaven \
     --dataset_root  /data/polyhaven_lvsm/test \
     --out_dir       source_data_polyhaven
+
+
+python3 preprocess_scripts/preprocess_tenIR.py \
+    --input /data/benchmark_tensoIR \
+    --output /data/benchmark_tensoIR_processed \
+    --hdri-dir /data/high_res_envmaps_1k \
+    --split both
