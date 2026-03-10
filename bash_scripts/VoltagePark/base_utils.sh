@@ -84,4 +84,4 @@ python3 preprocess_scripts/preprocess_tenIR.py \
     --input /data/benchmark_tensoIR \
     --output /data/benchmark_tensoIR_processed \
     --hdri-dir /data/high_res_envmaps_1k \
-    --split both
+    --split test
