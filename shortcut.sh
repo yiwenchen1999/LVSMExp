@@ -28,11 +28,11 @@ python preprocess_scripts/preprocess_objaverse.py \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
     --full-list /data/lvsm_scenes_dense/test/full_list_scenes.txt \
-    --output data/demo_scene_rotate.json \
-    --n-input 16 \
-    --n-target 8 \
-    --min-frame-dist 80 \
-    --max-frame-dist 100 \
+    --output data/demo_scene_rotate_dense.json \
+    --n-input 25 \
+    --n-target 5 \
+    --min-frame-dist 45 \
+    --max-frame-dist 50 \
     --max-scenes 5000 \
     --seed 42
 
