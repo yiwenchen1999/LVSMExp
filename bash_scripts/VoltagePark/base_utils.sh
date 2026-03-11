@@ -85,3 +85,13 @@ python3 preprocess_scripts/preprocess_tenIR.py \
     --output /data/benchmark_tensoIR_processed \
     --hdri-dir /data/high_res_envmaps_1k \
     --split test
+
+
+
+python preprocess_scripts/preprocess_objaverse_env_variations.py \
+  --input /data/polyhaven_lvsm/test \
+  --output /data/polyhaven_lvsm_rotating_env \
+  --split test \
+  --hdri-dir /data/high_res_envmaps_1k \
+  --n-variations 36 \
+  --scene-list env_varation_scene_list.json

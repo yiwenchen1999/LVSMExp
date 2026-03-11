@@ -443,8 +443,8 @@ def export_all_views_results(
         # Compute and save per-view metrics if requested
         if compute_metrics:
             _save_metrics(
-                gt_target,
-                rendered,
+                gt_target.cpu().float(),
+                rendered.float(),
                 target_indices,
                 sample_dir,
                 scene_name,
