@@ -14,6 +14,6 @@ torchrun --nproc_per_node 1 --nnodes 1 \
   inference.compute_metrics = true \
   inference.render_video = false \
   inference.condition_reverse = true \
-  inference.all_views = true \
+  inference.render_all_views = true \
   inference.view_idx_file_path = data/evaluation_index_polyhaven_demo.json \
   inference_out_dir = experiments/evaluation/demo_scenes

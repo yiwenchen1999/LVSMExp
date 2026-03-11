@@ -436,8 +436,12 @@ def export_all_views_results(
             comparison = np.concatenate([gt_np, pred_np], axis=1)
             Image.fromarray(comparison).save(os.path.join(sample_dir, f"gt_vs_pred_{view_idx:05d}.png"))
 
+        # Reorder frames by frame index so the video plays in natural order
+        sort_order = np.argsort(target_indices)
+        rendered_sorted = rendered[sort_order]
+
         # Save rendered video
-        _save_video(rendered, sample_dir)
+        _save_video(rendered_sorted, sample_dir)
         print(f"Exported {num_target} frames for scene {scene_name} to {sample_dir}")
 
         # Compute and save per-view metrics if requested
