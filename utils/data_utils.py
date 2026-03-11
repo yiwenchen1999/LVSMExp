@@ -184,6 +184,24 @@ class ProcessData(nn.Module):
 
         input_dict, target_dict = {}, {}
 
+        # render_all_views mode: input = first num_input_views, target = ALL views
+        render_all_views = self.config.inference.get("render_all_views", False)
+        is_inference = self.config.inference.get("if_inference", False)
+        if render_all_views and is_inference:
+            num_input = self.config.training.num_input_views
+            for key, value in data_batch.items():
+                if not isinstance(value, torch.Tensor):
+                    input_dict[key] = value
+                    target_dict[key] = value
+                    continue
+                input_dict[key] = value[:, :num_input, ...]
+                target_dict[key] = value  # ALL views as targets
+
+            height, width = data_batch["image"].shape[3], data_batch["image"].shape[4]
+            input_dict["image_h_w"] = (height, width)
+            target_dict["image_h_w"] = (height, width)
+            return edict(input_dict), edict(target_dict)
+
         # same_pose mode: clone input views to target (no novel-view sampling)
         same_pose = self.config.inference.get("same_pose", False)
         if same_pose:

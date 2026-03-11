@@ -27,12 +27,12 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /data/polyhaven_lvsm/test/full_list.txt \
-    --output data/evaluation_index_polyhaven.json \
-    --n-input 4 \
-    --n-target 8 \
-    --min-frame-dist 13 \
-    --max-frame-dist 50 \
+    --full-list /data/polyhaven_lvsm/test/full_list_demo.txt \
+    --output data/evaluation_index_polyhaven_demo.json \
+    --n-input 8 \
+    --n-target 16 \
+    --min-frame-dist 50 \
+    --max-frame-dist 100 \
     --max-scenes 5000 \
     --seed 42
 

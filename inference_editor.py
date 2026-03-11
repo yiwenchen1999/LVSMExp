@@ -7,8 +7,10 @@ import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 import torch.distributed as dist
+from easydict import EasyDict as edict
+from einops import rearrange, repeat
 from setup import init_config, init_distributed
-from utils.metric_utils import export_results, summarize_evaluation
+from utils.metric_utils import export_results, export_all_views_results, summarize_evaluation
 
 # Load config and read(override) arguments from CLI
 config = init_config()
@@ -38,15 +40,17 @@ Dataset = importlib.import_module(module).__dict__[class_name]
 dataset = Dataset(config)
 
 datasampler = DistributedSampler(dataset)
+# render_all_views requires batch_size=1 because frame counts vary per scene
+_batch_size = 1 if config.inference.get("render_all_views", False) else config.training.batch_size_per_gpu
 dataloader = DataLoader(
     dataset,
-    batch_size=config.training.batch_size_per_gpu,
+    batch_size=_batch_size,
     shuffle=False,
     num_workers=config.training.num_workers,
     prefetch_factor=config.training.prefetch_factor,
     persistent_workers=True,
     pin_memory=False,
-    drop_last=True,
+    drop_last=False if config.inference.get("render_all_views", False) else True,
     sampler=datasampler
 )
 dataloader_iter = iter(dataloader)
@@ -111,8 +115,75 @@ if ddp_info.is_main_process:
 dist.barrier()
 
 
+def render_all_views_chunked(m, batch, device, view_chunk_size=4):
+    """Render all target views using chunked decoding to avoid OOM.
+
+    Steps: process_data -> reconstructor -> editor -> chunked renderer.
+    """
+    input_dict, target_dict = m.process_data(
+        batch,
+        has_target_image=True,
+        target_has_input=config.training.target_has_input,
+        compute_rays=True,
+    )
+
+    latent_tokens, n_patches, d = m.reconstructor(input_dict)
+
+    n_latent_vectors = config.model.transformer.n_latent_vectors
+    condition_tokens = m._build_editor_condition_tokens(input_dict, d)
+    if condition_tokens is not None:
+        editor_input = torch.cat([latent_tokens, condition_tokens], dim=1)
+        editor_output = m.pass_layers(
+            m.transformer_editor, editor_input, gradient_checkpoint=False
+        )
+        latent_tokens = editor_output[:, :n_latent_vectors, :]
+
+    # Chunked rendering of all target views
+    target_pose_cond = m.get_posed_input(
+        ray_o=target_dict.ray_o, ray_d=target_dict.ray_d
+    )
+    bs, num_views, c_dim, ph, pw = target_pose_cond.size()
+    h, w = target_dict.image_h_w
+    patch_size = config.model.target_pose_tokenizer.patch_size
+
+    target_pose_tokens = m.target_pose_tokenizer(target_pose_cond)
+    _, n_per_view, _ = target_pose_tokens.size()
+    target_pose_tokens = target_pose_tokens.reshape(bs, num_views * n_per_view, d)
+
+    rendered_chunks = []
+    for start in range(0, num_views, view_chunk_size):
+        cur_sz = min(view_chunk_size, num_views - start)
+        s_idx = start * n_per_view
+        e_idx = (start + cur_sz) * n_per_view
+        cur_pose = rearrange(
+            target_pose_tokens[:, s_idx:e_idx, :],
+            "b (v p) d -> (b v) p d", v=cur_sz, p=n_per_view,
+        )
+        cur_latent = repeat(latent_tokens, "b nl d -> (b v) nl d", v=cur_sz)
+        dec_in = torch.cat((cur_pose, cur_latent), dim=1)
+        dec_in = m.transformer_input_layernorm_decoder(dec_in)
+        dec_out = m.pass_layers(
+            m.transformer_decoder, dec_in, gradient_checkpoint=False
+        )
+        img_tokens, _ = dec_out.split([n_per_view, n_latent_vectors], dim=1)
+        rendered = m.image_token_decoder(img_tokens)
+        rendered = rearrange(
+            rendered,
+            "(b v) (hh ww) (p1 p2 c) -> b v c (hh p1) (ww p2)",
+            v=cur_sz,
+            hh=h // patch_size, ww=w // patch_size,
+            p1=patch_size, p2=patch_size, c=3,
+        ).cpu()
+        rendered_chunks.append(rendered)
+
+    rendered_all = torch.cat(rendered_chunks, dim=1)
+    return edict(input=input_dict, target=target_dict, render=rendered_all)
+
+
 datasampler.set_epoch(0)
 model.eval()
+
+_render_all_views = config.inference.get("render_all_views", False)
 
 with torch.no_grad(), torch.autocast(
     enabled=config.training.use_amp,
@@ -121,10 +192,22 @@ with torch.no_grad(), torch.autocast(
 ):
     for batch in dataloader:
         batch = {k: v.to(ddp_info.device) if type(v) == torch.Tensor else v for k, v in batch.items()}
-        result = model(batch)
-        if config.inference.get("render_video", False):
-            result= model.module.render_video(result, **config.inference.render_video_config)
-        export_results(result, config.inference_out_dir, compute_metrics=config.inference.get("compute_metrics"))
+
+        if _render_all_views:
+            view_chunk_size = config.inference.get("view_chunk_size", 4)
+            result = render_all_views_chunked(
+                model.module, batch, ddp_info.device,
+                view_chunk_size=view_chunk_size,
+            )
+            export_all_views_results(
+                result, config.inference_out_dir,
+                compute_metrics=config.inference.get("compute_metrics", False),
+            )
+        else:
+            result = model(batch)
+            if config.inference.get("render_video", False):
+                result = model.module.render_video(result, **config.inference.render_video_config)
+            export_results(result, config.inference_out_dir, compute_metrics=config.inference.get("compute_metrics"))
     torch.cuda.empty_cache()
 
 

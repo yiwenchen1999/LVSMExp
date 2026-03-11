@@ -361,6 +361,96 @@ def _save_video(frames, out_dir):
     )
 
 
+@torch.no_grad()
+def export_all_views_results(
+    result: edict,
+    out_dir: str,
+    compute_metrics: bool = False,
+):
+    """
+    Export results when rendering all views of a scene.
+    Saves individual rendered frames, GT frames, gt_vs_pred comparisons, and a video.
+
+    Args:
+        result: EasyDict with input, target, render tensors
+        out_dir: Output directory
+        compute_metrics: Whether to compute per-view metrics
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    input_data, target_data = result.input, result.target
+
+    for batch_idx in range(input_data.image.size(0)):
+        scene_name = input_data.scene_name[batch_idx]
+        safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
+        sample_dir = os.path.join(out_dir, safe_scene_name)
+        os.makedirs(sample_dir, exist_ok=True)
+
+        input_indices = input_data.index[batch_idx, :, 0].cpu().numpy().tolist()
+        target_indices = target_data.index[batch_idx, :, 0].cpu().numpy().tolist()
+
+        relit_scene_name = None
+        if hasattr(input_data, 'relit_scene_name') and input_data.relit_scene_name is not None:
+            relit_scene_name = input_data.relit_scene_name[batch_idx]
+
+        metadata = {
+            "scene_name": scene_name,
+            "context_view_indices": input_indices,
+            "target_view_indices": target_indices,
+            "relit_scene_name": relit_scene_name,
+            "render_all_views": True,
+            "total_rendered_frames": len(target_indices),
+        }
+        with open(os.path.join(sample_dir, "metadata.json"), 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+        # Save input (context) views
+        input_img = input_data.image[batch_idx]
+        input_img_grid = rearrange(input_img, "v c h w -> h (v w) c")
+        input_img_grid = (input_img_grid.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+        Image.fromarray(input_img_grid).save(os.path.join(sample_dir, "input.png"))
+
+        # Determine GT target images (relit if available, else original)
+        if hasattr(target_data, 'relit_images') and target_data.relit_images is not None:
+            gt_target = target_data.relit_images[batch_idx]
+        else:
+            gt_target = target_data.image[batch_idx]
+
+        rendered = result.render[batch_idx]  # [v_target, 3, h, w]
+        num_target = rendered.shape[0]
+
+        # Save individual rendered frames, GT frames, and gt_vs_pred comparisons
+        for vi in range(num_target):
+            view_idx = target_indices[vi]
+
+            # Rendered frame
+            pred_frame = rendered[vi].cpu()
+            pred_np = (pred_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            Image.fromarray(pred_np).save(os.path.join(sample_dir, f"{view_idx:05d}.png"))
+
+            # GT frame
+            gt_frame = gt_target[vi].cpu()
+            gt_np = (gt_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            Image.fromarray(gt_np).save(os.path.join(sample_dir, f"gt_{view_idx:05d}.png"))
+
+            # Side-by-side gt_vs_pred
+            comparison = np.concatenate([gt_np, pred_np], axis=1)
+            Image.fromarray(comparison).save(os.path.join(sample_dir, f"gt_vs_pred_{view_idx:05d}.png"))
+
+        # Save rendered video
+        _save_video(rendered, sample_dir)
+        print(f"Exported {num_target} frames for scene {scene_name} to {sample_dir}")
+
+        # Compute and save per-view metrics if requested
+        if compute_metrics:
+            _save_metrics(
+                gt_target,
+                rendered,
+                target_indices,
+                sample_dir,
+                scene_name,
+            )
+
+
 def summarize_evaluation(evaluation_folder):
     # Find and sort all valid subfolders
     subfolders = sorted(

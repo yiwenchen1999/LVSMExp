@@ -87,6 +87,7 @@ class Dataset(Dataset):
             print(f"whiteEnvInput disabled: Filtered to {len(self.all_scene_paths)} scenes with valid lighting tags (from {total_scenes_before} total)")
 
         self.inference = self.config.inference.get("if_inference", False)
+        self.render_all_views = self.config.inference.get("render_all_views", False)
         # Load file that specifies the input and target view indices to use for inference
         if self.inference:
             self.view_idx_list = dict()
@@ -346,7 +347,16 @@ class Dataset(Dataset):
             # print(f"scene_name: {scene_name}")
             # print(f"frames: {len(frames)}")
 
-            if self.inference and scene_name in self.view_idx_list:
+            if self.inference and self.render_all_views:
+                # Load ALL frames: context from view_idx (or first N), rest as targets
+                if scene_name in self.view_idx_list:
+                    context_indices = self.view_idx_list[scene_name]["context"]
+                else:
+                    context_indices = list(range(self.config.training.num_input_views))
+                all_indices = list(range(len(frames)))
+                remaining_indices = sorted([i for i in all_indices if i not in context_indices])
+                image_indices = context_indices + remaining_indices
+            elif self.inference and scene_name in self.view_idx_list:
                 current_view_idx = self.view_idx_list[scene_name]
                 image_indices = current_view_idx["context"] + current_view_idx["target"]
             else:
