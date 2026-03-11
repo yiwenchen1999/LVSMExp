@@ -49,10 +49,43 @@ def is_env_scene(scene_name):
     return bool(re.search(r'(?<!white)_env_\d+$', scene_name))
 
 
+def check_variation_complete(var_scene_name, src_envmaps_dir, out_metadata_dir, out_envmaps_base, out_images_base):
+    """
+    Check if a variation is already fully generated.
+    Returns (is_complete, n_existing_envmaps, n_expected_envmaps).
+    """
+    var_json_path = os.path.join(out_metadata_dir, f"{var_scene_name}.json")
+    var_envmaps_dir = os.path.join(out_envmaps_base, var_scene_name)
+
+    if not os.path.exists(var_json_path):
+        expected_ldr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_ldr.png')}
+        expected_hdr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_hdr.png')}
+        n_expected = len(expected_ldr) + len(expected_hdr)
+        n_existing = 0
+        if os.path.isdir(var_envmaps_dir):
+            n_existing = len(os.listdir(var_envmaps_dir))
+        return False, n_existing, n_expected
+
+    if not os.path.isdir(var_envmaps_dir):
+        expected_ldr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_ldr.png')}
+        expected_hdr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_hdr.png')}
+        return False, 0, len(expected_ldr) + len(expected_hdr)
+
+    existing = set(os.listdir(var_envmaps_dir))
+    expected_ldr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_ldr.png')}
+    expected_hdr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_hdr.png')}
+    n_expected = len(expected_ldr) + len(expected_hdr)
+    n_existing = len(existing & (expected_ldr | expected_hdr))
+
+    is_complete = expected_ldr.issubset(existing) and expected_hdr.issubset(existing)
+    return is_complete, n_existing, n_expected
+
+
 def process_single_variation(args_tuple):
     """
     Worker function: create one variation of one scene.
     Rolls all LDR/HDR env maps horizontally and writes a new scene JSON.
+    Skips individual files that already exist (resume-safe).
     """
     (scene_name, variation_idx, n_variations,
      src_envmaps_base, out_metadata_dir, out_envmaps_base,
@@ -62,15 +95,6 @@ def process_single_variation(args_tuple):
     var_envmaps_dir = os.path.join(out_envmaps_base, var_scene_name)
     src_envmaps_dir = os.path.join(src_envmaps_base, scene_name)
 
-    # Skip if already fully done
-    var_json_path = os.path.join(out_metadata_dir, f"{var_scene_name}.json")
-    if os.path.exists(var_envmaps_dir) and os.path.exists(var_json_path):
-        existing = set(os.listdir(var_envmaps_dir))
-        expected_ldr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_ldr.png')}
-        expected_hdr = {f for f in os.listdir(src_envmaps_dir) if f.endswith('_hdr.png')}
-        if expected_ldr.issubset(existing) and expected_hdr.issubset(existing):
-            return var_scene_name, "skipped"
-
     os.makedirs(var_envmaps_dir, exist_ok=True)
 
     rotation_angle = (variation_idx - 1) * (2 * np.pi / n_variations)
@@ -79,7 +103,6 @@ def process_single_variation(args_tuple):
     ldr_files = [f for f in env_files if f.endswith('_ldr.png')]
     hdr_files = [f for f in env_files if f.endswith('_hdr.png')]
 
-    # Determine shift from the first file's width
     sample = np.array(Image.open(os.path.join(src_envmaps_dir, ldr_files[0])))
     env_w = sample.shape[1]
     shift = int(round((rotation_angle / (2 * np.pi)) * env_w))
@@ -104,6 +127,7 @@ def process_single_variation(args_tuple):
             os.symlink(os.path.abspath(src_img_dir), out_img_dir)
 
     # Scene JSON: same frames (same image paths / cameras), just rename scene
+    var_json_path = os.path.join(out_metadata_dir, f"{var_scene_name}.json")
     var_data = dict(scene_json_data)
     var_data["scene_name"] = var_scene_name
     with open(var_json_path, 'w') as f:
@@ -173,41 +197,62 @@ def create_env_variations(data_root, output_root, split, n_variations,
         with open(os.path.join(src_metadata_dir, f"{name}.json")) as f:
             scene_jsons[name] = json.load(f)
 
-    # Build work items
-    work_items = []
+    # --- Pre-check phase: scan existing output to determine what needs work ---
+    print(f"\nChecking existing output for {total_jobs} variations...")
+    items_to_process = []
+    already_complete = []
+    check_count = 0
     for name in scenes_to_process:
+        src_env_dir = os.path.join(src_envmaps_base, name)
         for vi in range(1, n_variations + 1):
-            work_items.append((
-                name, vi, n_variations,
-                src_envmaps_base, out_metadata_dir, out_envmaps_base,
-                scene_jsons[name], copy_images, src_images_base, out_images_base,
-            ))
+            check_count += 1
+            var_scene_name = f"{name}_{vi}"
+            is_complete, n_exist, n_expect = check_variation_complete(
+                var_scene_name, src_env_dir, out_metadata_dir, out_envmaps_base, out_images_base,
+            )
+            if is_complete:
+                already_complete.append(var_scene_name)
+            else:
+                items_to_process.append((
+                    name, vi, n_variations,
+                    src_envmaps_base, out_metadata_dir, out_envmaps_base,
+                    scene_jsons[name], copy_images, src_images_base, out_images_base,
+                ))
+            if check_count % 200 == 0 or check_count == total_jobs:
+                print(f"  Checked {check_count}/{total_jobs}: "
+                      f"{len(already_complete)} complete, {len(items_to_process)} to process")
 
-    created_scenes = []
-    skipped = 0
+    print(f"\nPre-check done: {len(already_complete)} already complete, "
+          f"{len(items_to_process)} to generate.\n")
+
+    if not items_to_process:
+        print("Nothing to do, all variations already exist.")
+        return sorted(already_complete)
+
+    # --- Processing phase ---
+    created_scenes = list(already_complete)
+    newly_created = 0
+    total_to_do = len(items_to_process)
 
     if workers <= 1:
-        for item in work_items:
+        for i, item in enumerate(items_to_process, 1):
             var_name, status = process_single_variation(item)
             created_scenes.append(var_name)
-            if status == "skipped":
-                skipped += 1
-            else:
-                print(f"  {var_name}: {status}")
+            newly_created += 1
+            print(f"  [{i}/{total_to_do}] {var_name}: {status}")
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(process_single_variation, item): item for item in work_items}
+            futures = {pool.submit(process_single_variation, item): item for item in items_to_process}
             done_count = 0
             for future in as_completed(futures):
                 done_count += 1
                 var_name, status = future.result()
                 created_scenes.append(var_name)
-                if status == "skipped":
-                    skipped += 1
-                else:
-                    print(f"  [{done_count}/{total_jobs}] {var_name}: {status}")
+                newly_created += 1
+                print(f"  [{done_count}/{total_to_do}] {var_name}: {status}")
 
-    print(f"\nDone: {len(created_scenes)} variation scenes ({skipped} already existed, {len(created_scenes) - skipped} newly created)")
+    print(f"\nDone: {len(created_scenes)} total variation scenes "
+          f"({len(already_complete)} already existed, {newly_created} newly created)")
     return sorted(created_scenes)
 
 
