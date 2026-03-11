@@ -68,10 +68,10 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.LVSM_checkpoint_dir = "$LVSM_CKPT_DIR" \
     training.batch_size_per_gpu = 4 \
     training.target_has_input = false \
-    training.num_views = 30 \
+    training.num_views = 24 \
     training.square_crop = true \
-    training.num_input_views = 25 \
-    training.num_target_views = 5 \
+    training.num_input_views = 16 \
+    training.num_target_views = 8 \
     training.condition_reverse = true \
     training.single_env_map = true \
     inference.if_inference = true \
