@@ -88,10 +88,9 @@ python3 preprocess_scripts/preprocess_tenIR.py \
 
 
 
-python preprocess_scripts/preprocess_objaverse_env_variations.py \
-  --input /data/polyhaven_lvsm/test \
-  --output /data/polyhaven_lvsm_rotating_env \
-  --split test \
-  --hdri-dir /data/high_res_envmaps_1k \
-  --n-variations 36 \
-  --scene-list env_varation_scene_list.json
+python preprocess_scripts/create_env_variations_from_processed.py \
+    --data-root /data/polyhaven_lvsm \
+    --output-root /data/polyhaven_lvsm_env_variations \
+    --split test \
+    --n-variations 100 \
+    --scene-list /data/polyhaven_lvsm/test/full_list_demo.txt
