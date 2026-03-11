@@ -27,9 +27,9 @@ python preprocess_scripts/preprocess_objaverse.py \
     --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
-    --full-list /data/polyhaven_lvsm_env_variations/test/full_list.txt \
-    --output data/evaluation_index_polyhaven_demo_rotateEnv.json \
-    --n-input 8 \
+    --full-list /data/lvsm_scenes_dense/test/full_list_scenes.txt \
+    --output data/demo_scene_rotate.json \
+    --n-input 16 \
     --n-target 8 \
     --min-frame-dist 80 \
     --max-frame-dist 100 \
