@@ -406,7 +406,7 @@ def export_all_views_results(
         # Save input (context) views
         input_img = input_data.image[batch_idx]
         input_img_grid = rearrange(input_img, "v c h w -> h (v w) c")
-        input_img_grid = (input_img_grid.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+        input_img_grid = (input_img_grid.cpu().float().numpy() * 255.0).clip(0, 255).astype(np.uint8)
         Image.fromarray(input_img_grid).save(os.path.join(sample_dir, "input.png"))
 
         # Determine GT target images (relit if available, else original)
@@ -423,12 +423,12 @@ def export_all_views_results(
             view_idx = target_indices[vi]
 
             # Rendered frame
-            pred_frame = rendered[vi].cpu()
+            pred_frame = rendered[vi].cpu().float()
             pred_np = (pred_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
             Image.fromarray(pred_np).save(os.path.join(sample_dir, f"{view_idx:05d}.png"))
 
             # GT frame
-            gt_frame = gt_target[vi].cpu()
+            gt_frame = gt_target[vi].cpu().float()
             gt_np = (gt_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
             Image.fromarray(gt_np).save(os.path.join(sample_dir, f"gt_{view_idx:05d}.png"))
 
