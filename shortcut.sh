@@ -29,8 +29,8 @@ python preprocess_scripts/preprocess_objaverse.py \
 python preprocess_scripts/create_evaluation_index.py \
     --full-list /data/lvsm_scenes_dense/test/full_list_scenes.txt \
     --output data/demo_scene_rotate_dense.json \
-    --n-input 25 \
-    --n-target 5 \
+    --n-input 16 \
+    --n-target 8 \
     --min-frame-dist 45 \
     --max-frame-dist 50 \
     --max-scenes 5000 \

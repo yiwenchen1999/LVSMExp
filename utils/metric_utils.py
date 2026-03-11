@@ -378,6 +378,7 @@ def export_all_views_results(
     """
     os.makedirs(out_dir, exist_ok=True)
     input_data, target_data = result.input, result.target
+    is_interpolated = result.get('interpolated', False)
 
     for batch_idx in range(input_data.image.size(0)):
         scene_name = input_data.scene_name[batch_idx]
@@ -392,13 +393,18 @@ def export_all_views_results(
         if hasattr(input_data, 'relit_scene_name') and input_data.relit_scene_name is not None:
             relit_scene_name = input_data.relit_scene_name[batch_idx]
 
+        rendered = result.render[batch_idx]  # [v_render, 3, h, w]
+        num_rendered = rendered.shape[0]
+
         metadata = {
             "scene_name": scene_name,
             "context_view_indices": input_indices,
             "target_view_indices": target_indices,
             "relit_scene_name": relit_scene_name,
             "render_all_views": True,
-            "total_rendered_frames": len(target_indices),
+            "total_rendered_frames": num_rendered,
+            "interpolated": is_interpolated,
+            "num_original_views": result.get('num_original_views', num_rendered),
         }
         with open(os.path.join(sample_dir, "metadata.json"), 'w') as f:
             json.dump(metadata, f, indent=2)
@@ -409,50 +415,52 @@ def export_all_views_results(
         input_img_grid = (input_img_grid.cpu().float().numpy() * 255.0).clip(0, 255).astype(np.uint8)
         Image.fromarray(input_img_grid).save(os.path.join(sample_dir, "input.png"))
 
-        # Determine GT target images (relit if available, else original)
-        if hasattr(target_data, 'relit_images') and target_data.relit_images is not None:
-            gt_target = target_data.relit_images[batch_idx]
+        if is_interpolated:
+            # Interpolated: save all rendered frames sequentially and the video
+            for vi in range(num_rendered):
+                pred_frame = rendered[vi].cpu().float()
+                pred_np = (pred_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                Image.fromarray(pred_np).save(os.path.join(sample_dir, f"{vi:05d}.png"))
+
+            _save_video(rendered, sample_dir)
+            print(f"Exported {num_rendered} interpolated frames "
+                  f"(from {len(target_indices)} original) for scene {scene_name} to {sample_dir}")
         else:
-            gt_target = target_data.image[batch_idx]
+            # Non-interpolated: save with GT comparison and metrics
+            if hasattr(target_data, 'relit_images') and target_data.relit_images is not None:
+                gt_target = target_data.relit_images[batch_idx]
+            else:
+                gt_target = target_data.image[batch_idx]
 
-        rendered = result.render[batch_idx]  # [v_target, 3, h, w]
-        num_target = rendered.shape[0]
+            for vi in range(num_rendered):
+                view_idx = target_indices[vi]
 
-        # Save individual rendered frames, GT frames, and gt_vs_pred comparisons
-        for vi in range(num_target):
-            view_idx = target_indices[vi]
+                pred_frame = rendered[vi].cpu().float()
+                pred_np = (pred_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                Image.fromarray(pred_np).save(os.path.join(sample_dir, f"{view_idx:05d}.png"))
 
-            # Rendered frame
-            pred_frame = rendered[vi].cpu().float()
-            pred_np = (pred_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
-            Image.fromarray(pred_np).save(os.path.join(sample_dir, f"{view_idx:05d}.png"))
+                gt_frame = gt_target[vi].cpu().float()
+                gt_np = (gt_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                Image.fromarray(gt_np).save(os.path.join(sample_dir, f"gt_{view_idx:05d}.png"))
 
-            # GT frame
-            gt_frame = gt_target[vi].cpu().float()
-            gt_np = (gt_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
-            Image.fromarray(gt_np).save(os.path.join(sample_dir, f"gt_{view_idx:05d}.png"))
+                comparison = np.concatenate([gt_np, pred_np], axis=1)
+                Image.fromarray(comparison).save(os.path.join(sample_dir, f"gt_vs_pred_{view_idx:05d}.png"))
 
-            # Side-by-side gt_vs_pred
-            comparison = np.concatenate([gt_np, pred_np], axis=1)
-            Image.fromarray(comparison).save(os.path.join(sample_dir, f"gt_vs_pred_{view_idx:05d}.png"))
+            # Reorder frames by frame index so the video plays in natural order
+            sort_order = np.argsort(target_indices)
+            rendered_sorted = rendered[sort_order]
 
-        # Reorder frames by frame index so the video plays in natural order
-        sort_order = np.argsort(target_indices)
-        rendered_sorted = rendered[sort_order]
+            _save_video(rendered_sorted, sample_dir)
+            print(f"Exported {num_rendered} frames for scene {scene_name} to {sample_dir}")
 
-        # Save rendered video
-        _save_video(rendered_sorted, sample_dir)
-        print(f"Exported {num_target} frames for scene {scene_name} to {sample_dir}")
-
-        # Compute and save per-view metrics if requested
-        if compute_metrics:
-            _save_metrics(
-                gt_target.cpu().float(),
-                rendered.float(),
-                target_indices,
-                sample_dir,
-                scene_name,
-            )
+            if compute_metrics:
+                _save_metrics(
+                    gt_target.cpu().float(),
+                    rendered.float(),
+                    target_indices,
+                    sample_dir,
+                    scene_name,
+                )
 
 
 def summarize_evaluation(evaluation_folder):

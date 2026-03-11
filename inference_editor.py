@@ -3,6 +3,7 @@
 import importlib
 import os
 import json
+import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
@@ -115,10 +116,52 @@ if ddp_info.is_main_process:
 dist.barrier()
 
 
-def render_all_views_chunked(m, batch, device, view_chunk_size=4):
+def interpolate_camera_poses(c2ws, fxfycxcy, desired_num_frames, device):
+    """Uniformly interpolate camera poses to reach desired_num_frames.
+
+    Uses SLERP for rotation and linear interpolation for translation/intrinsics.
+    Poses should already be sorted in the desired traversal order.
+    """
+    from scipy.spatial.transform import Rotation, Slerp
+
+    num_views = c2ws.shape[0]
+    if num_views >= desired_num_frames:
+        return c2ws, fxfycxcy
+
+    c2ws_np = c2ws.cpu().numpy()
+    fxfycxcy_np = fxfycxcy.cpu().numpy()
+
+    t_orig = np.linspace(0, 1, num_views)
+    t_new = np.linspace(0, 1, desired_num_frames)
+
+    rotations = Rotation.from_matrix(c2ws_np[:, :3, :3])
+    slerp = Slerp(t_orig, rotations)
+    interp_rotations = slerp(t_new)
+
+    translations = c2ws_np[:, :3, 3]
+    interp_translations = np.stack([
+        np.interp(t_new, t_orig, translations[:, i]) for i in range(3)
+    ], axis=-1)
+
+    interp_c2ws = np.broadcast_to(np.eye(4), (desired_num_frames, 4, 4)).copy()
+    interp_c2ws[:, :3, :3] = interp_rotations.as_matrix()
+    interp_c2ws[:, :3, 3] = interp_translations
+
+    interp_fxfycxcy = np.stack([
+        np.interp(t_new, t_orig, fxfycxcy_np[:, i]) for i in range(4)
+    ], axis=-1)
+
+    return (
+        torch.from_numpy(interp_c2ws).float().to(device),
+        torch.from_numpy(interp_fxfycxcy).float().to(device),
+    )
+
+
+def render_all_views_chunked(m, batch, device, view_chunk_size=4, desired_num_frames=None):
     """Render all target views using chunked decoding to avoid OOM.
 
-    Steps: process_data -> reconstructor -> editor -> chunked renderer.
+    Steps: process_data -> reconstructor -> editor -> sort targets ->
+           (optional) interpolate poses -> chunked renderer.
     """
     input_dict, target_dict = m.process_data(
         batch,
@@ -138,12 +181,47 @@ def render_all_views_chunked(m, batch, device, view_chunk_size=4):
         )
         latent_tokens = editor_output[:, :n_latent_vectors, :]
 
+    # Sort target views by frame index (dataset returns context-first ordering)
+    bs = target_dict.c2w.shape[0]
+    sort_indices = torch.argsort(target_dict.index[:, :, 0], dim=1)
+    for key in list(target_dict.keys()):
+        val = target_dict[key]
+        if not isinstance(val, torch.Tensor) or val.dim() < 2:
+            continue
+        idx = sort_indices
+        for _ in range(val.dim() - 2):
+            idx = idx.unsqueeze(-1)
+        target_dict[key] = torch.gather(val, 1, idx.expand_as(val))
+
+    h, w = target_dict.image_h_w
+
+    # Optionally interpolate poses to reach desired_num_frames
+    interpolated = False
+    num_original = target_dict.c2w.shape[1]
+    if desired_num_frames is not None and num_original < desired_num_frames:
+        interpolated = True
+        interp_c2ws, interp_fxfycxcy = [], []
+        for b in range(bs):
+            ic, ifx = interpolate_camera_poses(
+                target_dict.c2w[b], target_dict.fxfycxcy[b],
+                desired_num_frames, device,
+            )
+            interp_c2ws.append(ic)
+            interp_fxfycxcy.append(ifx)
+        render_c2ws = torch.stack(interp_c2ws, dim=0)
+        render_fxfycxcy = torch.stack(interp_fxfycxcy, dim=0)
+        render_ray_o, render_ray_d = m.process_data.compute_rays(
+            render_c2ws, render_fxfycxcy, h, w, device=device,
+        )
+    else:
+        render_ray_o = target_dict.ray_o
+        render_ray_d = target_dict.ray_d
+
     # Chunked rendering of all target views
     target_pose_cond = m.get_posed_input(
-        ray_o=target_dict.ray_o, ray_d=target_dict.ray_d
+        ray_o=render_ray_o, ray_d=render_ray_d,
     )
     bs, num_views, c_dim, ph, pw = target_pose_cond.size()
-    h, w = target_dict.image_h_w
     patch_size = config.model.target_pose_tokenizer.patch_size
 
     target_pose_tokens = m.target_pose_tokenizer(target_pose_cond)
@@ -177,7 +255,10 @@ def render_all_views_chunked(m, batch, device, view_chunk_size=4):
         rendered_chunks.append(rendered)
 
     rendered_all = torch.cat(rendered_chunks, dim=1)
-    return edict(input=input_dict, target=target_dict, render=rendered_all)
+    return edict(
+        input=input_dict, target=target_dict, render=rendered_all,
+        interpolated=interpolated, num_original_views=num_original,
+    )
 
 
 datasampler.set_epoch(0)
@@ -195,9 +276,11 @@ with torch.no_grad(), torch.autocast(
 
         if _render_all_views:
             view_chunk_size = config.inference.get("view_chunk_size", 4)
+            desired_num_frames = config.inference.get("desired_num_frames", None)
             result = render_all_views_chunked(
                 model.module, batch, ddp_info.device,
                 view_chunk_size=view_chunk_size,
+                desired_num_frames=desired_num_frames,
             )
             export_all_views_results(
                 result, config.inference_out_dir,

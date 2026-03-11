@@ -78,6 +78,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     inference.compute_metrics = true \
     inference.render_video = false \
     inference.render_all_views = true \
+    inference.desired_num_frames = 100 \
     inference.view_idx_file_path = "$EVAL_INDEX" \
     inference_out_dir = "$OUTPUT_DIR"
 
