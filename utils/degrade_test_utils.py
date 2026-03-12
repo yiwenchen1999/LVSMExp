@@ -173,8 +173,13 @@ def save_step(step, rendered, gt_images, env_name, scene_dir, num_views, save_im
     return metrics
 
 
-def create_flattened_views(scene_dir, num_steps, num_views):
-    """Create ``flattened/v{i}/`` folders with copies of rendered images for easy browsing."""
+def create_flattened_views(scene_dir, num_steps, num_views, entry_id=None, scene_name=None, env_name=None):
+    """
+    Create flattened organization of rendered images for easy browsing.
+
+    1) Per-scene: flattened/v{i}/step_XXX.png — grouped by view
+    2) If entry_id/scene_name/env_name provided: also link to global flattened_all/ at parent
+    """
     flat_dir = os.path.join(scene_dir, "flattened")
     for vi in range(num_views):
         view_dir = os.path.join(flat_dir, f"v{vi}")
@@ -189,3 +194,23 @@ def create_flattened_views(scene_dir, num_steps, num_views):
                     os.symlink(os.path.abspath(src), dst)
                 except OSError:
                     shutil.copy2(src, dst)
+
+    # Global flattened folder: all samples in one flat directory
+    if entry_id is not None and scene_name is not None and env_name is not None:
+        parent = os.path.dirname(scene_dir)
+        flat_all_dir = os.path.join(parent, "flattened_all")
+        os.makedirs(flat_all_dir, exist_ok=True)
+        safe_scene = scene_name.replace("/", "_")[:64]
+        safe_env = env_name.replace("/", "_")[:64]
+        prefix = f"{entry_id:04d}_{safe_scene}_{safe_env}"
+        for vi in range(num_views):
+            for step in range(num_steps):
+                src = os.path.join(scene_dir, f"step_{step:03d}", f"rendered_v{vi}.png")
+                dst = os.path.join(flat_all_dir, f"{prefix}_step{step:03d}_v{vi}.png")
+                if os.path.exists(src):
+                    try:
+                        if os.path.exists(dst) or os.path.islink(dst):
+                            os.remove(dst)
+                        os.symlink(os.path.abspath(src), dst)
+                    except OSError:
+                        shutil.copy2(src, dst)

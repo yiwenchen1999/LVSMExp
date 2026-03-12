@@ -28,7 +28,7 @@ python preprocess_scripts/preprocess_objaverse.py \
     --split test
 python preprocess_scripts/create_evaluation_index.py \
     --full-list /data/lvsm_scenes_dense_env_variations/test/full_list.txt \
-    --output data/demo_scene_rotate_dense_env_variations.json \
+    --output data/demo_scene_dense_recon.json \
     --n-input 8 \
     --n-target 8 \
     --min-frame-dist 17 \

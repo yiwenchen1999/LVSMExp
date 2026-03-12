@@ -19,4 +19,5 @@ torchrun --nproc_per_node 1 --nnodes 1 \
   inference.render_video = false \
   inference.same_pose = True \
   inference.benchmark_num_views = 100 \
+  inference.save_rendered = true \
   inference_out_dir = experiments/benchmark_relight

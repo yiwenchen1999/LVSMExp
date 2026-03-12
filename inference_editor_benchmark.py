@@ -15,7 +15,9 @@ import json
 import os
 import time
 
+import numpy as np
 import psutil
+from PIL import Image
 import torch
 import torch.distributed as dist
 from easydict import EasyDict as edict
@@ -282,6 +284,17 @@ with torch.no_grad(), torch.autocast(
     )
     torch.cuda.synchronize()
     timings["rendering_novel_views_s"] = time.perf_counter() - t3
+
+    # Optionally save rendered views to flattened folder
+    if config.inference.get("save_rendered", False) and ddp_info.is_main_process:
+        out_dir = config.get("inference_out_dir", "experiments/benchmark_relight")
+        flat_dir = os.path.join(out_dir, "rendered_flattened")
+        os.makedirs(flat_dir, exist_ok=True)
+        video_np = (video[0].clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)
+        for vi in range(video_np.shape[0]):
+            img = video_np[vi].transpose(1, 2, 0)
+            Image.fromarray(img).save(os.path.join(flat_dir, f"view_{vi:03d}.png"))
+        print(f"Rendered {NUM_NOVEL_VIEWS} views saved to {flat_dir}/")
 
 timings["end_to_end_s"] = (
     timings["data_loading_s"]
