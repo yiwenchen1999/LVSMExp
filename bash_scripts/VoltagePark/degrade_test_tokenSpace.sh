@@ -44,7 +44,7 @@ if [ ! -f "$EVAL_INDEX" ]; then
 fi
 
 torchrun --nproc_per_node 1 --nnodes 1 \
-    --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
+    --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29503 \
     inference_editor_degrade_test_tokenSpace.py \
     --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
   training.dataset_path = /data/polyhaven_lvsm/test/full_list.txt \
