@@ -18,7 +18,7 @@ export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_scenes}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
 export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb_long.json}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_scenes_recontest}"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_scenes_long_progressive}"
 
 # Detect GPU count (override with NPROC env var)
 if [[ -n "${NPROC:-}" ]]; then
@@ -68,16 +68,15 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.LVSM_checkpoint_dir = "$LVSM_CKPT_DIR" \
     training.batch_size_per_gpu = 4 \
     training.target_has_input = false \
-    training.num_views = 24 \
+    training.num_views = 12 \
     training.square_crop = true \
-    training.num_input_views = 16 \
+    training.num_input_views = 4 \
     training.num_target_views = 8 \
     training.condition_reverse = true \
     training.single_env_map = true \
     inference.if_inference = true \
     inference.compute_metrics = true \
     inference.render_video = false \
-    inference.render_all_views = true \
     inference.view_idx_file_path = "$EVAL_INDEX" \
     inference_out_dir = "$OUTPUT_DIR"
 

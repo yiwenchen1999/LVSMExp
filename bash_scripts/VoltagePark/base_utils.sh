@@ -9,6 +9,8 @@ rsync -avh --partial --inplace --progress \
   ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/experiments/evaluation/combined_scenes \
     result_previews
 
+rsync -avz ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/experiments/evaluation/demo_scene_env_variations demo_material/
+
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
   ckpt_0000000000010000.pt \
@@ -77,7 +79,7 @@ python3 preprocess_scripts/preprocess_obj_with_light.py \
   python3 scripts/fetch_source_data.py \
     --metadata_dir  metadata_polyhaven \
     --dataset_root  /data/polyhaven_lvsm/test \
-    --out_dir       source_data_polyhaven
+    --out_dir      source_data_polyhaven
 
 
 python3 preprocess_scripts/preprocess_tenIR.py \
@@ -89,17 +91,17 @@ python3 preprocess_scripts/preprocess_tenIR.py \
 
 
 python preprocess_scripts/create_env_variations_from_processed.py \
-    --data-root /data/polyhaven_lvsm \
-    --output-root /data/polyhaven_lvsm_env_variations \
+    --data-root /data/lvsm_scenes_dense \
+    --output-root /data/lvsm_scenes_dense_env_variations \
     --split test \
     --n-variations 100 \
-    --scene-list /data/polyhaven_lvsm/test/full_list_demo.txt
+    --scene-list /data/lvsm_scenes_dense/test/full_list_scenes.txt
 
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-exp_rotate_env.py --config "configs/LVSM_scene_encoder_decoder_wEditor.yaml" \
-training.dataset_path = "/data/polyhaven_lvsm_env_variations/test/full_list.txt" \
-training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4_singleMap \
+exp_rotate_env.py --config "configs/LVSM_scene_encoder_decoder_wEditor_envmap_pointlight.yaml" \
+training.dataset_path = "/data/lvsm_scenes_dense_env_variations/test/full_list.txt" \
+training.checkpoint_dir = ckpt/relight_combined_scenes \
 training.batch_size_per_gpu = 1 \
 training.target_has_input = false \
 training.num_views = 16 \
@@ -109,5 +111,5 @@ training.num_target_views = 8 \
 inference.if_inference = true \
 inference.compute_metrics = true \
 inference.render_video = false \
-inference.view_idx_file_path = "data/evaluation_index_polyhaven_demo_rotateEnv.json" \
-inference_out_dir = experiments/evaluation/demo_env_variations
+inference.view_idx_file_path = "data/demo_scene_rotate_dense_env_variations.json" \
+inference_out_dir = experiments/evaluation/demo_scene_env_variations

@@ -409,11 +409,16 @@ def export_all_views_results(
         with open(os.path.join(sample_dir, "metadata.json"), 'w') as f:
             json.dump(metadata, f, indent=2)
 
-        # Save input (context) views
+        # Save input (context) views: stitched grid + individual frames
         input_img = input_data.image[batch_idx]
         input_img_grid = rearrange(input_img, "v c h w -> h (v w) c")
         input_img_grid = (input_img_grid.cpu().float().numpy() * 255.0).clip(0, 255).astype(np.uint8)
         Image.fromarray(input_img_grid).save(os.path.join(sample_dir, "input.png"))
+
+        for vi, ctx_idx in enumerate(input_indices):
+            ctx_frame = input_img[vi].cpu().float()
+            ctx_np = (ctx_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
+            Image.fromarray(ctx_np).save(os.path.join(sample_dir, f"input_{ctx_idx:05d}.png"))
 
         if is_interpolated:
             # Interpolated: save all rendered frames sequentially and the video
