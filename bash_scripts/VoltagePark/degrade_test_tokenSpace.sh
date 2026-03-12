@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # VoltagePark paths
 ############################
 export PROJ="${PROJ:-$REPO_ROOT}"
-export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
+export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list_degredation.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
 export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb.json}"
