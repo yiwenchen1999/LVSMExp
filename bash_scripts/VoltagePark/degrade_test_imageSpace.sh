@@ -16,7 +16,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export PROJ="${PROJ:-$REPO_ROOT}"
 export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/degradation_exp/image_space}"
 
-export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list_degredation.txt}"
+export DATA_LIST="${DATA_LIST:-/data/polyhaven_lvsm/test/full_list_degredation.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_dense}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
 export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb.json}"
@@ -49,7 +49,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id "$(date +%s)" --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     inference_editor_degrade_test_imageSpace.py \
     --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
-  training.dataset_path = /data/polyhaven_lvsm/test/full_list.txt \
+  training.dataset_path = /data/polyhaven_lvsm/test/full_list_degredation.txt \
   training.checkpoint_dir = ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_lr1e4_singleMap \
   training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
   training.batch_size_per_gpu = 4 \
