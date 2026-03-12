@@ -100,7 +100,7 @@ python preprocess_scripts/create_env_variations_from_processed.py \
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
 exp_rotate_env.py --config "configs/LVSM_scene_encoder_decoder_wEditor_envmap_pointlight.yaml" \
-training.dataset_path = "/data/lvsm_scenes_dense_env_variations/test/full_list.txt" \
+training.dataset_path = "/data/lvsm_scenes_dense_env_variations/test/full_list_6d.txt" \
 training.checkpoint_dir = ckpt/relight_combined_scenes \
 training.batch_size_per_gpu = 1 \
 training.target_has_input = false \

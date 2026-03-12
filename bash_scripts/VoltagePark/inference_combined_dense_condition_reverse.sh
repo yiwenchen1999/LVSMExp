@@ -17,8 +17,11 @@ export PROJ="${PROJ:-$REPO_ROOT}"
 export DATA_LIST="${DATA_LIST:-/data/lvsm_scenes_dense/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_combined_scenes}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_scene_encoder_decoder_dense}"
-export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/evaluation_index_scenes_comb_long.json}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/combined_scenes_long_progressive}"
+export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/scene_comb_new.json}"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/scenes_progressive_video}"
+# Number of frames to interpolate to when render_video=true.
+# Set to 0 or leave unset to disable interpolated video rendering.
+export DESIRED_NUM_FRAMES="${DESIRED_NUM_FRAMES:-48}"
 
 # Detect GPU count (override with NPROC env var)
 if [[ -n "${NPROC:-}" ]]; then
@@ -43,6 +46,7 @@ echo "EVAL_INDEX: $EVAL_INDEX"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
 echo "nproc_per_node: $NPROC_PER_NODE"
 echo "nnodes: $NNODES"
+echo "DESIRED_NUM_FRAMES: $DESIRED_NUM_FRAMES"
 echo "MODE: condition_reverse"
 echo "----------------------------------------------"
 echo ""
@@ -76,7 +80,8 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.single_env_map = true \
     inference.if_inference = true \
     inference.compute_metrics = true \
-    inference.render_video = false \
+    inference.render_video = true \
+    inference.desired_num_frames = "$DESIRED_NUM_FRAMES" \
     inference.view_idx_file_path = "$EVAL_INDEX" \
     inference_out_dir = "$OUTPUT_DIR"
 

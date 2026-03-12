@@ -261,10 +261,115 @@ def render_all_views_chunked(m, batch, device, view_chunk_size=4, desired_num_fr
     )
 
 
+def render_video_from_all_poses(m, batch, device, view_chunk_size=4, desired_num_frames=100):
+    """Render a smooth interpolated video using all known poses (context + target).
+
+    Collects all poses from context and target, sorts by original frame index,
+    interpolates to desired_num_frames, and renders each frame in chunks.
+    Unlike render_all_views_chunked (which only uses target poses), this uses
+    every known pose in the batch to maximise trajectory coverage.
+    """
+    input_dict, target_dict = m.process_data(
+        batch,
+        has_target_image=True,
+        target_has_input=config.training.target_has_input,
+        compute_rays=True,
+    )
+
+    latent_tokens, n_patches, d = m.reconstructor(input_dict)
+
+    n_latent_vectors = config.model.transformer.n_latent_vectors
+    condition_tokens = m._build_editor_condition_tokens(input_dict, d)
+    if condition_tokens is not None:
+        editor_input = torch.cat([latent_tokens, condition_tokens], dim=1)
+        editor_output = m.pass_layers(
+            m.transformer_editor, editor_input, gradient_checkpoint=False
+        )
+        latent_tokens = editor_output[:, :n_latent_vectors, :]
+
+    bs = input_dict.c2w.shape[0]
+    h, w = target_dict.image_h_w
+
+    # Combine context and target poses, sort by original frame index
+    all_c2ws = torch.cat([input_dict.c2w, target_dict.c2w], dim=1)
+    all_fxfycxcy = torch.cat([input_dict.fxfycxcy, target_dict.fxfycxcy], dim=1)
+    all_indices = torch.cat(
+        [input_dict.index[:, :, 0], target_dict.index[:, :, 0]], dim=1
+    )
+    sort_idx = torch.argsort(all_indices, dim=1)
+    all_c2ws = torch.gather(
+        all_c2ws, 1,
+        sort_idx.unsqueeze(-1).unsqueeze(-1).expand_as(all_c2ws)
+    )
+    all_fxfycxcy = torch.gather(
+        all_fxfycxcy, 1,
+        sort_idx.unsqueeze(-1).expand_as(all_fxfycxcy)
+    )
+
+    num_original_poses = all_c2ws.shape[1]
+
+    # Interpolate each batch element to desired_num_frames
+    interp_c2ws, interp_fxfycxcy = [], []
+    for b in range(bs):
+        ic, ifx = interpolate_camera_poses(
+            all_c2ws[b], all_fxfycxcy[b], desired_num_frames, device
+        )
+        interp_c2ws.append(ic)
+        interp_fxfycxcy.append(ifx)
+    render_c2ws = torch.stack(interp_c2ws, dim=0)
+    render_fxfycxcy = torch.stack(interp_fxfycxcy, dim=0)
+
+    render_ray_o, render_ray_d = m.process_data.compute_rays(
+        render_c2ws, render_fxfycxcy, h, w, device=device,
+    )
+
+    # Chunked rendering (identical pattern to render_all_views_chunked)
+    target_pose_cond = m.get_posed_input(ray_o=render_ray_o, ray_d=render_ray_d)
+    bs, num_views, c_dim, ph, pw = target_pose_cond.size()
+    patch_size = config.model.target_pose_tokenizer.patch_size
+
+    target_pose_tokens = m.target_pose_tokenizer(target_pose_cond)
+    _, n_per_view, _ = target_pose_tokens.size()
+    target_pose_tokens = target_pose_tokens.reshape(bs, num_views * n_per_view, d)
+
+    rendered_chunks = []
+    for start in range(0, num_views, view_chunk_size):
+        cur_sz = min(view_chunk_size, num_views - start)
+        s_idx = start * n_per_view
+        e_idx = (start + cur_sz) * n_per_view
+        cur_pose = rearrange(
+            target_pose_tokens[:, s_idx:e_idx, :],
+            "b (v p) d -> (b v) p d", v=cur_sz, p=n_per_view,
+        )
+        cur_latent = repeat(latent_tokens, "b nl d -> (b v) nl d", v=cur_sz)
+        dec_in = torch.cat((cur_pose, cur_latent), dim=1)
+        dec_in = m.transformer_input_layernorm_decoder(dec_in)
+        dec_out = m.pass_layers(
+            m.transformer_decoder, dec_in, gradient_checkpoint=False
+        )
+        img_tokens, _ = dec_out.split([n_per_view, n_latent_vectors], dim=1)
+        rendered = m.image_token_decoder(img_tokens)
+        rendered = rearrange(
+            rendered,
+            "(b v) (hh ww) (p1 p2 c) -> b v c (hh p1) (ww p2)",
+            v=cur_sz,
+            hh=h // patch_size, ww=w // patch_size,
+            p1=patch_size, p2=patch_size, c=3,
+        ).cpu()
+        rendered_chunks.append(rendered)
+
+    rendered_all = torch.cat(rendered_chunks, dim=1)
+    return edict(
+        input=input_dict, target=target_dict, render=rendered_all,
+        interpolated=True, num_original_views=num_original_poses,
+    )
+
+
 datasampler.set_epoch(0)
 model.eval()
 
 _render_all_views = config.inference.get("render_all_views", False)
+_desired_num_frames = config.inference.get("desired_num_frames", None)
 
 with torch.no_grad(), torch.autocast(
     enabled=config.training.use_amp,
@@ -276,15 +381,26 @@ with torch.no_grad(), torch.autocast(
 
         if _render_all_views:
             view_chunk_size = config.inference.get("view_chunk_size", 4)
-            desired_num_frames = config.inference.get("desired_num_frames", None)
             result = render_all_views_chunked(
                 model.module, batch, ddp_info.device,
                 view_chunk_size=view_chunk_size,
-                desired_num_frames=desired_num_frames,
+                desired_num_frames=_desired_num_frames,
             )
             export_all_views_results(
                 result, config.inference_out_dir,
                 compute_metrics=config.inference.get("compute_metrics", False),
+            )
+        elif config.inference.get("render_video", False) and _desired_num_frames is not None:
+            # New path: render smooth video by interpolating over all known poses
+            view_chunk_size = config.inference.get("view_chunk_size", 4)
+            result = render_video_from_all_poses(
+                model.module, batch, ddp_info.device,
+                view_chunk_size=view_chunk_size,
+                desired_num_frames=_desired_num_frames,
+            )
+            export_all_views_results(
+                result, config.inference_out_dir,
+                compute_metrics=False,
             )
         else:
             result = model(batch)
