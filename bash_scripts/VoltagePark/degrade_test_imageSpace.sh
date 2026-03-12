@@ -63,6 +63,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
   inference.render_video = false \
   inference.same_pose = True \
   inference.view_idx_file_path = data/evaluation_index_polyhaven.json \
+  training.degrade_num_iterations = 20 \
   training.degrade_max_entries = 150 \
   inference_out_dir = experiments/degradation_exp/image_space
 

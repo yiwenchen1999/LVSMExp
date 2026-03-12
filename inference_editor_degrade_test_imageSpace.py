@@ -197,14 +197,12 @@ with torch.no_grad(), torch.autocast(
 
                     rendered = model.module.renderer(edited_tokens, tgt, n_patches, d)
                     rendered = rendered.clamp(0, 1)
-                    gt_image = input_data.image[b_idx, :, :, :]
 
-                    save_imgs = (step % 5 == 0) or (step == num_iterations - 1)
-                    gt_image = input_data.image[b_idx, :, :, :]
+                    # Save rendered results at every step for flattened folder organization
                     metrics = save_step(
                         step, rendered, gt_images, env_name,
                         scene_dir, num_input_views,
-                        save_images=save_imgs,
+                        save_images=True,
                     )
 
                     step_psnrs[step].append(metrics["psnr"])
@@ -230,7 +228,10 @@ with torch.no_grad(), torch.autocast(
 
                     current_images = rendered.detach()
 
-                create_flattened_views(scene_dir, num_iterations, num_input_views)
+                create_flattened_views(
+                    scene_dir, num_iterations, num_input_views,
+                    entry_id=entry_count, scene_name=scene_name, env_name=env_name,
+                )
 
                 entry_count += 1
                 if ddp_info.is_main_process:
