@@ -21,7 +21,7 @@ export EVAL_INDEX="${EVAL_INDEX:-$PROJ/data/scene_comb_new.json}"
 export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/scenes_progressive_video}"
 # Number of frames to interpolate to when render_video=true.
 # Set to 0 or leave unset to disable interpolated video rendering.
-export DESIRED_NUM_FRAMES="${DESIRED_NUM_FRAMES:-48}"
+export DESIRED_NUM_FRAMES="${DESIRED_NUM_FRAMES:-100}"
 
 # Detect GPU count (override with NPROC env var)
 if [[ -n "${NPROC:-}" ]]; then
