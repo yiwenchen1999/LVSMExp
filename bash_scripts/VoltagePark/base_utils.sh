@@ -9,7 +9,7 @@ rsync -avh --partial --inplace --progress \
   ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/experiments/evaluation/combined_scenes \
     result_previews
 
-rsync -avz ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/experiments/evaluation/scenes_progressive_video demo_material/
+rsync -avz ubuntu@147.185.41.15:/home/ubuntu/LVSMExp/experiments/degradation_exp/ demo_material/degrade_figure
 
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \

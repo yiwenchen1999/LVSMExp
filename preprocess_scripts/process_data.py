@@ -21,20 +21,21 @@ logging.basicConfig(
 def process_single_file(args):
     """
     Helper function to process a single file (needed for multiprocessing)
-    
-    Args:
-        args (tuple): Tuple containing (file_path, output_dir)
-    """
-    file_path, output_dir = args
-    return process_torch_file(file_path, output_dir)
 
-def process_torch_file(file_path, output_dir):
+    Args:
+        args (tuple): Tuple containing (file_path, output_dir, allowed_scene_keys or None)
+    """
+    file_path, output_dir, allowed_scene_keys = args
+    return process_torch_file(file_path, output_dir, allowed_scene_keys=allowed_scene_keys)
+
+def process_torch_file(file_path, output_dir, allowed_scene_keys=None):
     """
     Process a .torch file and save images and poses
-    
+
     Args:
         file_path (str): Path to the .torch file
         output_dir (str): Base directory to save outputs
+        allowed_scene_keys (set/frozenset/None): If set, only export scenes whose key is in this set
     """
     try:
         # Create output directories
@@ -52,13 +53,16 @@ def process_torch_file(file_path, output_dir):
             scene_name = cur_scene['key']
             if isinstance(scene_name, torch.Tensor):
                 scene_name = scene_name.item()
-            
+            scene_key = str(scene_name)
+            if allowed_scene_keys is not None and scene_key not in allowed_scene_keys:
+                continue
+
             # Create subdirectories for this specific sequence
-            seq_images_dir = os.path.join(images_dir, str(scene_name))
+            seq_images_dir = os.path.join(images_dir, scene_key)
             os.makedirs(seq_images_dir, exist_ok=True)
             
             cur_info_dict = {
-                'scene_name': scene_name,
+                'scene_name': scene_key,
                 'frames': []
             }
             
@@ -119,7 +123,7 @@ def process_torch_file(file_path, output_dir):
             cur_info_dict['frames'] = frames
             
             # Save metadata
-            meta_path = os.path.join(meta_dir, f'{scene_name}.json')
+            meta_path = os.path.join(meta_dir, f'{scene_key}.json')
             with open(meta_path, 'w') as f:
                 json.dump(cur_info_dict, f, indent=4)
                 
@@ -128,15 +132,22 @@ def process_torch_file(file_path, output_dir):
         logging.error(f"Error processing {file_path}: {str(e)}")
         return False, file_path
 
-def process_directory(input_dir, output_dir, num_processes=None, chunk_size=1):
+def process_directory(
+    input_dir,
+    output_dir,
+    num_processes=None,
+    chunk_size=1,
+    allowed_scene_keys=None,
+):
     """
     Process all .torch files in a directory using multiprocessing
-    
+
     Args:
         input_dir (str): Directory containing .torch files
         output_dir (str): Base directory to save outputs
         num_processes (int, optional): Number of processes to use. Defaults to CPU count - 1
         chunk_size (int, optional): Number of files to process per worker at once. Defaults to 1
+        allowed_scene_keys (set/frozenset/None): If set, only export matching scenes
     """
     # Get all .torch files in the directory
     torch_files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith('.torch')]
@@ -151,7 +162,7 @@ def process_directory(input_dir, output_dir, num_processes=None, chunk_size=1):
         num_processes = max(1, mp.cpu_count() - 1)
     
     # Prepare arguments for multiprocessing
-    args = [(f, output_dir) for f in torch_files]
+    args = [(f, output_dir, allowed_scene_keys) for f in torch_files]
     
     # Process files in parallel with progress bar
     start_time = time.time()
@@ -175,10 +186,14 @@ def process_directory(input_dir, output_dir, num_processes=None, chunk_size=1):
         for _, path in failed:
             logging.warning(f"  - {path}")
 
-def generate_full_list(base_path, output_dir):
+def generate_full_list(base_path, output_dir, allowed_scene_keys=None):
     # find all .json files in the base_path and generate a full list saving their absolute paths and store it in a txt file in the output_dir
     json_files = [os.path.join(base_path, f) for f in os.listdir(base_path) if f.endswith('.json')]
     json_files = [os.path.abspath(f) for f in json_files]
+    if allowed_scene_keys is not None:
+        json_files = [
+            f for f in json_files if os.path.splitext(os.path.basename(f))[0] in allowed_scene_keys
+        ]
     json_files.sort()
     with open(os.path.join(output_dir, 'full_list.txt'), 'w') as f:
         for file in json_files:
@@ -191,8 +206,19 @@ if __name__ == "__main__":
     parser.add_argument("--num_processes", type=int, default=32)
     parser.add_argument("--output_dir", type=str, default='/share/phoenix/nfs06/S9/hj453/DATA/re10k/')
     parser.add_argument("--base_path", type=str, default='/share/phoenix/nfs06/S9/hj453/DATA/re10k_raw/')
-    
+    parser.add_argument(
+        "--scene_keys_json",
+        type=str,
+        default=None,
+        help="Optional JSON file (e.g. evaluation index); only scenes listed as top-level keys are exported.",
+    )
+
     args = parser.parse_args()
+    allowed_scene_keys = None
+    if args.scene_keys_json:
+        with open(args.scene_keys_json, "r") as _f:
+            allowed_scene_keys = frozenset(json.load(_f).keys())
+        logging.info("Scene filter enabled: %d keys from %s", len(allowed_scene_keys), args.scene_keys_json)
     # Example usage
     cur_mode = args.mode
     input_dir = os.path.join(args.base_path, cur_mode)
@@ -200,9 +226,15 @@ if __name__ == "__main__":
     output_dir = os.path.join(args.output_dir, cur_mode)
     # Process test data only
     logging.info("Starting test data processing...")
-    process_directory(input_dir, output_dir, chunk_size=args.chunk_size, num_processes=args.num_processes)  
-    logging.info("Processing completed!") 
+    process_directory(
+        input_dir,
+        output_dir,
+        chunk_size=args.chunk_size,
+        num_processes=args.num_processes,
+        allowed_scene_keys=allowed_scene_keys,
+    )
+    logging.info("Processing completed!")
     search_list_dir = os.path.join(args.output_dir, cur_mode, 'metadata')
     save_dir = os.path.join(args.output_dir, cur_mode)
-    generate_full_list(search_list_dir, save_dir)
+    generate_full_list(search_list_dir, save_dir, allowed_scene_keys=allowed_scene_keys)
     logging.info("Full list generated!")
