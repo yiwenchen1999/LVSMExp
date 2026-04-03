@@ -22,8 +22,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
-CHECKPOINT="${CHECKPOINT:?Set CHECKPOINT to scene_encoder_decoder_256.pt (or your .pt path)}"
-DATASET_PATH="${DATASET_PATH:?Set DATASET_PATH to preprocessed test/full_list.txt for the 25 scenes}"
+CHECKPOINT="${CHECKPOINT:-${REPO_ROOT}/ckpt/re10k}"
+DATASET_PATH="${DATASET_PATH:-${REPO_ROOT}/preprocessed_data/re10k_c5_64_first25/test/full_list.txt}"
 OUT_DIR="${OUT_DIR:-${REPO_ROOT}/experiments/evaluation/re10k_c5_first25_encoder_decoder}"
 VIEW_IDX="${VIEW_IDX:-${REPO_ROOT}/data/re10k_c5_64_first25.json}"
 
