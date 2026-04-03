@@ -1,5 +1,6 @@
 # Copyright (c) 2025 Haian Jin. Created for the LVSM project (ICLR 2025).
 
+import os
 import random
 import numpy as np
 import torch
@@ -7,6 +8,7 @@ import torch.nn as nn
 from easydict import EasyDict as edict
 from einops import rearrange
 import imageio
+from PIL import Image
 
 
 
@@ -27,6 +29,48 @@ def create_video_from_frames(frames, output_video_file, framerate=30):
 
     imageio.mimsave(output_video_file, frames, fps=framerate, quality=8)
 
+
+def tensor_chw01_to_uint8_hwc(img_chw: torch.Tensor) -> np.ndarray:
+    """[c,h,w] float in ~[0,1] -> uint8 [h,w,c] RGB."""
+    x = img_chw.detach().float().cpu().clamp(0, 1).permute(1, 2, 0).numpy()
+    return (x * 255.0).clip(0, 255).astype(np.uint8)
+
+
+def save_eval_triplet_layout(
+    out_root: str,
+    safe_scene_name: str,
+    context_images: torch.Tensor,
+    context_frame_indices,
+    gt_images: torch.Tensor,
+    target_frame_indices,
+    pred_images: torch.Tensor,
+):
+    """
+    Save evaluation images under:
+        out_root/context/<safe_scene_name>/<frame_idx>.png
+        out_root/gt/<safe_scene_name>/<frame_idx>.png
+        out_root/predicted/<safe_scene_name>/<frame_idx>.png
+
+    Context uses input (reference) view indices; gt/predicted use target view indices.
+    Filenames are zero-padded original frame indices for alignment across folders.
+    """
+    ctx_dir = os.path.join(out_root, "context", safe_scene_name)
+    gt_dir = os.path.join(out_root, "gt", safe_scene_name)
+    pred_dir = os.path.join(out_root, "predicted", safe_scene_name)
+    for d in (ctx_dir, gt_dir, pred_dir):
+        os.makedirs(d, exist_ok=True)
+
+    for vi, fi in enumerate(context_frame_indices):
+        arr = tensor_chw01_to_uint8_hwc(context_images[vi])
+        Image.fromarray(arr).save(os.path.join(ctx_dir, f"{int(fi):05d}.png"))
+
+    n_t = len(target_frame_indices)
+    for vi in range(n_t):
+        fi = int(target_frame_indices[vi])
+        gt_arr = tensor_chw01_to_uint8_hwc(gt_images[vi])
+        pr_arr = tensor_chw01_to_uint8_hwc(pred_images[vi])
+        Image.fromarray(gt_arr).save(os.path.join(gt_dir, f"{fi:05d}.png"))
+        Image.fromarray(pr_arr).save(os.path.join(pred_dir, f"{fi:05d}.png"))
 
 
 class ProcessData(nn.Module):

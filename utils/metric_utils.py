@@ -117,16 +117,18 @@ def compute_ssim(
 @torch.no_grad()
 def export_results(
     result: edict,
-    out_dir: str, 
-    compute_metrics: bool = False
+    out_dir: str,
+    compute_metrics: bool = False,
+    export_split_layout: bool = False,
 ):
     """
     Save results including images and optional metrics and videos.
-    
+
     Args:
         result: EasyDict containing input, target, and rendered images, and optionally video frames
         out_dir: Directory to save the evaluation results
         compute_metrics: Whether to compute and save metrics
+        export_split_layout: If True, also write context/, gt/, predicted/ (see data_utils.save_eval_triplet_layout)
     """
     os.makedirs(out_dir, exist_ok=True)
     
@@ -166,7 +168,22 @@ def export_results(
         # Save images
         print('saving images to: ', sample_dir)
         _save_images(result, batch_idx, sample_dir)
-        
+
+        if export_split_layout:
+            if hasattr(target_data, "relit_images") and target_data.relit_images is not None:
+                gt_for_split = target_data.relit_images[batch_idx]
+            else:
+                gt_for_split = target_data.image[batch_idx]
+            data_utils.save_eval_triplet_layout(
+                out_root=out_dir,
+                safe_scene_name=safe_scene_name,
+                context_images=input_data.image[batch_idx],
+                context_indices=input_indices,
+                gt_images=gt_for_split,
+                target_indices=target_indices,
+                pred_images=result.render[batch_idx],
+            )
+
         # Check if number of target views exceeds threshold (default 36)
         # If so, save rendered results directly as video
         num_target_views = result.render[batch_idx].shape[0]  # [v, c, h, w]

@@ -37,6 +37,7 @@ Dataset = importlib.import_module(module).__dict__[class_name]
 dataset = Dataset(config)
 
 datasampler = DistributedSampler(dataset)
+_is_infer = config.inference.get("if_inference", False)
 dataloader = DataLoader(
     dataset,
     batch_size=config.training.batch_size_per_gpu,
@@ -45,7 +46,7 @@ dataloader = DataLoader(
     prefetch_factor=config.training.prefetch_factor,
     persistent_workers=True,
     pin_memory=False,
-    drop_last=True,
+    drop_last=not _is_infer,
     sampler=datasampler
 )
 dataloader_iter = iter(dataloader)
@@ -95,7 +96,12 @@ with torch.no_grad(), torch.autocast(
         result = model(batch)
         if config.inference.get("render_video", False):
             result= model.module.render_video(result, **config.inference.render_video_config)
-        export_results(result, config.inference_out_dir, compute_metrics=config.inference.get("compute_metrics"))
+        export_results(
+            result,
+            config.inference_out_dir,
+            compute_metrics=config.inference.get("compute_metrics"),
+            export_split_layout=config.inference.get("export_split_layout", False),
+        )
     torch.cuda.empty_cache()
 
 

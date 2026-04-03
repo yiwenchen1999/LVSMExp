@@ -76,6 +76,7 @@ training:
 inference:
   if_inference: False
   compute_metrics: False
+  export_split_layout: false
   view_idx_file_path: ./data/evaluation_index_objaverse_train.json
   render_video: False
   render_video_config:
