@@ -27,7 +27,7 @@ DATASET_PATH="${DATASET_PATH:?Set DATASET_PATH to preprocessed test/full_list.tx
 OUT_DIR="${OUT_DIR:-${REPO_ROOT}/experiments/evaluation/re10k_c5_first25_encoder_decoder}"
 VIEW_IDX="${VIEW_IDX:-${REPO_ROOT}/data/re10k_c5_64_first25.json}"
 
-NPROC="${NPROC:-8}"
+NPROC="${NPROC:-1}"
 MASTER_PORT="${MASTER_PORT:-29506}"
 
 mkdir -p "${OUT_DIR}"
