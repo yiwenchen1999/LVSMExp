@@ -47,8 +47,8 @@ LOG_FILE="${OUT_DIR}/test.log"
     --rdzv_id=18635 --rdzv_backend=c10d --rdzv_endpoint="localhost:${MASTER_PORT}" \
     inference.py \
     --config configs/LVSM_scene_encoder_decoder.yaml \
-    training.checkpoint_dir="${CHECKPOINT}" \
-    training.dataset_path="${DATASET_PATH}" \
+    training.checkpoint_dir=ckpt/re10k \
+    training.dataset_path=preprocessed_data/re10k_c5_64_first25/test/full_list.txt\
     training.dataset_name=data.dataset_scene_og.Dataset \
     training.batch_size_per_gpu=1 \
     training.num_workers=2 \
