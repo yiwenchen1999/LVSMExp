@@ -200,7 +200,7 @@ with torch.no_grad(), torch.autocast(
                         current_tokens, env_input,
                     )
 
-                    ramp_steps = 12
+                    ramp_steps = -1
                     if step == 0:
                         current_tokens = base_tokens.clone()
                     elif step < ramp_steps:

@@ -178,9 +178,9 @@ def export_results(
                 out_root=out_dir,
                 safe_scene_name=safe_scene_name,
                 context_images=input_data.image[batch_idx],
-                context_indices=input_indices,
+                context_frame_indices=input_indices,
                 gt_images=gt_for_split,
-                target_indices=target_indices,
+                target_frame_indices=target_indices,
                 pred_images=result.render[batch_idx],
             )
 

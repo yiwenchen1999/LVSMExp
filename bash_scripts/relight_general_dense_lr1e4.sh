@@ -27,6 +27,12 @@ torchrun --nproc_per_node 4 --nnodes 1 \
     training.checkpoint_dir = ckpt/dense_relight_env \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_dense_general_lr1e4 \
+    training.relight_signals = "[envmap]" \
+    training.multi_edit.enable = true \
+    training.multi_edit.max_steps = 3 \
+    training.multi_edit.sample_mode = uniform \
+    training.multi_edit.final_only = true \
+    training.multi_edit.insufficient_chain_policy = resample \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001

@@ -295,6 +295,20 @@ class ProcessData(nn.Module):
                 input_dict[key] = value
                 target_dict[key] = value
                 continue
+            if key.startswith("chain_"):
+                # Chain tensors use shape [b, steps, v, ...].
+                # Keep steps dimension intact and apply view split/gather on dim=2.
+                if value.dim() >= 3:
+                    input_dict[key] = value[:, :, :self.config.training.num_input_views, ...]
+                    to_expand_dim = value.shape[3:]
+                    expanded_index = index.view(
+                        index.shape[0], 1, index.shape[1], *(1,) * len(to_expand_dim)
+                    ).expand(-1, value.shape[1], -1, *to_expand_dim)
+                    target_dict[key] = torch.gather(value, dim=2, index=expanded_index)
+                else:
+                    input_dict[key] = value
+                    target_dict[key] = value
+                continue
             input_dict[key] = value[:, :self.config.training.num_input_views, ...]
 
             to_expand_dim = value.shape[2:] # [b, v, (value dim)] -> [value dim], e.g. [c, h, w] or [4] or [4, 4]

@@ -674,6 +674,76 @@ class LatentSceneEditor(nn.Module):
         
         return rendered_albedos
 
+    def _apply_editor_once(self, latent_tokens, condition_tokens):
+        if condition_tokens is None:
+            return latent_tokens
+        editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
+        checkpoint_every = self.config.training.grad_checkpoint_every
+        editor_output_tokens = self.pass_layers(
+            self.transformer_editor,
+            editor_input_tokens,
+            gradient_checkpoint=True,
+            checkpoint_every=checkpoint_every
+        )
+        n_latent_vectors = self.config.model.transformer.n_latent_vectors
+        return editor_output_tokens[:, :n_latent_vectors, :]
+
+    def _run_multi_edit_chain(self, latent_tokens, input_dict, token_dim):
+        chain_env_ldr = getattr(input_dict, "chain_env_ldr", None)
+        chain_env_hdr = getattr(input_dict, "chain_env_hdr", None)
+        if chain_env_ldr is None or chain_env_hdr is None:
+            return latent_tokens, None
+
+        if chain_env_ldr.dim() != 6 or chain_env_hdr.dim() != 6:
+            return latent_tokens, None
+
+        max_available_steps = min(chain_env_ldr.shape[1], chain_env_hdr.shape[1])
+        if max_available_steps <= 0:
+            return latent_tokens, None
+
+        multi_edit_cfg = self.config.training.get("multi_edit", {})
+        configured_max_steps = int(multi_edit_cfg.get("max_steps", 3))
+        max_steps = max(1, min(configured_max_steps, max_available_steps))
+        sample_mode = multi_edit_cfg.get("sample_mode", "uniform")
+
+        b = latent_tokens.shape[0]
+        if self.training:
+            if sample_mode == "uniform":
+                sampled_steps = torch.randint(1, max_steps + 1, (b,), device=latent_tokens.device)
+            else:
+                raise ValueError(f"Unsupported multi_edit.sample_mode: {sample_mode}")
+        else:
+            sampled_steps = torch.full((b,), max_steps, dtype=torch.long, device=latent_tokens.device)
+
+        updated_latent_tokens = latent_tokens
+        base_input = dict(input_dict)
+        for step_idx in range(max_steps):
+            step_input = edict(base_input)
+            step_input.env_ldr = chain_env_ldr[:, step_idx]
+            step_input.env_hdr = chain_env_hdr[:, step_idx]
+            condition_tokens = self._build_editor_condition_tokens(step_input, token_dim)
+            edited_latent_tokens = self._apply_editor_once(updated_latent_tokens, condition_tokens)
+            active_mask = (sampled_steps > step_idx).view(b, 1, 1)
+            updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
+
+        chain_info = {"sampled_steps": sampled_steps, "max_steps": max_steps, "sample_mode": sample_mode}
+        return updated_latent_tokens, chain_info
+
+    def _select_chain_target_images(self, target_dict, sampled_steps, max_steps):
+        chain_relit_images = getattr(target_dict, "chain_relit_images", None)
+        if chain_relit_images is None or chain_relit_images.dim() != 6:
+            return None
+        if chain_relit_images.shape[1] < max_steps:
+            max_steps = chain_relit_images.shape[1]
+        if max_steps <= 0:
+            return None
+
+        selected_step = sampled_steps.clamp(min=1, max=max_steps) - 1
+        gather_shape = [chain_relit_images.shape[0], 1] + list(chain_relit_images.shape[2:])
+        gather_index = selected_step.view(-1, 1, 1, 1, 1, 1).expand(*gather_shape)
+        selected_target = torch.gather(chain_relit_images, dim=1, index=gather_index).squeeze(1)
+        return selected_target
+
     def forward(self, data_batch, has_target_image=True):
         #& Step 1: Data preprocessing - Extract input and target data from data_batch, compute rays
         # input.image: [b, v_input, 3, h, w] - Input RGB images (v_input=2 views)
@@ -688,19 +758,14 @@ class LatentSceneEditor(nn.Module):
         latent_tokens, n_patches, d = self.reconstructor(input)
 
         # #& Step 3: Editor - edit latent tokens with configured lighting signals (envmap / point_light / both)
-        condition_tokens = self._build_editor_condition_tokens(input, d)
-        # print("condition_tokens:", condition_tokens.shape)
-        if condition_tokens is not None:
-            editor_input_tokens = torch.cat([latent_tokens, condition_tokens], dim=1)
-            checkpoint_every = self.config.training.grad_checkpoint_every
-            editor_output_tokens = self.pass_layers(
-                self.transformer_editor,
-                editor_input_tokens,
-                gradient_checkpoint=True,
-                checkpoint_every=checkpoint_every
-            )
-            n_latent_vectors = self.config.model.transformer.n_latent_vectors
-            latent_tokens = editor_output_tokens[:, :n_latent_vectors, :]
+        chain_info = None
+        multi_edit_cfg = self.config.training.get("multi_edit", {})
+        multi_edit_enable = bool(multi_edit_cfg.get("enable", False))
+        if multi_edit_enable:
+            latent_tokens, chain_info = self._run_multi_edit_chain(latent_tokens, input, d)
+        if (not multi_edit_enable) or (chain_info is None):
+            condition_tokens = self._build_editor_condition_tokens(input, d)
+            latent_tokens = self._apply_editor_once(latent_tokens, condition_tokens)
         
         #& Step 4: Renderer - Decode results from target ray maps
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)
@@ -715,8 +780,21 @@ class LatentSceneEditor(nn.Module):
         # loss_metrics contains: L2 loss, LPIPS loss, perceptual loss, etc.
         # Use relit_images target split if available, otherwise fall back to original image
         if has_target_image:
+            chain_target_images = None
+            if chain_info is not None:
+                multi_edit_cfg = self.config.training.get("multi_edit", {})
+                if not bool(multi_edit_cfg.get("final_only", True)):
+                    raise ValueError("Only multi_edit.final_only=true is currently supported.")
+                chain_target_images = self._select_chain_target_images(
+                    target_dict=target,
+                    sampled_steps=chain_info["sampled_steps"],
+                    max_steps=chain_info["max_steps"],
+                )
+
             # Check if relit_images are available in target (from relit scene)
-            if hasattr(target, 'relit_images') and target.relit_images is not None:
+            if chain_target_images is not None:
+                target_images = chain_target_images
+            elif hasattr(target, 'relit_images') and target.relit_images is not None:
                 target_images = target.relit_images
             else:
                 target_images = target.image
@@ -754,6 +832,13 @@ class LatentSceneEditor(nn.Module):
                 # If albedo decoder is enabled but no target albedos, still use image loss only
                 # (albedo decoder will still generate albedos, but no loss is computed)
                 loss_metrics = image_loss_metrics
+            if chain_info is not None:
+                loss_metrics.sampled_edit_steps_mean = chain_info["sampled_steps"].float().mean()
+                max_steps = chain_info["max_steps"]
+                sampled_steps = chain_info["sampled_steps"]
+                for step in range(1, max_steps + 1):
+                    step_ratio = (sampled_steps == step).float().mean()
+                    loss_metrics[f"sampled_edit_step_{step}_ratio"] = step_ratio
         else:
             loss_metrics = None
 

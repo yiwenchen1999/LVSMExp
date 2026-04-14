@@ -165,6 +165,126 @@ class Dataset(Dataset):
             sampled.append(torch.from_numpy(rays[sampled_idx]).float())  # [num_rays, 10]
         return torch.stack(sampled, dim=0)  # [v, num_rays, 10]
 
+    def _load_scene_images_by_indices(self, metadata_dir, scene_name, image_indices):
+        relit_scene_path = os.path.join(metadata_dir, scene_name + ".json")
+        if not os.path.exists(relit_scene_path):
+            raise FileNotFoundError(f"Relit scene JSON not found: {relit_scene_path}")
+
+        with open(relit_scene_path, "r") as f:
+            relit_data_json = json.load(f)
+        relit_frames = relit_data_json.get("frames", [])
+        if len(relit_frames) <= max(image_indices):
+            raise IndexError(
+                f"Relit scene '{scene_name}' has only {len(relit_frames)} frames, "
+                f"but need frame index {max(image_indices)}"
+            )
+
+        relit_image_paths = [relit_frames[ic]["image_path"] for ic in image_indices]
+        missing_images = [img_path for img_path in relit_image_paths if not os.path.exists(img_path)]
+        if missing_images:
+            if len(missing_images) > 3:
+                raise FileNotFoundError(
+                    f"Missing relit image files for scene '{scene_name}': {missing_images[:3]}..."
+                )
+            raise FileNotFoundError(f"Missing relit image files: {missing_images}")
+
+        relit_frames_chosen = [relit_frames[ic] for ic in image_indices]
+        relit_images, _, _ = self.preprocess_frames(relit_frames_chosen, relit_image_paths)
+        return relit_images
+
+    def _load_envmaps_or_zeros(self, base_dir, scene_name, image_indices):
+        envmaps_dir = os.path.join(base_dir, "envmaps", scene_name)
+        env_ldr_list = []
+        env_hdr_list = []
+        missing_slots = []
+        env_h = None
+        env_w = None
+        default_h, default_w = 256, 512
+
+        for ic in image_indices:
+            env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
+            env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
+            if (not os.path.exists(env_ldr_path)) or (not os.path.exists(env_hdr_path)):
+                if env_h is None or env_w is None:
+                    env_ldr_list.append(None)
+                    env_hdr_list.append(None)
+                    missing_slots.append(len(env_ldr_list) - 1)
+                else:
+                    env_ldr_list.append(torch.zeros(3, env_h, env_w, dtype=torch.float32))
+                    env_hdr_list.append(torch.zeros(3, env_h, env_w, dtype=torch.float32))
+                continue
+
+            try:
+                env_ldr_img = PIL.Image.open(env_ldr_path)
+                env_ldr_img.load()
+                env_ldr_array = np.array(env_ldr_img) / 255.0
+                if len(env_ldr_array.shape) == 2:
+                    env_ldr_array = np.stack([env_ldr_array, env_ldr_array, env_ldr_array], axis=2)
+                elif env_ldr_array.shape[2] == 4:
+                    rgb = env_ldr_array[:, :, :3]
+                    alpha = env_ldr_array[:, :, 3:4]
+                    env_ldr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                elif env_ldr_array.shape[2] != 3:
+                    env_ldr_array = env_ldr_array[:, :, :3]
+                env_ldr_tensor = torch.from_numpy(env_ldr_array).permute(2, 0, 1).float()
+
+                env_hdr_img = PIL.Image.open(env_hdr_path)
+                env_hdr_img.load()
+                env_hdr_array = np.array(env_hdr_img) / 255.0
+                if len(env_hdr_array.shape) == 2:
+                    env_hdr_array = np.stack([env_hdr_array, env_hdr_array, env_hdr_array], axis=2)
+                elif env_hdr_array.shape[2] == 4:
+                    rgb = env_hdr_array[:, :, :3]
+                    alpha = env_hdr_array[:, :, 3:4]
+                    env_hdr_array = rgb * alpha + (1.0 - alpha) * 1.0
+                elif env_hdr_array.shape[2] != 3:
+                    env_hdr_array = env_hdr_array[:, :, :3]
+                env_hdr_tensor = torch.from_numpy(env_hdr_array).permute(2, 0, 1).float()
+
+                if env_h is None or env_w is None:
+                    env_h, env_w = env_ldr_tensor.shape[1], env_ldr_tensor.shape[2]
+                    for slot_idx in missing_slots:
+                        env_ldr_list[slot_idx] = torch.zeros(3, env_h, env_w, dtype=torch.float32)
+                        env_hdr_list[slot_idx] = torch.zeros(3, env_h, env_w, dtype=torch.float32)
+                    missing_slots = []
+
+                if env_ldr_tensor.shape[1] != env_h or env_ldr_tensor.shape[2] != env_w:
+                    env_ldr_tensor = torch.nn.functional.interpolate(
+                        env_ldr_tensor.unsqueeze(0),
+                        size=(env_h, env_w),
+                        mode="bilinear",
+                        align_corners=False
+                    ).squeeze(0)
+
+                if env_hdr_tensor.shape[1] != env_h or env_hdr_tensor.shape[2] != env_w:
+                    env_hdr_tensor = torch.nn.functional.interpolate(
+                        env_hdr_tensor.unsqueeze(0),
+                        size=(env_h, env_w),
+                        mode="bilinear",
+                        align_corners=False
+                    ).squeeze(0)
+
+                env_ldr_list.append(env_ldr_tensor)
+                env_hdr_list.append(env_hdr_tensor)
+            except Exception:
+                if env_h is None or env_w is None:
+                    env_ldr_list.append(None)
+                    env_hdr_list.append(None)
+                    missing_slots.append(len(env_ldr_list) - 1)
+                else:
+                    env_ldr_list.append(torch.zeros(3, env_h, env_w, dtype=torch.float32))
+                    env_hdr_list.append(torch.zeros(3, env_h, env_w, dtype=torch.float32))
+
+        if env_h is None or env_w is None:
+            env_h, env_w = default_h, default_w
+
+        if missing_slots:
+            for slot_idx in missing_slots:
+                env_ldr_list[slot_idx] = torch.zeros(3, env_h, env_w, dtype=torch.float32)
+                env_hdr_list[slot_idx] = torch.zeros(3, env_h, env_w, dtype=torch.float32)
+
+        return torch.stack(env_ldr_list, dim=0), torch.stack(env_hdr_list, dim=0)
+
 
     def preprocess_frames(self, frames_chosen, image_paths_chosen):
         resize_h = self.config.model.image_tokenizer.image_size
@@ -397,6 +517,11 @@ class Dataset(Dataset):
             env_ldr = None
             env_hdr = None
             albedos = None
+            chain_relit_images = None
+            chain_env_ldr = None
+            chain_env_hdr = None
+            chain_num_steps = None
+            chain_scene_names = None
             
             object_id = self._extract_object_id(scene_name)
             
@@ -609,6 +734,82 @@ class Dataset(Dataset):
                             10, 
                             dtype=torch.float32
                         ).clone()
+
+                multi_edit_cfg = self.config.training.get("multi_edit", {})
+                multi_edit_enable = bool(multi_edit_cfg.get("enable", False))
+                if (
+                    multi_edit_enable
+                    and self.use_relight_envmap
+                    and (not self.use_relight_point_light)
+                    and (not self.condition_reverse)
+                ):
+                    max_steps = int(multi_edit_cfg.get("max_steps", 3))
+                    max_steps = max(1, max_steps)
+                    insufficient_chain_policy = multi_edit_cfg.get("insufficient_chain_policy", "resample")
+                    if len(candidate_scenes) < max_steps:
+                        if insufficient_chain_policy == "resample":
+                            return self.__getitem__(
+                                random.randint(0, len(self) - 1),
+                                max_retries=max_retries,
+                                _retry_count=_retry_count + 1,
+                            )
+                        if insufficient_chain_policy == "sample_with_replacement":
+                            sampled_chain = random.choices(candidate_scenes, k=max_steps)
+                        else:
+                            raise ValueError(
+                                f"Not enough relit scenes for multi_edit chain, "
+                                f"need {max_steps}, got {len(candidate_scenes)} "
+                                f"(scene: {scene_name}, object_id: {object_id})"
+                            )
+                    else:
+                        remaining_scenes = [s for s in candidate_scenes if s != relit_scene_name]
+                        if max_steps > 1 and len(remaining_scenes) < (max_steps - 1):
+                            if insufficient_chain_policy == "resample":
+                                return self.__getitem__(
+                                    random.randint(0, len(self) - 1),
+                                    max_retries=max_retries,
+                                    _retry_count=_retry_count + 1,
+                                )
+                            if insufficient_chain_policy == "sample_with_replacement":
+                                sampled_chain = [relit_scene_name]
+                                sampled_chain.extend(
+                                    random.choices(candidate_scenes, k=max_steps - 1)
+                                )
+                            else:
+                                raise ValueError(
+                                    f"Not enough unique relit scenes for multi_edit chain after first sample, "
+                                    f"need {max_steps - 1}, got {len(remaining_scenes)} "
+                                    f"(scene: {scene_name}, object_id: {object_id})"
+                                )
+                        else:
+                            sampled_chain = [relit_scene_name]
+                            if max_steps > 1:
+                                sampled_chain.extend(random.sample(remaining_scenes, max_steps - 1))
+
+                    chain_relit_images_list = []
+                    chain_env_ldr_list = []
+                    chain_env_hdr_list = []
+                    for chain_scene_name in sampled_chain:
+                        chain_relit_images_list.append(
+                            self._load_scene_images_by_indices(
+                                metadata_dir=metadata_dir,
+                                scene_name=chain_scene_name,
+                                image_indices=image_indices,
+                            )
+                        )
+                        cur_env_ldr, cur_env_hdr = self._load_envmaps_or_zeros(
+                            base_dir=base_dir,
+                            scene_name=chain_scene_name,
+                            image_indices=image_indices,
+                        )
+                        chain_env_ldr_list.append(cur_env_ldr)
+                        chain_env_hdr_list.append(cur_env_hdr)
+
+                    chain_relit_images = torch.stack(chain_relit_images_list, dim=0)  # [steps, v, 3, h, w]
+                    chain_env_ldr = torch.stack(chain_env_ldr_list, dim=0)            # [steps, v, 3, eh, ew]
+                    chain_env_hdr = torch.stack(chain_env_hdr_list, dim=0)            # [steps, v, 3, eh, ew]
+                    chain_num_steps = torch.tensor(max_steps, dtype=torch.long)
+                    chain_scene_names = sampled_chain
             else:
                 # Skip loading relit signals if not configured
                 relit_images = None
@@ -756,6 +957,16 @@ class Dataset(Dataset):
                 if self.use_relight_envmap:
                     result_dict["env_ldr"] = env_ldr
                     result_dict["env_hdr"] = env_hdr
+                    if chain_relit_images is not None:
+                        result_dict["chain_relit_images"] = chain_relit_images
+                    if chain_env_ldr is not None:
+                        result_dict["chain_env_ldr"] = chain_env_ldr
+                    if chain_env_hdr is not None:
+                        result_dict["chain_env_hdr"] = chain_env_hdr
+                    if chain_num_steps is not None:
+                        result_dict["chain_num_steps"] = chain_num_steps
+                    if chain_scene_names is not None:
+                        result_dict["chain_scene_names"] = chain_scene_names
                 if self.use_relight_point_light:
                     result_dict["point_light_rays"] = point_light_rays
             if self.use_albedos:
