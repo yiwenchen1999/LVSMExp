@@ -727,7 +727,7 @@ class LatentSceneEditor(nn.Module):
             condition_tokens = self._build_editor_condition_tokens(step_input, token_dim)
             edited_latent_tokens = self._apply_editor_once(updated_latent_tokens, condition_tokens)
             active_mask = (sampled_steps > step_idx).view(b, 1, 1)
-            print("active_mask:", active_mask.shape)
+            print("active_mask:", active_mask)
             updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
 
         chain_info = {"sampled_steps": sampled_steps, "max_steps": max_steps, "sample_mode": sample_mode}
