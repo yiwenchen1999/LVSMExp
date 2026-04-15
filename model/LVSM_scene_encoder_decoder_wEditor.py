@@ -689,11 +689,8 @@ class LatentSceneEditor(nn.Module):
         return editor_output_tokens[:, :n_latent_vectors, :]
 
     def _run_multi_edit_chain(self, latent_tokens, input_dict, token_dim):
-        print("Running multi-edit chain...")
         chain_env_ldr = getattr(input_dict, "chain_env_ldr", None)
         chain_env_hdr = getattr(input_dict, "chain_env_hdr", None)
-        print("chain_env_ldr:", chain_env_ldr.shape)
-        print("chain_env_hdr:", chain_env_hdr.shape)
         if chain_env_ldr is None or chain_env_hdr is None:
             return latent_tokens, None
 
@@ -708,9 +705,12 @@ class LatentSceneEditor(nn.Module):
         configured_max_steps = int(multi_edit_cfg.get("max_steps", 3))
         max_steps = max(1, min(configured_max_steps, max_available_steps))
         sample_mode = multi_edit_cfg.get("sample_mode", "uniform")
+        force_all_steps = bool(multi_edit_cfg.get("force_all_steps", False))
 
         b = latent_tokens.shape[0]
-        if self.training:
+        if force_all_steps:
+            sampled_steps = torch.full((b,), max_steps, dtype=torch.long, device=latent_tokens.device)
+        elif self.training:
             if sample_mode == "uniform":
                 sampled_steps = torch.randint(1, max_steps + 1, (b,), device=latent_tokens.device)
             else:
@@ -720,16 +720,24 @@ class LatentSceneEditor(nn.Module):
 
         updated_latent_tokens = latent_tokens
         base_input = dict(input_dict)
+        pass_latents = []
         for step_idx in range(max_steps):
             step_input = edict(base_input)
             step_input.env_ldr = chain_env_ldr[:, step_idx]
             step_input.env_hdr = chain_env_hdr[:, step_idx]
             condition_tokens = self._build_editor_condition_tokens(step_input, token_dim)
             edited_latent_tokens = self._apply_editor_once(updated_latent_tokens, condition_tokens)
-            active_mask = torch.ones((b, 1, 1), dtype=torch.bool, device=updated_latent_tokens.device)
+            active_mask = (sampled_steps > step_idx).view(b, 1, 1)
             updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
+            pass_latents.append(updated_latent_tokens)
 
-        chain_info = {"sampled_steps": sampled_steps, "max_steps": max_steps, "sample_mode": sample_mode}
+        chain_info = {
+            "sampled_steps": sampled_steps,
+            "max_steps": max_steps,
+            "sample_mode": sample_mode,
+            "force_all_steps": force_all_steps,
+            "pass_latents": torch.stack(pass_latents, dim=1),
+        }
         return updated_latent_tokens, chain_info
 
     def _select_chain_target_images(self, target_dict, sampled_steps, max_steps):
@@ -745,8 +753,36 @@ class LatentSceneEditor(nn.Module):
         gather_shape = [chain_relit_images.shape[0], 1] + list(chain_relit_images.shape[2:])
         gather_index = selected_step.view(-1, 1, 1, 1, 1, 1).expand(*gather_shape)
         selected_target = torch.gather(chain_relit_images, dim=1, index=gather_index).squeeze(1)
-        print('gather_index:', gather_index)
         return selected_target
+
+    def _compute_multi_pass_outputs(self, chain_info, target, n_patches, d):
+        pass_latents = chain_info["pass_latents"]  # [b, steps, n_latent, d]
+        max_steps = pass_latents.shape[1]
+        pass_renders = []
+        for step_idx in range(max_steps):
+            pass_renders.append(self.renderer(pass_latents[:, step_idx], target, n_patches, d))
+        return torch.stack(pass_renders, dim=1)
+
+    def _compute_multi_pass_loss(self, pass_renders, pass_targets):
+        # pass_renders/pass_targets: [b, steps, v, c, h, w]
+        _, max_steps, _, _, _, _ = pass_renders.shape
+        pass_metrics = []
+        for pass_idx in range(max_steps):
+            pass_metrics.append(
+                self.loss_computer(
+                    pass_renders[:, pass_idx],
+                    pass_targets[:, pass_idx],
+                )
+            )
+
+        loss_metrics = edict()
+        metric_keys = list(pass_metrics[0].keys())
+        for key in metric_keys:
+            per_pass_vals = torch.stack([pm[key] for pm in pass_metrics], dim=0)
+            loss_metrics[key] = per_pass_vals.mean()
+            for pass_idx in range(max_steps):
+                loss_metrics[f"pass{pass_idx + 1}_{key}"] = per_pass_vals[pass_idx]
+        return loss_metrics
 
     def forward(self, data_batch, has_target_image=True):
         #& Step 1: Data preprocessing - Extract input and target data from data_batch, compute rays
@@ -773,6 +809,19 @@ class LatentSceneEditor(nn.Module):
         
         #& Step 4: Renderer - Decode results from target ray maps
         rendered_images = self.renderer(latent_tokens, target, n_patches, d)
+        pass_renders = None
+        pass_targets = None
+        if chain_info is not None:
+            pass_renders = self._compute_multi_pass_outputs(chain_info, target, n_patches, d)
+            chain_supervision = None
+            if hasattr(target, "pass_relit_images") and target.pass_relit_images is not None:
+                chain_supervision = target.pass_relit_images
+            elif hasattr(target, "chain_relit_images") and target.chain_relit_images is not None:
+                chain_supervision = target.chain_relit_images
+            if chain_supervision is not None:
+                max_steps = min(chain_info["max_steps"], chain_supervision.shape[1])
+                pass_renders = pass_renders[:, :max_steps]
+                pass_targets = chain_supervision[:, :max_steps]
         
         #& Step 4.5: Process albedo decoder if enabled
         rendered_albedos = None
@@ -802,40 +851,43 @@ class LatentSceneEditor(nn.Module):
                 target_images = target.relit_images
             else:
                 target_images = target.image
-            
-            # Compute image loss
-            image_loss_metrics = self.loss_computer(
-                rendered_images,
-                target_images
-            )
-            
-            # Compute albedo loss if albedo decoder is enabled and target albedos are available
-            if self.use_albedo_decoder and hasattr(target, 'albedos') and target.albedos is not None:
-                albedo_loss_metrics = self.loss_computer(
-                    rendered_albedos,
-                    target.albedos
-                )
-                
-                # Combine losses: add image loss and albedo loss
-                # Sum all loss values
-                combined_loss = image_loss_metrics.loss + albedo_loss_metrics.loss
-                
-                # Create combined loss metrics with both image and albedo losses
-                loss_metrics = edict(
-                    loss=combined_loss,
-                    image_loss=image_loss_metrics.loss,
-                    albedo_loss=albedo_loss_metrics.loss,
-                    l2_loss=image_loss_metrics.l2_loss + albedo_loss_metrics.l2_loss,
-                    lpips_loss=image_loss_metrics.lpips_loss + albedo_loss_metrics.lpips_loss,
-                    perceptual_loss=image_loss_metrics.perceptual_loss + albedo_loss_metrics.perceptual_loss,
-                    psnr=image_loss_metrics.psnr,  # Keep image PSNR
-                    norm_perceptual_loss=image_loss_metrics.norm_perceptual_loss + albedo_loss_metrics.norm_perceptual_loss,
-                    norm_lpips_loss=image_loss_metrics.norm_lpips_loss + albedo_loss_metrics.norm_lpips_loss,
-                )
+
+            if pass_renders is not None and pass_targets is not None:
+                loss_metrics = self._compute_multi_pass_loss(pass_renders, pass_targets)
             else:
-                # If albedo decoder is enabled but no target albedos, still use image loss only
-                # (albedo decoder will still generate albedos, but no loss is computed)
-                loss_metrics = image_loss_metrics
+                # Compute image loss
+                image_loss_metrics = self.loss_computer(
+                    rendered_images,
+                    target_images
+                )
+
+                # Compute albedo loss if albedo decoder is enabled and target albedos are available
+                if self.use_albedo_decoder and hasattr(target, 'albedos') and target.albedos is not None:
+                    albedo_loss_metrics = self.loss_computer(
+                        rendered_albedos,
+                        target.albedos
+                    )
+
+                    # Combine losses: add image loss and albedo loss
+                    # Sum all loss values
+                    combined_loss = image_loss_metrics.loss + albedo_loss_metrics.loss
+
+                    # Create combined loss metrics with both image and albedo losses
+                    loss_metrics = edict(
+                        loss=combined_loss,
+                        image_loss=image_loss_metrics.loss,
+                        albedo_loss=albedo_loss_metrics.loss,
+                        l2_loss=image_loss_metrics.l2_loss + albedo_loss_metrics.l2_loss,
+                        lpips_loss=image_loss_metrics.lpips_loss + albedo_loss_metrics.lpips_loss,
+                        perceptual_loss=image_loss_metrics.perceptual_loss + albedo_loss_metrics.perceptual_loss,
+                        psnr=image_loss_metrics.psnr,  # Keep image PSNR
+                        norm_perceptual_loss=image_loss_metrics.norm_perceptual_loss + albedo_loss_metrics.norm_perceptual_loss,
+                        norm_lpips_loss=image_loss_metrics.norm_lpips_loss + albedo_loss_metrics.norm_lpips_loss,
+                    )
+                else:
+                    # If albedo decoder is enabled but no target albedos, still use image loss only
+                    # (albedo decoder will still generate albedos, but no loss is computed)
+                    loss_metrics = image_loss_metrics
             if chain_info is not None:
                 loss_metrics.sampled_edit_steps_mean = chain_info["sampled_steps"].float().mean()
                 max_steps = chain_info["max_steps"]
@@ -856,6 +908,10 @@ class LatentSceneEditor(nn.Module):
         
         if rendered_albedos is not None:
             result.render_albedo = rendered_albedos
+        if pass_renders is not None:
+            result.render_passes = pass_renders
+        if pass_targets is not None:
+            result.target_passes = pass_targets
         
         return result
 

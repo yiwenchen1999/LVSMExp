@@ -52,6 +52,7 @@ training:
     enable: false
     max_steps: 3
     sample_mode: uniform
+    force_all_steps: false
     final_only: true
     insufficient_chain_policy: resample
   grad_accum_steps: 1

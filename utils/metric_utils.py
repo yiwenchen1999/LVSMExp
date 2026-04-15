@@ -220,41 +220,37 @@ def visualize_intermediate_results(out_dir, result):
     input, target = result.input, result.target
 
     if result.render is not None:
-        # For supervision images, we want different layouts based on available data:
-        # - If albedo exists: target.image | [target.relit_images] | rendered_images | target.albedo | rendered_albedo
-        # - Otherwise: target.image | [target.relit_images] | rendered_images
-        
         rendered_image = result.render
         b, v, _, h, w = rendered_image.size()
-        rendered_image = rendered_image.reshape(b * v, -1, h, w)
-        
-        # unlitGT: original unlit image
-        unlitGT = target.image.reshape(b * v, -1, h, w)
-        
-        # Check if albedo data exists
-        has_albedo = (hasattr(result, 'render_albedo') and result.render_albedo is not None and
-                     hasattr(target, 'albedos') and target.albedos is not None)
-        
-        # Build visualization components
-        components = [unlitGT]  # Start with target.image
-        
-        # Add relit_images if available
-        if hasattr(target, 'relit_images') and target.relit_images is not None:
-            gt_image = target.relit_images.reshape(b * v, -1, h, w)
-            components.append(gt_image)
-        
-        # Add rendered images
-        components.append(rendered_image)
-        
-        # Add albedo if available
-        if has_albedo:
-            target_albedo = target.albedos.reshape(b * v, -1, h, w)
-            rendered_albedo = result.render_albedo.reshape(b * v, -1, h, w)
-            components.append(target_albedo)
-            components.append(rendered_albedo)
-        
-        # Concatenate all components horizontally
-        m = len(components)
+
+        # Multi-pass layout:
+        # input_image | pass1_relit_image | pass1_render | pass2_relit_image | pass2_render | ...
+        if hasattr(result, "render_passes") and result.render_passes is not None:
+            pass_renders = result.render_passes  # [b, steps, v, c, h, w]
+            pass_targets = result.target_passes if hasattr(result, "target_passes") else None
+            components = [target.image.reshape(b * v, -1, h, w)]
+            if pass_targets is not None:
+                max_steps = min(pass_renders.shape[1], pass_targets.shape[1])
+            else:
+                max_steps = pass_renders.shape[1]
+            for step_idx in range(max_steps):
+                if pass_targets is not None:
+                    components.append(pass_targets[:, step_idx].reshape(b * v, -1, h, w))
+                components.append(pass_renders[:, step_idx].reshape(b * v, -1, h, w))
+            m = len(components)
+        else:
+            rendered_image = rendered_image.reshape(b * v, -1, h, w)
+            has_albedo = (hasattr(result, 'render_albedo') and result.render_albedo is not None and
+                          hasattr(target, 'albedos') and target.albedos is not None)
+            components = [target.image.reshape(b * v, -1, h, w)]
+            if hasattr(target, 'relit_images') and target.relit_images is not None:
+                components.append(target.relit_images.reshape(b * v, -1, h, w))
+            components.append(rendered_image)
+            if has_albedo:
+                components.append(target.albedos.reshape(b * v, -1, h, w))
+                components.append(result.render_albedo.reshape(b * v, -1, h, w))
+            m = len(components)
+
         visualized_image = torch.cat(components, dim=3).detach().cpu()
         visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=m)
         visualized_image = (visualized_image.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
@@ -293,37 +289,29 @@ def _save_images(result, batch_idx, out_dir):
     input_img = (input_img.cpu().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
     Image.fromarray(input_img).save(os.path.join(out_dir, "input.png"))
 
-    # Save GT vs prediction comparison
-    # Layout depends on available data:
-    # - If albedo exists: target.image | [target.relit_images] | rendered_images | target.albedo | rendered_albedo
-    # - Otherwise: target.image | [target.relit_images] | rendered_images
-    
-    # Check if albedo data exists
-    has_albedo = (hasattr(result, 'render_albedo') and result.render_albedo is not None and
-                 hasattr(result.target, 'albedos') and result.target.albedos is not None)
-    
-    # Build comparison components
-    components = []
-    
-    # Add target.image
-    target_img = result.target.image[batch_idx]  # [v, c, h, w]
-    components.append(target_img)
-    
-    # Add relit_images if available
-    if hasattr(result.target, 'relit_images') and result.target.relit_images is not None:
-        relit_img = result.target.relit_images[batch_idx]  # [v, c, h, w]
-        components.append(relit_img)
-    
-    # Add rendered images
-    rendered_img = result.render[batch_idx]  # [v, c, h, w]
-    components.append(rendered_img)
-    
-    # Add albedo if available
-    if has_albedo:
-        target_albedo = result.target.albedos[batch_idx]  # [v, c, h, w]
-        rendered_albedo = result.render_albedo[batch_idx]  # [v, c, h, w]
-        components.append(target_albedo)
-        components.append(rendered_albedo)
+    # Save GT vs prediction comparison.
+    # Multi-pass layout: input_image | pass1_relit_image | pass1_render | ...
+    components = [result.target.image[batch_idx]]
+    if hasattr(result, "render_passes") and result.render_passes is not None:
+        pass_renders = result.render_passes[batch_idx]  # [steps, v, c, h, w]
+        pass_targets = result.target_passes[batch_idx] if hasattr(result, "target_passes") and result.target_passes is not None else None
+        if pass_targets is not None:
+            max_steps = min(pass_renders.shape[0], pass_targets.shape[0])
+        else:
+            max_steps = pass_renders.shape[0]
+        for step_idx in range(max_steps):
+            if pass_targets is not None:
+                components.append(pass_targets[step_idx])
+            components.append(pass_renders[step_idx])
+    else:
+        has_albedo = (hasattr(result, 'render_albedo') and result.render_albedo is not None and
+                     hasattr(result.target, 'albedos') and result.target.albedos is not None)
+        if hasattr(result.target, 'relit_images') and result.target.relit_images is not None:
+            components.append(result.target.relit_images[batch_idx])
+        components.append(result.render[batch_idx])
+        if has_albedo:
+            components.append(result.target.albedos[batch_idx])
+            components.append(result.render_albedo[batch_idx])
     
     # Concatenate all components horizontally
     comparison = torch.cat(components, dim=2).detach().cpu()  # [v, c, h, total_w]

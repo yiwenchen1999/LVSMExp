@@ -305,6 +305,9 @@ class ProcessData(nn.Module):
                         index.shape[0], 1, index.shape[1], *(1,) * len(to_expand_dim)
                     ).expand(-1, value.shape[1], -1, *to_expand_dim)
                     target_dict[key] = torch.gather(value, dim=2, index=expanded_index)
+                    # Keep an explicit alias for per-pass supervision logging/loss code paths.
+                    if key == "chain_relit_images":
+                        target_dict["pass_relit_images"] = target_dict[key]
                 else:
                     input_dict[key] = value
                     target_dict[key] = value

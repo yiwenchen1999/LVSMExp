@@ -29,8 +29,9 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.wandb_exp_name = LVSM_edit_dense_general_lr1e4 \
     training.relight_signals = "[envmap]" \
     training.multi_edit.enable = true \
-    training.multi_edit.max_steps = 3 \
+    training.multi_edit.max_steps = 2 \
     training.multi_edit.sample_mode = uniform \
+    training.multi_edit.force_all_steps = false \
     training.multi_edit.final_only = true \
     training.multi_edit.insufficient_chain_policy = resample \
     training.warmup = 3000 \
