@@ -722,6 +722,7 @@ class LatentSceneEditor(nn.Module):
         base_input = dict(input_dict)
         pass_latents = []
         for step_idx in range(max_steps):
+            print('STEP:', step_idx)
             step_input = edict(base_input)
             step_input.env_ldr = chain_env_ldr[:, step_idx]
             step_input.env_hdr = chain_env_hdr[:, step_idx]
@@ -730,8 +731,6 @@ class LatentSceneEditor(nn.Module):
             active_mask = (sampled_steps > step_idx).view(b, 1, 1)
             if step_idx != 0:
                 updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
-            else:
-                updated_latent_tokens = edited_latent_tokens
             pass_latents.append(updated_latent_tokens)
 
         chain_info = {
