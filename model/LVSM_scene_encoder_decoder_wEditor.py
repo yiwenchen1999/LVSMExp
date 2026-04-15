@@ -689,8 +689,11 @@ class LatentSceneEditor(nn.Module):
         return editor_output_tokens[:, :n_latent_vectors, :]
 
     def _run_multi_edit_chain(self, latent_tokens, input_dict, token_dim):
+        print("Running multi-edit chain...")
         chain_env_ldr = getattr(input_dict, "chain_env_ldr", None)
         chain_env_hdr = getattr(input_dict, "chain_env_hdr", None)
+        print("chain_env_ldr:", chain_env_ldr.shape)
+        print("chain_env_hdr:", chain_env_hdr.shape)
         if chain_env_ldr is None or chain_env_hdr is None:
             return latent_tokens, None
 
@@ -724,6 +727,7 @@ class LatentSceneEditor(nn.Module):
             condition_tokens = self._build_editor_condition_tokens(step_input, token_dim)
             edited_latent_tokens = self._apply_editor_once(updated_latent_tokens, condition_tokens)
             active_mask = (sampled_steps > step_idx).view(b, 1, 1)
+            print("active_mask:", active_mask.shape)
             updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
 
         chain_info = {"sampled_steps": sampled_steps, "max_steps": max_steps, "sample_mode": sample_mode}
