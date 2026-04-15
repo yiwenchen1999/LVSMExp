@@ -745,6 +745,7 @@ class LatentSceneEditor(nn.Module):
         gather_shape = [chain_relit_images.shape[0], 1] + list(chain_relit_images.shape[2:])
         gather_index = selected_step.view(-1, 1, 1, 1, 1, 1).expand(*gather_shape)
         selected_target = torch.gather(chain_relit_images, dim=1, index=gather_index).squeeze(1)
+        print('gather_index:', gather_index)
         return selected_target
 
     def forward(self, data_batch, has_target_image=True):
