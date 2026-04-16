@@ -745,26 +745,16 @@ class Dataset(Dataset):
                 ):
                     max_steps = int(multi_edit_cfg.get("max_steps", 3))
                     max_steps = max(1, max_steps)
-                    insufficient_chain_policy = multi_edit_cfg.get(
-                        "insufficient_chain_policy", "sample_with_replacement"
-                    )
-                    allow_repeat_variations = bool(
-                        multi_edit_cfg.get("allow_repeat_variations", True)
-                    )
-                    if len(candidate_scenes) == 0:
-                        raise ValueError(
-                            f"No candidate relit scenes for multi_edit chain "
-                            f"(scene: {scene_name}, object_id: {object_id})"
-                        )
+                    insufficient_chain_policy = multi_edit_cfg.get("insufficient_chain_policy", "resample")
                     if len(candidate_scenes) < max_steps:
-                        if allow_repeat_variations or insufficient_chain_policy == "sample_with_replacement":
-                            sampled_chain = random.choices(candidate_scenes, k=max_steps)
-                        elif insufficient_chain_policy == "resample":
+                        if insufficient_chain_policy == "resample":
                             return self.__getitem__(
                                 random.randint(0, len(self) - 1),
                                 max_retries=max_retries,
                                 _retry_count=_retry_count + 1,
                             )
+                        if insufficient_chain_policy == "sample_with_replacement":
+                            sampled_chain = random.choices(candidate_scenes, k=max_steps)
                         else:
                             raise ValueError(
                                 f"Not enough relit scenes for multi_edit chain, "
@@ -774,16 +764,16 @@ class Dataset(Dataset):
                     else:
                         remaining_scenes = [s for s in candidate_scenes if s != relit_scene_name]
                         if max_steps > 1 and len(remaining_scenes) < (max_steps - 1):
-                            if allow_repeat_variations or insufficient_chain_policy == "sample_with_replacement":
-                                sampled_chain = [relit_scene_name]
-                                sampled_chain.extend(
-                                    random.choices(candidate_scenes, k=max_steps - 1)
-                                )
-                            elif insufficient_chain_policy == "resample":
+                            if insufficient_chain_policy == "resample":
                                 return self.__getitem__(
                                     random.randint(0, len(self) - 1),
                                     max_retries=max_retries,
                                     _retry_count=_retry_count + 1,
+                                )
+                            if insufficient_chain_policy == "sample_with_replacement":
+                                sampled_chain = [relit_scene_name]
+                                sampled_chain.extend(
+                                    random.choices(candidate_scenes, k=max_steps - 1)
                                 )
                             else:
                                 raise ValueError(

@@ -34,8 +34,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.multi_edit.sample_mode = uniform \
     training.multi_edit.force_all_steps = true \
     training.multi_edit.final_only = true \
-    training.multi_edit.insufficient_chain_policy = sample_with_replacement \
-    training.multi_edit.allow_repeat_variations = true \
+    training.multi_edit.insufficient_chain_policy = resample \
     training.warmup = 3000 \
     training.vis_every = 1 \
     training.lr = 0.0001
