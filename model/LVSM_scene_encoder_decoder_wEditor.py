@@ -703,7 +703,12 @@ class LatentSceneEditor(nn.Module):
 
         multi_edit_cfg = self.config.training.get("multi_edit", {})
         configured_max_steps = int(multi_edit_cfg.get("max_steps", 3))
-        max_steps = max(1, min(configured_max_steps, max_available_steps))
+        max_steps = max(1, configured_max_steps)
+        if max_available_steps < max_steps:
+            raise ValueError(
+                f"multi_edit.max_steps={max_steps} but chain data only provides "
+                f"{max_available_steps} steps. Please align dataloader output."
+            )
         sample_mode = multi_edit_cfg.get("sample_mode", "uniform")
         force_all_steps = bool(multi_edit_cfg.get("force_all_steps", False))
 
@@ -722,15 +727,13 @@ class LatentSceneEditor(nn.Module):
         base_input = dict(input_dict)
         pass_latents = []
         for step_idx in range(max_steps):
-            print('STEP:', step_idx)
             step_input = edict(base_input)
             step_input.env_ldr = chain_env_ldr[:, step_idx]
             step_input.env_hdr = chain_env_hdr[:, step_idx]
             condition_tokens = self._build_editor_condition_tokens(step_input, token_dim)
             edited_latent_tokens = self._apply_editor_once(updated_latent_tokens, condition_tokens)
             active_mask = (sampled_steps > step_idx).view(b, 1, 1)
-            if step_idx != -1:
-                updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
+            updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
             pass_latents.append(updated_latent_tokens)
 
         chain_info = {

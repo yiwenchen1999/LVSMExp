@@ -54,7 +54,8 @@ training:
     sample_mode: uniform
     force_all_steps: false
     final_only: true
-    insufficient_chain_policy: resample
+    insufficient_chain_policy: sample_with_replacement
+    allow_repeat_variations: true
   grad_accum_steps: 1
   grad_checkpoint_every: 1
   grad_clip_norm: 1.0
