@@ -20,10 +20,11 @@ export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 # export XDG_CONFIG_HOME=/scratch/chen.yiwe/.config
 # export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 
-torchrun --nproc_per_node 4 --nnodes 1 \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
-    training.batch_size_per_gpu = 4 \
+    training.batch_size_per_gpu = 1 \
+    training.dataset_path = /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
     training.checkpoint_dir = ckpt/dense_relight_env_progressive \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_dense_general_lr1e4 \
