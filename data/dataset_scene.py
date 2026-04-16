@@ -747,20 +747,9 @@ class Dataset(Dataset):
                     max_steps = max(1, max_steps)
                     insufficient_chain_policy = multi_edit_cfg.get("insufficient_chain_policy", "resample")
                     if len(candidate_scenes) < max_steps:
-                        if insufficient_chain_policy == "resample":
-                            return self.__getitem__(
-                                random.randint(0, len(self) - 1),
-                                max_retries=max_retries,
-                                _retry_count=_retry_count + 1,
-                            )
-                        if insufficient_chain_policy == "sample_with_replacement":
-                            sampled_chain = random.choices(candidate_scenes, k=max_steps)
-                        else:
-                            raise ValueError(
-                                f"Not enough relit scenes for multi_edit chain, "
-                                f"need {max_steps}, got {len(candidate_scenes)} "
-                                f"(scene: {scene_name}, object_id: {object_id})"
-                            )
+                        # If max_steps exceeds available lighting variations,
+                        # sample with replacement so the same variation can be reused.
+                        sampled_chain = [random.choice(candidate_scenes) for _ in range(max_steps)]
                     else:
                         remaining_scenes = [s for s in candidate_scenes if s != relit_scene_name]
                         if max_steps > 1 and len(remaining_scenes) < (max_steps - 1):
