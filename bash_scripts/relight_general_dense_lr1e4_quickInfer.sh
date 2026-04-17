@@ -25,8 +25,8 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
     training.batch_size_per_gpu = 1 \
     training.dataset_path = /scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
-    training.checkpoint_dir = ckpt/progressive_results_og \
-    training.LVSM_checkpoint_dir = ckpt/progressive_results_formatchange \
+    training.checkpoint_dir = ckpt/progressive_results_formatchange \
+    training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_dense_general_lr1e4 \
     training.relight_signals = "[envmap]" \
     training.multi_edit.enable = true \
