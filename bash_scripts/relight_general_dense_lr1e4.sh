@@ -35,5 +35,5 @@ torchrun --nproc_per_node 4 --nnodes 1 \
     training.multi_edit.final_only = true \
     training.multi_edit.insufficient_chain_policy = resample \
     training.warmup = 3000 \
-    training.vis_every = 1 \
+    training.vis_every = 1000 \
     training.lr = 0.0001

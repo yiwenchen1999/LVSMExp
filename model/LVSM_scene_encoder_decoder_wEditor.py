@@ -730,6 +730,9 @@ class LatentSceneEditor(nn.Module):
             edited_latent_tokens = self._apply_editor_once(updated_latent_tokens, condition_tokens)
             active_mask = (sampled_steps > step_idx).view(b, 1, 1)
             if step_idx != -1:
+                print('updating latent tokens..., tensor type:', updated_latent_tokens.dtype)
+                print('edited latent tokens..., tensor type:', edited_latent_tokens.dtype)
+                print('active mask..., tensor type:', active_mask.dtype)
                 updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
             pass_latents.append(updated_latent_tokens)
 
