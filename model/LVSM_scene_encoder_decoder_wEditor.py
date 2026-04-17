@@ -733,7 +733,7 @@ class LatentSceneEditor(nn.Module):
                 # Convert updated_latent_tokens to bf16 then back to float32 before update for ablation
                 # updated_latent_tokens_bf16 = updated_latent_tokens.to(torch.bfloat16)
                 # updated_latent_tokens_fp32 = updated_latent_tokens_bf16.to(torch.float32)
-                updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens_fp32)
+                updated_latent_tokens = torch.where(active_mask, edited_latent_tokens, updated_latent_tokens)
          
             pass_latents.append(updated_latent_tokens)
 
