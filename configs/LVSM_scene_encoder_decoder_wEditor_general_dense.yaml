@@ -50,6 +50,7 @@ training:
   relight_signals: ["envmap"]
   multi_edit:
     enable: false
+    mode: latent_chain
     max_steps: 3
     sample_mode: uniform
     force_all_steps: false
