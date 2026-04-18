@@ -812,21 +812,21 @@ class LatentSceneEditor(nn.Module):
             pass_renders_context.append(current_context_render)
             current_input_image = current_context_render
 
-        return edict(
-            final_latent=current_latent,
-            final_render=current_target_render,
-            pass_latents=torch.stack(pass_latents, dim=1),
-            pass_renders_target=torch.stack(pass_renders_target, dim=1),
-            pass_renders_context=torch.stack(pass_renders_context, dim=1),
-            n_patches=n_patches,
-            d=d,
-            chain_info=edict(
-                sampled_steps=sampled_steps,
-                max_steps=max_steps,
-                sample_mode=sample_mode,
-                force_all_steps=force_all_steps,
-            ),
-        )
+        return edict({
+            "final_latent": current_latent,
+            "final_render": current_target_render,
+            "pass_latents": torch.stack(pass_latents, dim=1),
+            "pass_renders_target": torch.stack(pass_renders_target, dim=1),
+            "pass_renders_context": torch.stack(pass_renders_context, dim=1),
+            "n_patches": n_patches,
+            "d": d,
+            "chain_info": edict({
+                "sampled_steps": sampled_steps,
+                "max_steps": max_steps,
+                "sample_mode": sample_mode,
+                "force_all_steps": force_all_steps,
+            }),
+        })
 
     def _select_chain_target_images(self, target_dict, sampled_steps, max_steps):
         chain_relit_images = getattr(target_dict, "chain_relit_images", None)

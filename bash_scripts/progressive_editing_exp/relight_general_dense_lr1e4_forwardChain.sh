@@ -20,22 +20,22 @@ export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 # export XDG_CONFIG_HOME=/scratch/chen.yiwe/.config
 # export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 
-torchrun --nproc_per_node 4 --nnodes 1 \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29505 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
-    training.batch_size_per_gpu = 4 \
+    training.batch_size_per_gpu = 1 \
     training.checkpoint_dir = ckpt/dense_relight_env_forward_chain \
     training.LVSM_checkpoint_dir = ckpt/LVSM_scene_encoder_decoder \
     training.wandb_exp_name = LVSM_edit_dense_general_lr1e4_forward_chain \
     training.relight_signals = "[envmap]" \
     training.multi_edit.enable = true \
     training.multi_edit.mode = forward_chain \
-    training.multi_edit.max_steps = 5 \
+    training.multi_edit.max_steps = 10 \
     training.multi_edit.sample_mode = uniform \
     training.multi_edit.force_all_steps = true \
     training.multi_edit.final_only = true \
     training.multi_edit.insufficient_chain_policy = sample_with_replacement \
     training.multi_edit.allow_repeat_variations = true \
     training.warmup = 3000 \
-    training.vis_every = 1000 \
+    training.vis_every = 1 \
     training.lr = 0.0001
