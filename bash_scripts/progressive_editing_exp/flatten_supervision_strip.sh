@@ -14,7 +14,7 @@ cd "$REPO_ROOT"
 exec python data_postprocess/flatten_progressive_supervision.py "$@"
 
 #usage:
-# bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh result_previews/progressive_stability/finetuned_ckpt
+# bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh result_previews/progressive_stability/pixel_space_progression
 
 # 视角数 n（任选一种：-n / --num-views / --n-views）
 # bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh -n 8

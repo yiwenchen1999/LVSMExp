@@ -18,8 +18,8 @@ exec python data_postprocess/psnr_relit_sequence.py "$@"
 #   bash bash_scripts/progressive_editing_exp/psnr_relit_sequence.sh
 #   # 自定义根目录 + 输出目录与文件前缀
 #   bash bash_scripts/progressive_editing_exp/psnr_relit_sequence.sh \
-#     result_previews/progressive_stability/og_ckpt_objaverse \
-#     -o result_previews/progressive_stability/og_ckpt_objaverse/relit_psnr_metrics \
+#     result_previews/progressive_stability/pixel_space_progression \
+#     -o result_previews/progressive_stability/pixel_space_progression/relit_psnr_metrics \
 #     --basename objaverse_relit_psnr
 #   # 仅从已有 CSV 重绘曲线（默认 PNG 与 CSV 同目录、同名 .png）
 #   bash bash_scripts/progressive_editing_exp/psnr_relit_sequence.sh \
