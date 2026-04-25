@@ -14,12 +14,12 @@ cd "$REPO_ROOT"
 exec python data_postprocess/flatten_progressive_supervision.py "$@"
 
 #usage:
-# bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh result_previews/progressive_stability/pixel_space_progression
+# bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh result_previews/progressive_stability/latent_space_progression_cycledTraining
 
 # 视角数 n（任选一种：-n / --num-views / --n-views）
 # bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh -n 8
 # bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh --num-views 4
-# # 只检查、不写文件
+# # 只检查、不写文件夹
 # bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh --dry-run
 # # 瓦片尺寸（默认 256）
 # bash bash_scripts/progressive_editing_exp/flatten_supervision_strip.sh --tile-w 256 --tile-h 256
