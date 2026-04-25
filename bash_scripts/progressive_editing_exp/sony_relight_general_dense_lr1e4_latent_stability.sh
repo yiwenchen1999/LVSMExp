@@ -30,7 +30,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 # Train paths (allow overrides with env vars)
 export DATA_LIST="${DATA_LIST:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/progressive_results_new}"
+export CKPT_DIR="${CKPT_DIR:-/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/progressive_results_finetuned}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/LVSM_scene_encoder_decoder}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_lr1e4}"
 
