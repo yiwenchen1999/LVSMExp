@@ -1,7 +1,12 @@
 #!/bin/bash
-# Train relight editor (general dense, lr1e4) on Sony cluster.
-# Usage:
-#   bash bash_scripts/inference_scripts/sony_relight_general_dense_lr1e4.sh
+#SBATCH --job-name=relight_latent_stability_lr1e4
+#SBATCH --partition=ct
+#SBATCH --account=ct
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --time=168:00:00
+#SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
+#SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
 set -euo pipefail
 
@@ -38,9 +43,10 @@ export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_lr1e4}"
 # Logging
 ############################
 echo "=============================================="
-echo "Train Relight General Dense lr1e4 (Sony)"
+echo "SBATCH Train Relight Latent Stability lr1e4"
 echo "=============================================="
 echo "Host: $(hostname)"
+echo "JobID: ${SLURM_JOB_ID:-N/A}"
 echo "PROJ: $PROJ"
 echo "DATASET_PATH: $DATASET_PATH"
 echo "CKPT_DIR: $CKPT_DIR"
@@ -60,15 +66,10 @@ if [ ! -d "$DATASET_PATH" ] && [ ! -f "$DATASET_PATH" ]; then
 fi
 
 ############################
-# Non-interactive mode (sbatch friendly)
-############################
-
-############################
 # Run training
 ############################
-echo ""
-echo "Starting training..."
-singularity exec --nv $BIND $SIF bash -lc "
+echo "Starting training with srun..."
+srun singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:\${PYTHONPATH:-}\"
   export WANDB_DIR=\"$WANDB_DIR\"
@@ -82,7 +83,7 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29501 \
@@ -104,12 +105,9 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.lr = 0.0001
 "
 
-############################
-# Done
-############################
 echo ""
 echo "=============================================="
-echo "✓ Training complete!"
+echo "✓ SBATCH training complete!"
 echo "=============================================="
 echo "Checkpoints saved to: $CKPT_DIR"
 echo ""
