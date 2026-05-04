@@ -21,6 +21,7 @@ import os
 import json
 import numpy as np
 import argparse
+import io
 from pathlib import Path
 from PIL import Image
 import shutil
@@ -122,17 +123,36 @@ def load_point_light_info(pl_folder_path):
     Returns (pos, color, power) or None if not found.
     For white_pl, color is (1, 1, 1).
     """
-    for name in ('rgb_pl.json', 'white_pl.json'):
-        path = os.path.join(pl_folder_path, name)
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                data = json.load(f)
-            pos = np.array(data['pos'], dtype=np.float64)
-            power = float(data['power'])
-            color = np.array(data.get('color', [1.0, 1.0, 1.0]), dtype=np.float64)
-            if color.size != 3:
-                color = np.array([1.0, 1.0, 1.0], dtype=np.float64)
-            return pos, color, power
+    json_names = ("rgb_pl.json", "white_pl.json")
+    data = None
+
+    if os.path.isdir(pl_folder_path):
+        for name in json_names:
+            path = os.path.join(pl_folder_path, name)
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    data = json.load(f)
+                break
+    elif os.path.isfile(pl_folder_path) and pl_folder_path.endswith(".tar"):
+        with tarfile.open(pl_folder_path, "r") as tar:
+            file_members = [m for m in tar.getmembers() if m.isfile()]
+            member_by_name = {m.name: m for m in file_members}
+            member_by_base = {os.path.basename(m.name): m for m in file_members}
+            for name in json_names:
+                member = member_by_name.get(name) or member_by_base.get(name)
+                if member is not None:
+                    fobj = tar.extractfile(member)
+                    if fobj is not None:
+                        data = json.load(fobj)
+                    break
+
+    if data is not None:
+        pos = np.array(data["pos"], dtype=np.float64)
+        power = float(data["power"])
+        color = np.array(data.get("color", [1.0, 1.0, 1.0]), dtype=np.float64)
+        if color.size != 3:
+            color = np.array([1.0, 1.0, 1.0], dtype=np.float64)
+        return pos, color, power
     return None
 
 
@@ -622,6 +642,122 @@ def create_tar_from_directory(source_dir, tar_path):
     print(f"Created tar archive: {tar_path}")
 
 
+def _resolve_light_source(split_path, folder_name):
+    """Return ('dir'|'tar'|None, source_path)."""
+    dir_path = os.path.join(split_path, folder_name)
+    tar_path = os.path.join(split_path, f"{folder_name}.tar")
+    if os.path.isdir(dir_path):
+        return "dir", dir_path
+    if os.path.isfile(tar_path):
+        return "tar", tar_path
+    return None, None
+
+
+def _list_numeric_gt_images(split_path, folder_name):
+    """
+    List (frame_idx, filename) for gt_*.png in a folder or tar.
+    """
+    source_type, source_path = _resolve_light_source(split_path, folder_name)
+    if source_type is None:
+        return []
+
+    all_image_files = []
+    if source_type == "dir":
+        all_image_files = [f for f in os.listdir(source_path) if f.startswith("gt_") and f.endswith(".png")]
+    else:
+        with tarfile.open(source_path, "r") as tar:
+            all_image_files = [
+                os.path.basename(m.name)
+                for m in tar.getmembers()
+                if m.isfile() and os.path.basename(m.name).startswith("gt_") and os.path.basename(m.name).endswith(".png")
+            ]
+
+    image_files_with_idx = []
+    for image_file in all_image_files:
+        idx_str = image_file.replace("gt_", "").replace(".png", "")
+        try:
+            frame_idx = int(idx_str)
+            image_files_with_idx.append((frame_idx, image_file))
+        except ValueError:
+            continue
+    image_files_with_idx.sort(key=lambda x: x[0])
+    return image_files_with_idx
+
+
+def _read_image_size_from_source(split_path, folder_name, image_name):
+    source_type, source_path = _resolve_light_source(split_path, folder_name)
+    if source_type is None:
+        raise FileNotFoundError(f"Missing source for {folder_name} under {split_path}")
+
+    if source_type == "dir":
+        image_path = os.path.join(source_path, image_name)
+        with Image.open(image_path) as img:
+            return img.size
+
+    with tarfile.open(source_path, "r") as tar:
+        members = [m for m in tar.getmembers() if m.isfile() and os.path.basename(m.name) == image_name]
+        if not members:
+            raise FileNotFoundError(f"{image_name} not found in tar {source_path}")
+        member = members[0]
+        fobj = tar.extractfile(member)
+        if fobj is None:
+            raise FileNotFoundError(f"Could not extract {image_name} from {source_path}")
+        with Image.open(io.BytesIO(fobj.read())) as img:
+            return img.size
+
+
+def _copy_image_from_source(split_path, folder_name, image_name, output_image_path):
+    source_type, source_path = _resolve_light_source(split_path, folder_name)
+    if source_type is None:
+        raise FileNotFoundError(f"Missing source for {folder_name} under {split_path}")
+
+    if source_type == "dir":
+        shutil.copy2(os.path.join(source_path, image_name), output_image_path)
+        return
+
+    with tarfile.open(source_path, "r") as tar:
+        members = [m for m in tar.getmembers() if m.isfile() and os.path.basename(m.name) == image_name]
+        if not members:
+            raise FileNotFoundError(f"{image_name} not found in tar {source_path}")
+        member = members[0]
+        fobj = tar.extractfile(member)
+        if fobj is None:
+            raise FileNotFoundError(f"Could not extract {image_name} from {source_path}")
+        os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+        with open(output_image_path, "wb") as out_f:
+            out_f.write(fobj.read())
+
+
+def _load_json_from_source(split_path, folder_name, json_names):
+    """
+    Load first existing json from source folder/tar.
+    Returns dict or None.
+    """
+    source_type, source_path = _resolve_light_source(split_path, folder_name)
+    if source_type is None:
+        return None
+
+    if source_type == "dir":
+        for name in json_names:
+            path = os.path.join(source_path, name)
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    return json.load(f)
+        return None
+
+    with tarfile.open(source_path, "r") as tar:
+        file_members = [m for m in tar.getmembers() if m.isfile()]
+        member_by_name = {m.name: m for m in file_members}
+        member_by_base = {os.path.basename(m.name): m for m in file_members}
+        for name in json_names:
+            member = member_by_name.get(name) or member_by_base.get(name)
+            if member is not None:
+                fobj = tar.extractfile(member)
+                if fobj is not None:
+                    return json.load(fobj)
+        return None
+
+
 def check_scene_exists_in_outputs(scene_name, output_root, output_tar_root, split, is_point_light_scene=False):
     """
     Check if a scene already exists in both output locations (A and B).
@@ -733,7 +869,13 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             elif is_pl_folder(folder_name):
                 pl_tar_files.append(folder_name)
     
-    all_light_folders = sorted(env_folders) + sorted(pl_folders) + sorted(multi_pl_folders) + sorted(area_folders) + sorted(combined_folders)
+    all_light_folders = (
+        sorted(set(env_folders + env_tar_files))
+        + sorted(set(pl_folders + pl_tar_files))
+        + sorted(multi_pl_folders)
+        + sorted(area_folders)
+        + sorted(combined_folders)
+    )
     if not all_light_folders:
         # All folders are already compressed or none found; collect existing scenes from tar
         scene_names_from_tar = []
@@ -753,18 +895,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
     # Process albedo folder (shared across all scenes with the same object_id)
     # First, get the number of frames from the first light folder (env or pl) to check if albedo is complete
     first_light_folder = all_light_folders[0]
-    first_env_path = os.path.join(split_path, first_light_folder)
-    first_env_image_files = [f for f in os.listdir(first_env_path) 
-                            if f.startswith('gt_') and f.endswith('.png')]
-    first_env_image_files_with_idx = []
-    for image_file in first_env_image_files:
-        idx_str = image_file.replace('gt_', '').replace('.png', '')
-        try:
-            frame_idx = int(idx_str)
-            first_env_image_files_with_idx.append(frame_idx)
-        except ValueError:
-            continue
-    
+    first_env_image_files_with_idx = _list_numeric_gt_images(split_path, first_light_folder)
     num_frames = len(first_env_image_files_with_idx) if first_env_image_files_with_idx else 0
     
     # Check and process albedo folder
@@ -846,25 +977,14 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
     
     # Process each env folder as a separate scene
     processed_scene_names = []  # Track all processed scene names (including skipped ones)
-    for env_folder in sorted(env_folders):
-        env_path = os.path.join(split_path, env_folder)
+    for env_folder in sorted(set(env_folders + env_tar_files)):
+        source_type, source_path = _resolve_light_source(split_path, env_folder)
+        if source_type is None:
+            continue
+        env_path = source_path
         
         # Find all gt_*.png images and filter to only numeric indices
-        all_image_files = [f for f in os.listdir(env_path) 
-                          if f.startswith('gt_') and f.endswith('.png')]
-        
-        # Filter to only include files where the index is a number
-        # Extract index from filename (gt_0.png -> 0) and check if it's numeric
-        image_files_with_idx = []
-        for image_file in all_image_files:
-            # Extract the index part (between 'gt_' and '.png')
-            idx_str = image_file.replace('gt_', '').replace('.png', '')
-            try:
-                frame_idx = int(idx_str)
-                image_files_with_idx.append((frame_idx, image_file))
-            except ValueError:
-                # Skip files where index is not a number (e.g., gt_{idx}.png)
-                continue
+        image_files_with_idx = _list_numeric_gt_images(split_path, env_folder)
         
         if not image_files_with_idx:
             print(f"Warning: No valid gt_*.png images with numeric indices found in {env_path}, skipping")
@@ -874,12 +994,10 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
         image_files_with_idx.sort(key=lambda x: x[0])
         
         # Get image dimensions from first image
-        first_image_path = os.path.join(env_path, image_files_with_idx[0][1])
         try:
-            with Image.open(first_image_path) as img:
-                image_width, image_height = img.size
+            image_width, image_height = _read_image_size_from_source(split_path, env_folder, image_files_with_idx[0][1])
         except Exception as e:
-            print(f"Error reading image {first_image_path}: {e}, skipping")
+            print(f"Error reading first image for {env_folder}: {e}, skipping")
             continue
         
         # Create scene name: object_id_env_folder
@@ -892,29 +1010,14 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
         os.makedirs(output_metadata_dir, exist_ok=True)
         
         # Load environment map info if available (needed to check if envmaps should exist)
-        # For train split, look for env info in the corresponding test folder
+        # For train split, prefer matching source under test split.
+        env_info = None
         if split == 'train':
             test_split_path = os.path.join(object_path, 'test')
-            test_env_path = os.path.join(test_split_path, env_folder) if os.path.exists(test_split_path) else None
-            if test_env_path and os.path.exists(test_env_path):
-                env_json_path = os.path.join(test_env_path, 'env.json')
-                white_env_json_path = os.path.join(test_env_path, 'white_env.json')
-            else:
-                # Fallback to current split if test folder doesn't exist
-                env_json_path = os.path.join(env_path, 'env.json')
-                white_env_json_path = os.path.join(env_path, 'white_env.json')
-        else:
-            # For test split, use current folder
-            env_json_path = os.path.join(env_path, 'env.json')
-            white_env_json_path = os.path.join(env_path, 'white_env.json')
-        
-        env_info = None
-        if os.path.exists(env_json_path):
-            with open(env_json_path, 'r') as f:
-                env_info = json.load(f)
-        elif os.path.exists(white_env_json_path):
-            with open(white_env_json_path, 'r') as f:
-                env_info = json.load(f)
+            if os.path.exists(test_split_path):
+                env_info = _load_json_from_source(test_split_path, env_folder, ['env.json', 'white_env.json'])
+        if env_info is None:
+            env_info = _load_json_from_source(split_path, env_folder, ['env.json', 'white_env.json'])
         
         # Check if scene already exists and all files are present
         output_json_path = os.path.join(output_metadata_dir, f"{scene_name}.json")
@@ -1026,8 +1129,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             # Only copy image and process envmaps if not skipping
             if not skip_file_processing:
                 # Copy image to output directory with zero-padded name
-                input_image_path = os.path.join(env_path, image_file)
-                shutil.copy2(input_image_path, output_image_path)
+                _copy_image_from_source(split_path, env_folder, image_file, output_image_path)
                 
                 # Process environment map if available
                 if env_map is not None:
@@ -1194,27 +1296,20 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
                         print(f"Warning: Error with rm -rf {env_path}: {e2}, but tar file was created successfully")
     
     # Process each point-light folder as a separate scene (images + metadata + point_light_rays .npy)
-    for pl_folder in sorted(pl_folders):
-        pl_path = os.path.join(split_path, pl_folder)
-        all_image_files = [f for f in os.listdir(pl_path) if f.startswith('gt_') and f.endswith('.png')]
-        image_files_with_idx = []
-        for image_file in all_image_files:
-            idx_str = image_file.replace('gt_', '').replace('.png', '')
-            try:
-                frame_idx = int(idx_str)
-                image_files_with_idx.append((frame_idx, image_file))
-            except ValueError:
-                continue
+    for pl_folder in sorted(set(pl_folders + pl_tar_files)):
+        source_type, source_path = _resolve_light_source(split_path, pl_folder)
+        if source_type is None:
+            continue
+        pl_path = source_path
+        image_files_with_idx = _list_numeric_gt_images(split_path, pl_folder)
         if not image_files_with_idx:
             print(f"Warning: No valid gt_*.png in {pl_path}, skipping")
             continue
         image_files_with_idx.sort(key=lambda x: x[0])
-        first_image_path = os.path.join(pl_path, image_files_with_idx[0][1])
         try:
-            with Image.open(first_image_path) as img:
-                image_width, image_height = img.size
+            image_width, image_height = _read_image_size_from_source(split_path, pl_folder, image_files_with_idx[0][1])
         except Exception as e:
-            print(f"Error reading image {first_image_path}: {e}, skipping")
+            print(f"Error reading first image for {pl_folder}: {e}, skipping")
             continue
         scene_name = f"{object_id}_{pl_folder}"
         output_metadata_dir = os.path.join(output_root, split, 'metadata')
@@ -1258,7 +1353,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, output_tar_r
             output_image_name = f"{frame_idx:05d}.png"
             output_image_path = os.path.join(output_images_dir, output_image_name)
             if not skip_file_processing:
-                shutil.copy2(os.path.join(pl_path, image_file), output_image_path)
+                _copy_image_from_source(split_path, pl_folder, image_file, output_image_path)
             absolute_image_path = os.path.abspath(output_image_path)
             frames.append({
                 "image_path": absolute_image_path,
