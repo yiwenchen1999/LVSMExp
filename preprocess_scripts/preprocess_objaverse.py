@@ -1741,7 +1741,9 @@ def main():
     parser.add_argument('--output', '-o', required=True,
                        help='Output directory for processed data (e.g., data_samples/objaverse_processed)')
     parser.add_argument('--output-tar', type=str, default=None,
-                       help='Output directory for tar archives (location B). If None, tar archiving is skipped.')
+                       help='Output directory for tar archives (location B). If omitted or empty, tar archiving is skipped.')
+    parser.add_argument('--no-output-tar', action='store_true',
+                       help='Do not create location B (no tar dirs, no tar copies, no B metadata). Overrides --output-tar.')
     parser.add_argument('--split', '-s', default='test', choices=['train', 'test'],
                        help='Split to process (default: test)')
     parser.add_argument('--object-id', type=str, default=None,
@@ -1762,7 +1764,12 @@ def main():
     args = parser.parse_args()
     
     output_root = args.output
-    output_tar_root = args.output_tar
+    if args.no_output_tar:
+        output_tar_root = None
+    else:
+        output_tar_root = args.output_tar
+        if output_tar_root is not None and not str(output_tar_root).strip():
+            output_tar_root = None
     
     if args.full_list_only:
         # Skip processing; only create full_list from existing metadata

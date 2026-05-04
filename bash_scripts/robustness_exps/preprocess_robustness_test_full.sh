@@ -11,8 +11,10 @@
 set -euo pipefail
 
 BASE_INPUT=/projects/vig/Datasets/objaverse/hf-objaverse-v1
-OUTPUT_ROOT=/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse_robustTest
-OUTPUT_TAR_ROOT=/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse_robustTest_tar
+OUTPUT_ROOT=/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsmPlus_objaverse_robustTest
+# Tar mirror (location B) disabled via --no-output-tar in python calls below.
+# To re-enable: set a path and pass --output-tar "${OUTPUT_TAR_ROOT}" instead of --no-output-tar.
+# OUTPUT_TAR_ROOT=/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse_robustTest_tar
 SPLIT=test
 HDRI_DIR=/projects/vig/Datasets/objaverse/envmaps_256/hdirs
 
@@ -27,7 +29,7 @@ for input_dir in "${INPUT_DIRS[@]}"; do
   python preprocess_scripts/preprocess_objaverse.py \
     --input "${input_dir}" \
     --output "${OUTPUT_ROOT}" \
-    --output-tar "${OUTPUT_TAR_ROOT}" \
+    --no-output-tar \
     --split "${SPLIT}" \
     --hdri-dir "${HDRI_DIR}"
 done
@@ -35,6 +37,6 @@ done
 # Regenerate an integrated list after all sources are merged.
 python preprocess_scripts/preprocess_objaverse.py \
   --output "${OUTPUT_ROOT}" \
-  --output-tar "${OUTPUT_TAR_ROOT}" \
+  --no-output-tar \
   --split "${SPLIT}" \
   --full-list-only
