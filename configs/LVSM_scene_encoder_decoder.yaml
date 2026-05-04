@@ -43,10 +43,10 @@ training:
 
   lr: 0.0002
   train_steps: 100000
-  num_input_views: 1
+  num_input_views: 2
   num_target_views: 8
   num_threads: 4
-  num_views: 9
+  num_views: 10
   num_workers: 2
 
   prefetch_factor: 32
@@ -61,8 +61,8 @@ training:
   use_rel_pose: false
   use_tf32: true
   view_selector:
-    max_frame_dist: 30
-    min_frame_dist: 10
+    max_frame_dist: 50
+    min_frame_dist: 15
   vis_every: 1000
   wandb_exp_name: LVSM_obj_encoder_decoder_dense
   wandb_log_every: 50
