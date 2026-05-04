@@ -43,7 +43,7 @@ training:
 
   lr: 0.0002
   train_steps: 100000
-  num_input_views: 2
+  num_input_views: 1
   num_target_views: 8
   num_threads: 4
   num_views: 12
