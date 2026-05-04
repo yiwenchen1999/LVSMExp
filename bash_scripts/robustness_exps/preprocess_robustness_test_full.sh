@@ -11,32 +11,35 @@
 set -euo pipefail
 
 BASE_INPUT=/projects/vig/Datasets/objaverse/hf-objaverse-v1
-OUTPUT_ROOT=/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsmPlus_objaverse_robustTest
-# Tar mirror (location B) disabled via --no-output-tar in python calls below.
-# To re-enable: set a path and pass --output-tar "${OUTPUT_TAR_ROOT}" instead of --no-output-tar.
-# OUTPUT_TAR_ROOT=/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse_robustTest_tar
+OUTPUT_BASE=/projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsmPlus_objaverse_robustTest
 SPLIT=test
 HDRI_DIR=/projects/vig/Datasets/objaverse/envmaps_256/hdirs
 
-INPUT_DIRS=(
-  "${BASE_INPUT}/rendered_dense_robustTest_far"
-  "${BASE_INPUT}/rendered_dense_robustTest_near"
-  "${BASE_INPUT}/rendered_dense_robustTest_normal"
-)
+ROBUST_TAGS=(far near normal)
 
-for input_dir in "${INPUT_DIRS[@]}"; do
+for tag in "${ROBUST_TAGS[@]}"; do
+  input_dir="${BASE_INPUT}/rendered_dense_robustTest_${tag}"
+  output_dir="${OUTPUT_BASE}_${tag}"
   echo "Processing robustness source: ${input_dir}"
+  echo "Output directory: ${output_dir}"
   python preprocess_scripts/preprocess_objaverse.py \
     --input "${input_dir}" \
-    --output "${OUTPUT_ROOT}" \
+    --output "${output_dir}" \
     --no-output-tar \
     --split "${SPLIT}" \
     --hdri-dir "${HDRI_DIR}"
+
+  # Regenerate full_list for each robustness bucket separately.
+  python preprocess_scripts/preprocess_objaverse.py \
+    --output "${output_dir}" \
+    --no-output-tar \
+    --split "${SPLIT}" \
+    --full-list-only
 done
 
-# Regenerate an integrated list after all sources are merged.
-python preprocess_scripts/preprocess_objaverse.py \
-  --output "${OUTPUT_ROOT}" \
-  --no-output-tar \
+# Merge full_list/metadata from 3 robustness buckets into one list for training.
+python preprocess_scripts/merge_robustness_full_list.py \
+  --input-roots "${OUTPUT_BASE}_far" "${OUTPUT_BASE}_near" "${OUTPUT_BASE}_normal" \
+  --output-root "${OUTPUT_BASE}_merged" \
   --split "${SPLIT}" \
-  --full-list-only
+  --prefer-image-tar
