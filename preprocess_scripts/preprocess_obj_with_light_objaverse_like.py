@@ -17,10 +17,10 @@ Per scene convention:
 import argparse
 import json
 import re
-import shutil
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 
 def read_camera_txt(path: Path):
@@ -48,6 +48,57 @@ def build_frame_entry(image_abs_path: Path, K: np.ndarray, w2c: np.ndarray):
     }
 
 
+def process_image_with_mask(
+    image_path: Path, mask_path: Path | None, target_size: int, apply_mask: bool
+) -> tuple[np.ndarray, tuple[int, int, int], float]:
+    with Image.open(image_path) as image:
+        rgb = np.array(image.convert("RGB"), dtype=np.float32)
+    if apply_mask:
+        if mask_path is None:
+            raise ValueError(f"Mask is required when apply_mask=True: {image_path}")
+        with Image.open(mask_path) as mask_image:
+            alpha = np.array(mask_image.convert("L"), dtype=np.float32) / 255.0
+
+        if rgb.shape[:2] != alpha.shape[:2]:
+            raise ValueError(
+                f"Mask shape mismatch for {image_path.name}: image={rgb.shape[:2]}, mask={alpha.shape[:2]}"
+            )
+
+        # Alpha blend foreground with white background (supports soft mask edges).
+        alpha = alpha[..., None]
+        rgb = rgb * alpha + 255.0 * (1.0 - alpha)
+    rgb = np.clip(np.rint(rgb), 0, 255).astype(np.uint8)
+
+    h, w = rgb.shape[:2]
+    crop_size = min(h, w)
+    x0 = (w - crop_size) // 2
+    y0 = (h - crop_size) // 2
+    cropped = rgb[y0 : y0 + crop_size, x0 : x0 + crop_size]
+
+    if crop_size != target_size:
+        resized = np.array(
+            Image.fromarray(cropped).resize((target_size, target_size), Image.Resampling.BICUBIC),
+            dtype=np.uint8,
+        )
+    else:
+        resized = cropped
+
+    scale = target_size / float(crop_size)
+    return resized, (x0, y0, crop_size), scale
+
+
+def update_intrinsics_for_crop_resize(
+    K: np.ndarray, crop_xy_size: tuple[int, int, int], scale: float
+) -> np.ndarray:
+    x0, y0, _ = crop_xy_size
+    K_new = K.copy()
+    K_new[0, 0] = K[0, 0] * scale
+    K_new[1, 1] = K[1, 1] * scale
+    K_new[0, 2] = (K[0, 2] - x0) * scale
+    K_new[1, 2] = (K[1, 2] - y0) * scale
+    return K_new
+
+
 def extract_frame_id(name: str, pattern: str):
     m = re.match(pattern, name)
     if not m:
@@ -61,8 +112,12 @@ def process_split(
     img_prefix: str,
     cam_dir: Path,
     cam_prefix: str,
+    mask_dir: Path,
+    mask_prefix: str,
     output_root: Path,
     split: str,
+    target_size: int,
+    apply_mask: bool,
 ):
     out_images_dir = output_root / split / "images" / scene_name
     out_meta_dir = output_root / split / "metadata"
@@ -84,7 +139,17 @@ def process_split(
         if fid is not None:
             cam_map[fid] = p
 
+    mask_map = {}
+    if apply_mask:
+        mask_pattern = rf"{re.escape(mask_prefix)}(\d+)\.png$"
+        for p in mask_dir.glob(f"{mask_prefix}*.png"):
+            fid = extract_frame_id(p.name, mask_pattern)
+            if fid is not None:
+                mask_map[fid] = p
+
     common_ids = sorted(set(img_map.keys()) & set(cam_map.keys()))
+    if apply_mask:
+        common_ids = sorted(set(common_ids) & set(mask_map.keys()))
     if not common_ids:
         return None
 
@@ -92,11 +157,16 @@ def process_split(
     for out_idx, fid in enumerate(common_ids):
         src_img = img_map[fid]
         src_cam = cam_map[fid]
+        src_mask = mask_map.get(fid) if apply_mask else None
         out_img = out_images_dir / f"{out_idx:05d}.png"
-        shutil.copy2(src_img, out_img)
 
         K, w2c = read_camera_txt(src_cam)
-        frames.append(build_frame_entry(out_img, K, w2c))
+        rgb_out, crop_xy_size, scale = process_image_with_mask(
+            src_img, src_mask, target_size, apply_mask
+        )
+        K_out = update_intrinsics_for_crop_resize(K, crop_xy_size, scale)
+        Image.fromarray(rgb_out).save(out_img)
+        frames.append(build_frame_entry(out_img, K_out, w2c))
 
     scene_meta = {"scene_name": scene_name, "frames": frames}
     out_json = out_meta_dir / f"{scene_name}.json"
@@ -131,6 +201,25 @@ def parse_args():
         default="data_samples/processed_obj_with_light_objaverse_like",
         help="Output root in Objaverse-like format.",
     )
+    parser.add_argument(
+        "--target-size",
+        type=int,
+        default=512,
+        help="Output square image size after center crop and resize.",
+    )
+    parser.add_argument(
+        "--apply-mask",
+        dest="apply_mask",
+        action="store_true",
+        help="Apply mask blending onto a white background before crop/resize.",
+    )
+    parser.add_argument(
+        "--no-apply-mask",
+        dest="apply_mask",
+        action="store_false",
+        help="Disable mask blending and keep original RGB before crop/resize.",
+    )
+    parser.set_defaults(apply_mask=True)
     return parser.parse_args()
 
 
@@ -164,8 +253,12 @@ def main():
             img_prefix="image_",
             cam_dir=scene_inputs_root,
             cam_prefix="camera_",
+            mask_dir=scene_inputs_root,
+            mask_prefix="mask_",
             output_root=output_root,
             split="train",
+            target_size=args.target_size,
+            apply_mask=args.apply_mask,
         )
         if train_json is not None:
             n_train += 1
@@ -176,8 +269,12 @@ def main():
             img_prefix="gt_image_",
             cam_dir=scene_test_root,
             cam_prefix="gt_camera_",
+            mask_dir=scene_test_root,
+            mask_prefix="gt_mask_",
             output_root=output_root,
             split="test",
+            target_size=args.target_size,
+            apply_mask=args.apply_mask,
         )
         if test_json is not None:
             n_test += 1
