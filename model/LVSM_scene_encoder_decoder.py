@@ -10,6 +10,7 @@ import traceback
 from utils import camera_utils, data_utils
 from .transformer import QK_Norm_TransformerBlock, init_weights
 from .loss import LossComputer
+from .decoder_heads import build_decoder_head
 
 
 class Images2LatentScene(nn.Module):
@@ -61,17 +62,16 @@ class Images2LatentScene(nn.Module):
             d_model = self.config.model.transformer.d
         )
         
-        # Image token decoder (decode image tokens into pixels)
-        self.image_token_decoder = nn.Sequential(
-            nn.LayerNorm(self.config.model.transformer.d, bias=False),
-            nn.Linear(
-                self.config.model.transformer.d,
-                (self.config.model.target_pose_tokenizer.patch_size**2) * 3,
-                bias=False,
-            ),
-            nn.Sigmoid()
+        # Decoder head (legacy MLP or multi-layer DPT).
+        head_cfg = self.config.model.get("decoder_head", {})
+        self.image_token_decoder, self.decoder_head_type = build_decoder_head(
+            head_cfg=head_cfg,
+            d_model=self.config.model.transformer.d,
+            patch_size=self.config.model.target_pose_tokenizer.patch_size,
+            out_channels=3,
         )
-        self.image_token_decoder.apply(init_weights)
+        dpt_cfg = head_cfg.get("dpt", {})
+        self.decoder_head_layer_indices = dpt_cfg.get("layer_indices", [3, 6, 9, 12])
 
 
     def _init_transformer(self):
@@ -140,7 +140,15 @@ class Images2LatentScene(nn.Module):
 
 
     
-    def pass_layers(self, transformer_blocks, input_tokens, gradient_checkpoint=False, checkpoint_every=1):
+    def pass_layers(
+        self,
+        transformer_blocks,
+        input_tokens,
+        gradient_checkpoint=False,
+        checkpoint_every=1,
+        return_intermediate=False,
+        capture_layers=None,
+    ):
         """
         Helper function to pass input tokens through all transformer blocks with optional gradient checkpointing.
         
@@ -159,6 +167,22 @@ class Images2LatentScene(nn.Module):
         """
         num_layers = len(transformer_blocks)
         
+        if return_intermediate:
+            capture_set = set(capture_layers or [])
+            layer_outputs = {}
+            for layer_idx, layer in enumerate(transformer_blocks, start=1):
+                if gradient_checkpoint:
+                    input_tokens = torch.utils.checkpoint.checkpoint(
+                        layer,
+                        input_tokens,
+                        use_reentrant=False,
+                    )
+                else:
+                    input_tokens = layer(input_tokens)
+                if layer_idx in capture_set:
+                    layer_outputs[layer_idx] = input_tokens
+            return input_tokens, layer_outputs
+
         if not gradient_checkpoint:
             # Standard forward pass through all layers
             for layer in transformer_blocks:
@@ -184,6 +208,73 @@ class Images2LatentScene(nn.Module):
             )
             
         return input_tokens
+
+    def _extract_image_tokens(self, decoder_tokens, n_patches, n_latent_vectors):
+        image_tokens, _ = decoder_tokens.split([n_patches, n_latent_vectors], dim=1)
+        return image_tokens
+
+    def _decode_image_tokens(self, image_tokens, v_target, height, width, multi_scale_tokens=None):
+        patch_size = self.config.model.target_pose_tokenizer.patch_size
+        h_patches = height // patch_size
+        w_patches = width // patch_size
+
+        if self.decoder_head_type == "dpt":
+            rendered_images = self.image_token_decoder(
+                image_tokens=image_tokens,
+                h_patches=h_patches,
+                w_patches=w_patches,
+                multi_scale_tokens=multi_scale_tokens,
+            )
+            rendered_images = rearrange(rendered_images, "(b v) c h w -> b v c h w", v=v_target)
+            return rendered_images
+
+        rendered_images = self.image_token_decoder(image_tokens)
+        rendered_images = rearrange(
+            rendered_images, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
+            v=v_target,
+            h=h_patches,
+            w=w_patches,
+            p1=patch_size,
+            p2=patch_size,
+            c=3,
+        )
+        return rendered_images
+
+    def _run_decoder_with_scales(self, decoder_input_tokens, n_patches, n_latent_vectors, checkpoint_every, gradient_checkpoint):
+        capture_layers = self.decoder_head_layer_indices if self.decoder_head_type == "dpt" else []
+        if len(capture_layers) == 0:
+            transformer_output_tokens = self.pass_layers(
+                self.transformer_decoder,
+                decoder_input_tokens,
+                gradient_checkpoint=gradient_checkpoint,
+                checkpoint_every=checkpoint_every,
+            )
+            target_image_tokens = self._extract_image_tokens(transformer_output_tokens, n_patches, n_latent_vectors)
+            return target_image_tokens, None
+
+        transformer_output_tokens, layer_outputs = self.pass_layers(
+            self.transformer_decoder,
+            decoder_input_tokens,
+            gradient_checkpoint=gradient_checkpoint,
+            checkpoint_every=checkpoint_every,
+            return_intermediate=True,
+            capture_layers=capture_layers,
+        )
+        target_image_tokens = self._extract_image_tokens(transformer_output_tokens, n_patches, n_latent_vectors)
+        multi_scale_tokens = {}
+        for layer_idx, layer_token in layer_outputs.items():
+            multi_scale_tokens[layer_idx] = self._extract_image_tokens(layer_token, n_patches, n_latent_vectors)
+        return target_image_tokens, multi_scale_tokens
+
+    def decode_tokens_to_image(self, image_tokens, v_target, image_h_w, multi_scale_tokens=None):
+        height, width = image_h_w
+        return self._decode_image_tokens(
+            image_tokens=image_tokens,
+            v_target=v_target,
+            height=height,
+            width=width,
+            multi_scale_tokens=multi_scale_tokens,
+        )
             
 
     def get_posed_input(self, images=None, ray_o=None, ray_d=None, method="default_plucker"):
@@ -312,20 +403,13 @@ class Images2LatentScene(nn.Module):
         # Each layer contains: LayerNorm -> QK_Norm_SelfAttention (12 heads, 64 dim/head) -> LayerNorm -> MLP (ratio=4, hidden=3072)
         # Decoder generates target view image tokens based on target pose and scene latent
         # transformer_output_tokens: [b*v_target, 4096, 768] - Decoded tokens
-        transformer_output_tokens = self.pass_layers(self.transformer_decoder, decoder_input_tokens, gradient_checkpoint=True, checkpoint_every=checkpoint_every)
-
-        #& Step 14: Extract target image tokens - Discard latent tokens, keep only image tokens
-        # target_image_tokens: [b*v_target, 1024, 768] - Generated target image patch tokens
-        # _: [b*v_target, 3072, 768] - latent tokens (discarded)
-        target_image_tokens, _ = transformer_output_tokens.split(
-            [n_patches, n_latent_vectors], dim=1
-        ) # [b*v_target, n_patches, d], [b*v_target, n_latent_vectors, d]
-
-        #& Step 15: Image token decoding - Decode tokens to RGB pixel values
-        # According to config: target_pose_tokenizer.patch_size=8
-        # Each 768-dim token goes through LayerNorm -> Linear(768 -> 8*8*3) -> Sigmoid
-        # rendered_images: [b*v_target, 1024, 192] - 8x8x3 pixel values per patch (range [0,1])
-        rendered_images = self.image_token_decoder(target_image_tokens)
+        target_image_tokens, multi_scale_tokens = self._run_decoder_with_scales(
+            decoder_input_tokens=decoder_input_tokens,
+            n_patches=n_patches,
+            n_latent_vectors=n_latent_vectors,
+            checkpoint_every=checkpoint_every,
+            gradient_checkpoint=True,
+        )
         
         height, width = target.image_h_w
 
@@ -333,15 +417,12 @@ class Images2LatentScene(nn.Module):
         # According to config: patch_size=8, image_size=256
         # h_patches = height//8 = 256//8 = 32, w_patches = width//8 = 32
         # rendered_images: [b, v_target, 3, 256, 256] - Final rendered RGB images
-        patch_size = self.config.model.target_pose_tokenizer.patch_size
-        rendered_images = rearrange(
-            rendered_images, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
-            v=v_target,
-            h=height // patch_size, 
-            w=width // patch_size, 
-            p1=patch_size, 
-            p2=patch_size, 
-            c=3
+        rendered_images = self._decode_image_tokens(
+            image_tokens=target_image_tokens,
+            v_target=v_target,
+            height=height,
+            width=width,
+            multi_scale_tokens=multi_scale_tokens,
         )
         
         #& Step 17: Compute loss (if target images are provided)
@@ -484,29 +565,22 @@ class Images2LatentScene(nn.Module):
             decoder_input_tokens = torch.cat((cur_target_pose_tokens, cur_repeated_latent_tokens), dim=1)
             decoder_input_tokens = self.transformer_input_layernorm_decoder(decoder_input_tokens)
 
-            transformer_output_tokens = self.pass_layers(
-                self.transformer_decoder, 
-                decoder_input_tokens, 
-                gradient_checkpoint=False
-            )
-
-            target_image_tokens, _ = transformer_output_tokens.split(
-                [n_patches, self.config.model.transformer.n_latent_vectors], dim=1
+            target_image_tokens, multi_scale_tokens = self._run_decoder_with_scales(
+                decoder_input_tokens=decoder_input_tokens,
+                n_patches=n_patches,
+                n_latent_vectors=self.config.model.transformer.n_latent_vectors,
+                checkpoint_every=1,
+                gradient_checkpoint=False,
             )
 
             # Decode to images
             height, width = target.image_h_w
-            patch_size = self.config.model.target_pose_tokenizer.patch_size
-            
-            video_rendering = self.image_token_decoder(target_image_tokens)
-            video_rendering = rearrange(
-                video_rendering, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
-                v=cur_view_chunk_size,
-                h=height // patch_size, 
-                w=width // patch_size, 
-                p1=patch_size, 
-                p2=patch_size, 
-                c=3
+            video_rendering = self._decode_image_tokens(
+                image_tokens=target_image_tokens,
+                v_target=cur_view_chunk_size,
+                height=height,
+                width=width,
+                multi_scale_tokens=multi_scale_tokens,
             ).cpu()
 
             video_rendering_list.append(video_rendering)

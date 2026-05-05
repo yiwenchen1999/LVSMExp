@@ -14,6 +14,54 @@ from utils.metric_utils import visualize_intermediate_results
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
 
+def _group_params_with_decay(named_params, weight_decay, lr):
+    decay_params, nodecay_params = [], []
+    for _, param in named_params:
+        if param.dim() == 1 or getattr(param, "_no_weight_decay", False):
+            nodecay_params.append(param)
+        else:
+            decay_params.append(param)
+    groups = []
+    if len(decay_params) > 0:
+        groups.append({"params": decay_params, "weight_decay": weight_decay, "lr": lr})
+    if len(nodecay_params) > 0:
+        groups.append({"params": nodecay_params, "weight_decay": 0.0, "lr": lr})
+    return groups
+
+
+def create_optimizer_for_stage(model, config, stage_name, dpt_transfer_cfg):
+    weight_decay = config.training.weight_decay
+    learning_rate = config.training.lr
+    betas = (config.training.beta1, config.training.beta2)
+
+    all_param_dict = {name: param for name, param in model.named_parameters()}
+    optimized_param_dict = {name: param for name, param in all_param_dict.items() if param.requires_grad}
+
+    use_scaled_groups = (
+        bool(dpt_transfer_cfg.get("enabled", False))
+        and str(stage_name).lower() == "stage2"
+        and float(dpt_transfer_cfg.get("backbone_lr_scale", 1.0)) != 1.0
+    )
+
+    if not use_scaled_groups:
+        return create_optimizer(model, weight_decay, learning_rate, betas)
+
+    backbone_lr_scale = float(dpt_transfer_cfg.get("backbone_lr_scale", 0.1))
+    head_named = [(n, p) for n, p in optimized_param_dict.items() if "image_token_decoder" in n]
+    backbone_named = [(n, p) for n, p in optimized_param_dict.items() if "image_token_decoder" not in n]
+
+    optim_groups = []
+    optim_groups.extend(_group_params_with_decay(head_named, weight_decay, learning_rate))
+    optim_groups.extend(_group_params_with_decay(backbone_named, weight_decay, learning_rate * backbone_lr_scale))
+
+    optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, fused=True)
+    print_rank0(
+        f"Stage2 optimizer groups enabled: head_lr={learning_rate}, "
+        f"backbone_lr={learning_rate * backbone_lr_scale}"
+    )
+    return optimizer, optimized_param_dict, all_param_dict
+
+
 # Load config and read(override) arguments from CLI
 config = init_config()
 relight_signals = config.training.get("relight_signals", ["envmap"])
@@ -89,6 +137,24 @@ module, class_name = config.model.class_name.rsplit(".", 1)
 LVSM = importlib.import_module(module).__dict__[class_name]
 model = LVSM(config).to(ddp_info.device)
 
+dpt_transfer_cfg = config.training.get("dpt_transfer", {})
+dpt_transfer_enabled = bool(dpt_transfer_cfg.get("enabled", False))
+dpt_train_stage = str(dpt_transfer_cfg.get("train_stage", "auto")).lower()
+stage1_steps = int(dpt_transfer_cfg.get("stage1_steps", 0))
+if dpt_transfer_enabled and dpt_transfer_cfg.get("use_teacher_distill", False):
+    print_rank0("Warning: use_teacher_distill is enabled, but teacher distillation loss is not implemented in this training loop yet.")
+
+if dpt_transfer_enabled and hasattr(model, "set_dpt_transfer_stage"):
+    if dpt_train_stage == "stage1":
+        active_stage = "stage1"
+    elif dpt_train_stage == "stage2":
+        active_stage = "stage2"
+    else:
+        active_stage = "stage1" if stage1_steps > 0 else "stage2"
+    model.set_dpt_transfer_stage(active_stage, dpt_transfer_cfg)
+else:
+    active_stage = "stage2"
+
 # Initialize from Images2LatentScene if LVSM_checkpoint_dir is provided
 if config.training.get("LVSM_checkpoint_dir", ""):
     lvsm_checkpoint_dir = config.training.LVSM_checkpoint_dir
@@ -101,18 +167,18 @@ if config.training.get("LVSM_checkpoint_dir", ""):
 
 # Freeze reconstructor and renderer layers, only train editor layers
 # Do this before DDP wrapping to ensure freeze state is preserved
-if config.training.get("freeze_reconstructor_renderer", False):
+if config.training.get("freeze_reconstructor_renderer", False) and not dpt_transfer_enabled:
     model.freeze_reconstructor_and_renderer()
     print(f"------2.0.1 frozen reconstructor and renderer, only editor layers trainable------")
 
 model = DDP(model, device_ids=[ddp_info.local_rank], find_unused_parameters=True)
 print(f"------2.0 model initialized and wrapped with DDP------")
 
-optimizer, optimized_param_dict, all_param_dict = create_optimizer(
-    model,
-    config.training.weight_decay,
-    config.training.lr,
-    (config.training.beta1, config.training.beta2),
+optimizer, optimized_param_dict, all_param_dict = create_optimizer_for_stage(
+    model=model,
+    config=config,
+    stage_name=active_stage,
+    dpt_transfer_cfg=dpt_transfer_cfg,
 )
 optim_param_list = list(optimized_param_dict.values())
 
@@ -167,6 +233,36 @@ start_train_step = cur_train_step
 model.train()
 print(f"------5.0 model set to train mode------")
 while cur_train_step <= total_train_steps:
+    if (
+        dpt_transfer_enabled
+        and dpt_train_stage == "auto"
+        and active_stage == "stage1"
+        and cur_param_update_step >= stage1_steps
+    ):
+        active_stage = "stage2"
+        if hasattr(model.module, "set_dpt_transfer_stage"):
+            model.module.set_dpt_transfer_stage(active_stage, dpt_transfer_cfg)
+        optimizer, optimized_param_dict, all_param_dict = create_optimizer_for_stage(
+            model=model,
+            config=config,
+            stage_name=active_stage,
+            dpt_transfer_cfg=dpt_transfer_cfg,
+        )
+        optim_param_list = list(optimized_param_dict.values())
+        lr_scheduler = create_lr_scheduler(
+            optimizer,
+            total_param_update_steps,
+            config.training.warmup,
+            scheduler_type=scheduler_type,
+        )
+        for _ in range(cur_param_update_step):
+            lr_scheduler.step()
+        optimizer.zero_grad(set_to_none=True)
+        print_rank0(f"Switched DPT transfer stage to {active_stage} at param update step {cur_param_update_step}")
+
+    if dpt_transfer_enabled and hasattr(model.module, "set_decoder_head_gate_schedule"):
+        model.module.set_decoder_head_gate_schedule(cur_param_update_step, dpt_transfer_cfg)
+
     # print(f"------5.1 training step {cur_train_step} started!------")
     tic = time.time()
     cur_epoch = int(cur_train_step * (total_batch_size / grad_accum_steps) // len(dataset) )
@@ -280,7 +376,12 @@ while cur_train_step <= total_train_steps:
                 "iter_time": time.time() - tic,
                 "grad_norm": total_grad_norm,
                 "epoch": cur_epoch,
+                "train_stage": 1 if active_stage == "stage1" else 2,
             }
+            if dpt_transfer_enabled and hasattr(model.module.image_token_decoder, "get_gate_values"):
+                gate_vals = model.module.image_token_decoder.get_gate_values()
+                for gate_key, gate_val in gate_vals.items():
+                    log_dict[f"gates/{gate_key}"] = gate_val
             log_dict.update({"train/" + k: v for k, v in loss_dict.items()})
             wandb.log(
                 log_dict,

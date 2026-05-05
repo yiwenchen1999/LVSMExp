@@ -244,13 +244,10 @@ def render_all_views_chunked(m, batch, device, view_chunk_size=4, desired_num_fr
             m.transformer_decoder, dec_in, gradient_checkpoint=False
         )
         img_tokens, _ = dec_out.split([n_per_view, n_latent_vectors], dim=1)
-        rendered = m.image_token_decoder(img_tokens)
-        rendered = rearrange(
-            rendered,
-            "(b v) (hh ww) (p1 p2 c) -> b v c (hh p1) (ww p2)",
-            v=cur_sz,
-            hh=h // patch_size, ww=w // patch_size,
-            p1=patch_size, p2=patch_size, c=3,
+        rendered = m.decode_tokens_to_image(
+            image_tokens=img_tokens,
+            v_target=cur_sz,
+            image_h_w=(h, w),
         ).cpu()
         rendered_chunks.append(rendered)
 
@@ -348,13 +345,10 @@ def render_video_from_all_poses(m, batch, device, view_chunk_size=4, desired_num
             m.transformer_decoder, dec_in, gradient_checkpoint=False
         )
         img_tokens, _ = dec_out.split([n_per_view, n_latent_vectors], dim=1)
-        rendered = m.image_token_decoder(img_tokens)
-        rendered = rearrange(
-            rendered,
-            "(b v) (hh ww) (p1 p2 c) -> b v c (hh p1) (ww p2)",
-            v=cur_sz,
-            hh=h // patch_size, ww=w // patch_size,
-            p1=patch_size, p2=patch_size, c=3,
+        rendered = m.decode_tokens_to_image(
+            image_tokens=img_tokens,
+            v_target=cur_sz,
+            image_h_w=(h, w),
         ).cpu()
         rendered_chunks.append(rendered)
 

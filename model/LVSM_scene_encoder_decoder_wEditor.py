@@ -10,6 +10,7 @@ import traceback
 from utils import camera_utils, data_utils
 from .transformer import QK_Norm_TransformerBlock, init_weights
 from .loss import LossComputer
+from .decoder_heads import build_decoder_head
 
 
 class LatentSceneEditor(nn.Module):
@@ -108,17 +109,16 @@ class LatentSceneEditor(nn.Module):
         else:
             self.point_light_tokenizer = None
         
-        # Image token decoder (decode image tokens into pixels)
-        self.image_token_decoder = nn.Sequential(
-            nn.LayerNorm(self.config.model.transformer.d, bias=False),
-            nn.Linear(
-                self.config.model.transformer.d,
-                (self.config.model.target_pose_tokenizer.patch_size**2) * 3,
-                bias=False,
-            ),
-            nn.Sigmoid()
+        # Decoder head (legacy MLP or multi-layer DPT).
+        head_cfg = self.config.model.get("decoder_head", {})
+        self.image_token_decoder, self.decoder_head_type = build_decoder_head(
+            head_cfg=head_cfg,
+            d_model=self.config.model.transformer.d,
+            patch_size=self.config.model.target_pose_tokenizer.patch_size,
+            out_channels=3,
         )
-        self.image_token_decoder.apply(init_weights)
+        dpt_cfg = head_cfg.get("dpt", {})
+        self.decoder_head_layer_indices = dpt_cfg.get("layer_indices", [3, 6, 9, 12])
 
 
     def _init_transformer(self):
@@ -301,9 +301,79 @@ class LatentSceneEditor(nn.Module):
             param.requires_grad = True
         print("Unfrozen all layers.")
 
+    def freeze_all_except_decoder_head(self):
+        """Freeze all params except decoder head parameters."""
+        for param in self.parameters():
+            param.requires_grad = False
+        for param in self.image_token_decoder.parameters():
+            param.requires_grad = True
+        print("Frozen all layers except decoder head.")
+
+    def set_decoder_head_gate_schedule(self, global_step, gate_cfg):
+        if self.decoder_head_type != "dpt":
+            return
+        if not hasattr(self.image_token_decoder, "set_gate_values"):
+            return
+        if gate_cfg is None:
+            return
+
+        gate_init = gate_cfg.get("gate_init", {"l3": 0.0, "l6": 0.0, "l9": 0.0, "l12": 1.0})
+        gate_ramp_cfg = gate_cfg.get("gate_ramp_steps", {})
+        ramp_len = int(gate_ramp_cfg.get("ramp_len", 1000))
+        ramp_len = max(ramp_len, 1)
+
+        gate_values = {
+            "l3": float(gate_init.get("l3", 0.0)),
+            "l6": float(gate_init.get("l6", 0.0)),
+            "l9": float(gate_init.get("l9", 0.0)),
+            "l12": float(gate_init.get("l12", 1.0)),
+        }
+
+        for key in ("l9", "l6", "l3"):
+            start_step = int(gate_ramp_cfg.get(f"{key}_start", 0))
+            if global_step <= start_step:
+                continue
+            progress = min(max((global_step - start_step) / ramp_len, 0.0), 1.0)
+            gate_values[key] = gate_init.get(key, 0.0) + (1.0 - gate_init.get(key, 0.0)) * progress
+
+        self.image_token_decoder.set_gate_values(gate_values)
+
+    def set_dpt_transfer_stage(self, stage_name, transfer_cfg):
+        stage_name = str(stage_name).lower()
+        freeze_backbone = bool(transfer_cfg.get("freeze_backbone_in_stage1", True))
+        stage2_unfreeze = transfer_cfg.get("stage2_unfreeze", "all")
+
+        if stage_name == "stage1":
+            if freeze_backbone:
+                self.freeze_all_except_decoder_head()
+            else:
+                self.unfreeze_all()
+            return
+
+        # stage2 / default
+        self.unfreeze_all()
+        if stage2_unfreeze == "decoder_only":
+            for param in self.parameters():
+                param.requires_grad = False
+            for module in [self.transformer_input_layernorm_decoder, self.transformer_decoder, self.image_token_decoder]:
+                for param in module.parameters():
+                    param.requires_grad = True
+            if self.use_albedo_decoder:
+                for param in self.transformer_decoder_albedo.parameters():
+                    param.requires_grad = True
+            print("Stage2 with decoder_only: only decoder stack and head are trainable.")
+
 
     
-    def pass_layers(self, transformer_blocks, input_tokens, gradient_checkpoint=False, checkpoint_every=1):
+    def pass_layers(
+        self,
+        transformer_blocks,
+        input_tokens,
+        gradient_checkpoint=False,
+        checkpoint_every=1,
+        return_intermediate=False,
+        capture_layers=None,
+    ):
         """
         Helper function to pass input tokens through all transformer blocks with optional gradient checkpointing.
         
@@ -322,6 +392,22 @@ class LatentSceneEditor(nn.Module):
         """
         num_layers = len(transformer_blocks)
         
+        if return_intermediate:
+            capture_set = set(capture_layers or [])
+            layer_outputs = {}
+            for layer_idx, layer in enumerate(transformer_blocks, start=1):
+                if gradient_checkpoint:
+                    input_tokens = torch.utils.checkpoint.checkpoint(
+                        layer,
+                        input_tokens,
+                        use_reentrant=False,
+                    )
+                else:
+                    input_tokens = layer(input_tokens)
+                if layer_idx in capture_set:
+                    layer_outputs[layer_idx] = input_tokens
+            return input_tokens, layer_outputs
+
         if not gradient_checkpoint:
             # Standard forward pass through all layers
             for layer in transformer_blocks:
@@ -347,6 +433,82 @@ class LatentSceneEditor(nn.Module):
             )
             
         return input_tokens
+
+    def _extract_image_tokens(self, decoder_tokens, n_patches, n_latent_vectors):
+        image_tokens, _ = decoder_tokens.split([n_patches, n_latent_vectors], dim=1)
+        return image_tokens
+
+    def _decode_image_tokens(self, image_tokens, v_target, height, width, multi_scale_tokens=None):
+        patch_size = self.config.model.target_pose_tokenizer.patch_size
+        h_patches = height // patch_size
+        w_patches = width // patch_size
+
+        if self.decoder_head_type == "dpt":
+            rendered_images = self.image_token_decoder(
+                image_tokens=image_tokens,
+                h_patches=h_patches,
+                w_patches=w_patches,
+                multi_scale_tokens=multi_scale_tokens,
+            )
+            rendered_images = rearrange(rendered_images, "(b v) c h w -> b v c h w", v=v_target)
+            return rendered_images
+
+        rendered_images = self.image_token_decoder(image_tokens)
+        rendered_images = rearrange(
+            rendered_images, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
+            v=v_target,
+            h=h_patches,
+            w=w_patches,
+            p1=patch_size,
+            p2=patch_size,
+            c=3,
+        )
+        return rendered_images
+
+    def _run_decoder_with_scales(
+        self,
+        decoder_tokens,
+        n_patches,
+        n_latent_vectors,
+        checkpoint_every,
+        gradient_checkpoint,
+        use_albedo_decoder=False,
+    ):
+        decoder_blocks = self.transformer_decoder_albedo if use_albedo_decoder else self.transformer_decoder
+        capture_layers = self.decoder_head_layer_indices if self.decoder_head_type == "dpt" else []
+        if len(capture_layers) == 0:
+            output_tokens = self.pass_layers(
+                decoder_blocks,
+                decoder_tokens,
+                gradient_checkpoint=gradient_checkpoint,
+                checkpoint_every=checkpoint_every,
+            )
+            image_tokens = self._extract_image_tokens(output_tokens, n_patches, n_latent_vectors)
+            return image_tokens, None
+
+        output_tokens, layer_outputs = self.pass_layers(
+            decoder_blocks,
+            decoder_tokens,
+            gradient_checkpoint=gradient_checkpoint,
+            checkpoint_every=checkpoint_every,
+            return_intermediate=True,
+            capture_layers=capture_layers,
+        )
+        image_tokens = self._extract_image_tokens(output_tokens, n_patches, n_latent_vectors)
+        multi_scale_tokens = {}
+        for layer_idx, layer_token in layer_outputs.items():
+            multi_scale_tokens[layer_idx] = self._extract_image_tokens(layer_token, n_patches, n_latent_vectors)
+        return image_tokens, multi_scale_tokens
+
+    def decode_tokens_to_image(self, image_tokens, v_target, image_h_w, multi_scale_tokens=None):
+        height, width = image_h_w
+        return self._decode_image_tokens(
+            image_tokens=image_tokens,
+            v_target=v_target,
+            height=height,
+            width=width,
+            multi_scale_tokens=multi_scale_tokens,
+        )
             
 
     def get_posed_input(self, images=None, ray_o=None, ray_d=None, method="default_plucker"):
@@ -593,25 +755,23 @@ class LatentSceneEditor(nn.Module):
         decoder_input_tokens = torch.cat((target_pose_tokens, repeated_latent_tokens), dim=1) # [b*v_target, n_latent_vectors + n_patches, d]
         decoder_input_tokens = self.transformer_input_layernorm_decoder(decoder_input_tokens)
 
-        transformer_output_tokens = self.pass_layers(self.transformer_decoder, decoder_input_tokens, gradient_checkpoint=True, checkpoint_every=checkpoint_every)
-        target_image_tokens, _ = transformer_output_tokens.split(
-            [n_patches, n_latent_vectors], dim=1
-        ) # [b*v_target, n_patches, d], [b*v_target, n_latent_vectors, d]
-
-        #& Step 6: Image token decoding - Decode tokens to RGB pixel values
-        rendered_images = self.image_token_decoder(target_image_tokens)
+        target_image_tokens, multi_scale_tokens = self._run_decoder_with_scales(
+            decoder_tokens=decoder_input_tokens,
+            n_patches=n_patches,
+            n_latent_vectors=n_latent_vectors,
+            checkpoint_every=checkpoint_every,
+            gradient_checkpoint=True,
+            use_albedo_decoder=False,
+        )
         
         height, width = target.image_h_w
 
-        patch_size = self.config.model.target_pose_tokenizer.patch_size
-        rendered_images = rearrange(
-            rendered_images, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
-            v=v_target,
-            h=height // patch_size, 
-            w=width // patch_size, 
-            p1=patch_size, 
-            p2=patch_size, 
-            c=3
+        rendered_images = self._decode_image_tokens(
+            image_tokens=target_image_tokens,
+            v_target=v_target,
+            height=height,
+            width=width,
+            multi_scale_tokens=multi_scale_tokens,
         )
         
         return rendered_images
@@ -651,25 +811,23 @@ class LatentSceneEditor(nn.Module):
         decoder_input_tokens = torch.cat((target_pose_tokens, repeated_latent_tokens), dim=1) # [b*v_target, n_latent_vectors + n_patches, d]
         decoder_input_tokens = self.transformer_input_layernorm_decoder(decoder_input_tokens)
 
-        transformer_albedo_output_tokens = self.pass_layers(self.transformer_decoder_albedo, decoder_input_tokens, gradient_checkpoint=True, checkpoint_every=checkpoint_every)
-        target_albedo_tokens, _ = transformer_albedo_output_tokens.split(
-            [n_patches, n_latent_vectors], dim=1
-        ) # [b*v_target, n_patches, d], [b*v_target, n_latent_vectors, d]
-
-        #& Step 5: Image token decoding - Decode tokens to RGB pixel values (albedo)
-        rendered_albedos = self.image_token_decoder(target_albedo_tokens)
+        target_albedo_tokens, multi_scale_tokens = self._run_decoder_with_scales(
+            decoder_tokens=decoder_input_tokens,
+            n_patches=n_patches,
+            n_latent_vectors=n_latent_vectors,
+            checkpoint_every=checkpoint_every,
+            gradient_checkpoint=True,
+            use_albedo_decoder=True,
+        )
         
         height, width = target.image_h_w
 
-        patch_size = self.config.model.target_pose_tokenizer.patch_size
-        rendered_albedos = rearrange(
-            rendered_albedos, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
-            v=v_target,
-            h=height // patch_size, 
-            w=width // patch_size, 
-            p1=patch_size, 
-            p2=patch_size, 
-            c=3
+        rendered_albedos = self._decode_image_tokens(
+            image_tokens=target_albedo_tokens,
+            v_target=v_target,
+            height=height,
+            width=width,
+            multi_scale_tokens=multi_scale_tokens,
         )
         
         return rendered_albedos
@@ -1210,29 +1368,23 @@ class LatentSceneEditor(nn.Module):
             decoder_input_tokens = torch.cat((cur_target_pose_tokens, cur_repeated_latent_tokens), dim=1)
             decoder_input_tokens = self.transformer_input_layernorm_decoder(decoder_input_tokens)
 
-            transformer_output_tokens = self.pass_layers(
-                self.transformer_decoder, 
-                decoder_input_tokens, 
-                gradient_checkpoint=False
-            )
-
-            target_image_tokens, _ = transformer_output_tokens.split(
-                [n_patches, self.config.model.transformer.n_latent_vectors], dim=1
+            target_image_tokens, multi_scale_tokens = self._run_decoder_with_scales(
+                decoder_tokens=decoder_input_tokens,
+                n_patches=n_patches,
+                n_latent_vectors=self.config.model.transformer.n_latent_vectors,
+                checkpoint_every=1,
+                gradient_checkpoint=False,
+                use_albedo_decoder=False,
             )
 
             # Decode to images
             height, width = target.image_h_w
-            patch_size = self.config.model.target_pose_tokenizer.patch_size
-            
-            video_rendering = self.image_token_decoder(target_image_tokens)
-            video_rendering = rearrange(
-                video_rendering, "(b v) (h w) (p1 p2 c) -> b v c (h p1) (w p2)",
-                v=cur_view_chunk_size,
-                h=height // patch_size, 
-                w=width // patch_size, 
-                p1=patch_size, 
-                p2=patch_size, 
-                c=3
+            video_rendering = self._decode_image_tokens(
+                image_tokens=target_image_tokens,
+                v_target=cur_view_chunk_size,
+                height=height,
+                width=width,
+                multi_scale_tokens=multi_scale_tokens,
             ).cpu()
 
             video_rendering_list.append(video_rendering)
