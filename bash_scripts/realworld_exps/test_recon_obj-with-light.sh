@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=jiang
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a6000:4
+#SBATCH --gres=gpu:a6000:1
 #SBATCH --time=72:00:00
 #SBATCH --job-name=relight_stanford
 #SBATCH --mem=128
@@ -14,7 +14,7 @@ export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 
 # Run Weights & Biases offline (no API/network during training; sync later with `wandb sync <run-dir>`).
 torchrun --nproc_per_node 1 --nnodes 1 \
-    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
+    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
     train.py --config configs/LVSM_scene_encoder_decoder.yaml \
     training.batch_size_per_gpu = 8 \
     training.dataset_path = /projects/vig/Datasets/obj-with-light/lvsm_format/train/full_list.txt \
