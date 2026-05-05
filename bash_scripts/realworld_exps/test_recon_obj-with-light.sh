@@ -3,11 +3,11 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a6000:1
 #SBATCH --time=72:00:00
-#SBATCH --job-name=relight_stanford
+#SBATCH --job-name=relight_obj-with-light
 #SBATCH --mem=128
 #SBATCH --ntasks=32
-#SBATCH --output=myjob.relight_stanford.out
-#SBATCH --error=myjob.relight_stanford.err
+#SBATCH --output=myjob.relight_obj-with-light.out
+#SBATCH --error=myjob.relight_obj-with-light.err
 
 export HF_HOME=/projects/vig/yiwenc/caches
 export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
