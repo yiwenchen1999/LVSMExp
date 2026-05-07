@@ -14,7 +14,7 @@ from setup import init_config, init_distributed, init_wandb_and_backup
 from utils.metric_utils import visualize_intermediate_results
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
-DEBUG_LOG_PATH = "~/LVSMExp/.cursor/debug-3926cc.log"
+DEBUG_LOG_PATH = "/home/yiwen/.cursor/debug-3926cc.log"
 DEBUG_SESSION_ID = "3926cc"
 
 
@@ -28,8 +28,15 @@ def _debug_log(run_id, hypothesis_id, location, message, data):
         "data": data,
         "timestamp": int(time.time() * 1000),
     }
-    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    log_path = os.path.expanduser(DEBUG_LOG_PATH)
+    log_dir = os.path.dirname(log_path)
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception:
+        # Never let debug logging break training runtime.
+        pass
 
 
 def _collect_optimizer_layout_snapshot(optimizer, optimized_param_dict):
