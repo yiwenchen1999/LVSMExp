@@ -7,12 +7,12 @@ model:
   class_name: model.LVSM_scene_encoder_decoder_wEditor.LatentSceneEditor
 
   image_tokenizer:
-    image_size: 512
+    image_size: 256
     patch_size: 8
     in_channels: 9  # 3 RGB + 3 direction + 3 Reference
 
   target_pose_tokenizer:
-    image_size: 512
+    image_size: 256
     patch_size: 8
     in_channels: 6  # 3 direction + 3 Reference
 
@@ -59,8 +59,8 @@ training:
   allowed_gradnorm_factor: 5
   center_crop: true
   scene_scale_factor: 1.35
-  LVSM_checkpoint_dir: ckpt/LVSM_object_encoder_decoder_512
-  checkpoint_dir: ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_512_singleMap_dpt_transfer
+  LVSM_checkpoint_dir: ckpt/LVSM_object_encoder_decoder
+  checkpoint_dir: ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_256_singleMap_dpt_transfer
   checkpoint_every: 2000
   dataset_name: data.dataset_scene.Dataset
   dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt
@@ -102,7 +102,7 @@ training:
     max_frame_dist: 60
     min_frame_dist: 13
   vis_every: 1000
-  wandb_exp_name: LVSM_edit_dense_general_512_dptTransfer_singleMap
+  wandb_exp_name: LVSM_edit_dense_general_256_dptTransfer_singleMap
   wandb_log_every: 50
   wandb_project: LVSM
   warmup: 3000
