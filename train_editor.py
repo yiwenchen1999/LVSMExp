@@ -14,7 +14,7 @@ from setup import init_config, init_distributed, init_wandb_and_backup
 from utils.metric_utils import visualize_intermediate_results
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
-DEBUG_LOG_PATH = "/Users/yiwenchen/Desktop/ResearchProjects/LightingDiffusion/3dgs/LVSMExp/.cursor/debug-3926cc.log"
+DEBUG_LOG_PATH = "~/LVSMExp/.cursor/debug-3926cc.log"
 DEBUG_SESSION_ID = "3926cc"
 
 
