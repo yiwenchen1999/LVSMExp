@@ -3,6 +3,7 @@
 import importlib
 import os
 import time
+import json
 import wandb
 import torch
 from rich import print
@@ -12,6 +13,57 @@ import torch.distributed as dist
 from setup import init_config, init_distributed, init_wandb_and_backup
 from utils.metric_utils import visualize_intermediate_results
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
+
+DEBUG_LOG_PATH = "/Users/yiwenchen/Desktop/ResearchProjects/LightingDiffusion/3dgs/LVSMExp/.cursor/debug-3926cc.log"
+DEBUG_SESSION_ID = "3926cc"
+
+
+def _debug_log(run_id, hypothesis_id, location, message, data):
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+
+def _collect_optimizer_layout_snapshot(optimizer, optimized_param_dict):
+    summary = []
+    for name, param in optimized_param_dict.items():
+        if not param.requires_grad:
+            continue
+        grad = param.grad
+        state = optimizer.state.get(param, {})
+        exp_avg = state.get("exp_avg", None)
+        exp_avg_sq = state.get("exp_avg_sq", None)
+        summary.append(
+            {
+                "name": name,
+                "param_dtype": str(param.dtype),
+                "param_device": str(param.device),
+                "param_layout": str(param.layout),
+                "param_stride": list(param.stride()),
+                "grad_is_none": grad is None,
+                "grad_dtype": str(grad.dtype) if grad is not None else None,
+                "grad_device": str(grad.device) if grad is not None else None,
+                "grad_layout": str(grad.layout) if grad is not None else None,
+                "grad_stride": list(grad.stride()) if grad is not None else None,
+                "exp_avg_dtype": str(exp_avg.dtype) if exp_avg is not None else None,
+                "exp_avg_device": str(exp_avg.device) if exp_avg is not None else None,
+                "exp_avg_layout": str(exp_avg.layout) if exp_avg is not None else None,
+                "exp_avg_stride": list(exp_avg.stride()) if exp_avg is not None else None,
+                "exp_avg_sq_dtype": str(exp_avg_sq.dtype) if exp_avg_sq is not None else None,
+                "exp_avg_sq_device": str(exp_avg_sq.device) if exp_avg_sq is not None else None,
+                "exp_avg_sq_layout": str(exp_avg_sq.layout) if exp_avg_sq is not None else None,
+                "exp_avg_sq_stride": list(exp_avg_sq.stride()) if exp_avg_sq is not None else None,
+            }
+        )
+    return summary
 
 
 def _group_params_with_decay(named_params, weight_decay, lr):
@@ -181,6 +233,21 @@ optimizer, optimized_param_dict, all_param_dict = create_optimizer_for_stage(
     dpt_transfer_cfg=dpt_transfer_cfg,
 )
 optim_param_list = list(optimized_param_dict.values())
+#region agent log
+_debug_log(
+    run_id="pre-fix",
+    hypothesis_id="H1",
+    location="train_editor.py:optimizer_init",
+    message="optimizer created",
+    data={
+        "active_stage": active_stage,
+        "optimizer_type": type(optimizer).__name__,
+        "optimizer_fused": optimizer.defaults.get("fused", None),
+        "num_param_groups": len(optimizer.param_groups),
+        "trainable_param_count": len(optimized_param_dict),
+    },
+)
+#endregion
 
 
 scheduler_type = config.training.get("scheduler_type", "cosine")
@@ -345,7 +412,42 @@ while cur_train_step <= total_train_steps:
 
             # since skip flag may be updated because of grad norm, we check it again
             if not skip_optimizer_step:
-                scaler.step(optimizer)
+                if cur_param_update_step < 2:
+                    #region agent log
+                    _debug_log(
+                        run_id="pre-fix",
+                        hypothesis_id="H2",
+                        location="train_editor.py:before_scaler_step",
+                        message="before scaler.step snapshot",
+                        data={
+                            "cur_train_step": cur_train_step,
+                            "cur_param_update_step": cur_param_update_step,
+                            "optimizer_fused": optimizer.defaults.get("fused", None),
+                            "sampled_params": _collect_optimizer_layout_snapshot(
+                                optimizer, dict(list(optimized_param_dict.items())[:8])
+                            ),
+                        },
+                    )
+                    #endregion
+                try:
+                    scaler.step(optimizer)
+                except RuntimeError as e:
+                    #region agent log
+                    _debug_log(
+                        run_id="pre-fix",
+                        hypothesis_id="H3",
+                        location="train_editor.py:scaler_step_exception",
+                        message="scaler.step runtime error",
+                        data={
+                            "error": str(e),
+                            "optimizer_fused": optimizer.defaults.get("fused", None),
+                            "full_snapshot": _collect_optimizer_layout_snapshot(
+                                optimizer, optimized_param_dict
+                            )[:50],
+                        },
+                    )
+                    #endregion
+                    raise
                 cur_param_update_step += 1
 
         scaler.update()
