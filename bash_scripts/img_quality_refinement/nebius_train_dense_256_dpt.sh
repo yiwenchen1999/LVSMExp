@@ -20,6 +20,8 @@ TRAIN_STAGE=${TRAIN_STAGE:-auto}
 STAGE1_STEPS=${STAGE1_STEPS:-5000}
 DISTILL_WEIGHT=${DISTILL_WEIGHT:-0.0}
 BACKBONE_LR_SCALE=${BACKBONE_LR_SCALE:-0.1}
+OG_DATASET_BASE=${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}
+LOCAL_DATASET_BASE=${LOCAL_DATASET_BASE:-/mnt/filesystem-z1}
 
 torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 28635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
@@ -33,6 +35,8 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
     training.single_env_map = true \
+    training.og_dataset_base = ${OG_DATASET_BASE} \
+    training.local_dataset_base = ${LOCAL_DATASET_BASE} \
     training.dpt_transfer.enabled = true \
     training.dpt_transfer.train_stage = ${TRAIN_STAGE} \
     training.dpt_transfer.freeze_backbone_in_stage1 = true \

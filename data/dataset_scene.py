@@ -16,11 +16,18 @@ class Dataset(Dataset):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.og_dataset_base = self._normalize_base_path(
+            self.config.training.get("og_dataset_base", None)
+        )
+        self.local_dataset_base = self._normalize_base_path(
+            self.config.training.get("local_dataset_base", None)
+        )
 
         try:
             with open(self.config.training.dataset_path, 'r') as f:
                 self.all_scene_paths = f.read().splitlines()
             self.all_scene_paths = [path for path in self.all_scene_paths if path.strip()]
+            self.all_scene_paths = [self._remap_path(path.strip()) for path in self.all_scene_paths]
         
         except Exception as e:
             print(f"Error reading dataset paths from '{self.config.training.dataset_path}'")
@@ -123,6 +130,33 @@ class Dataset(Dataset):
         self.white_env_as_albedo = self.config.training.get("white_env_as_albedo", False)
 
 
+    def _normalize_base_path(self, path):
+        if path is None:
+            return None
+        path = str(path).strip()
+        if len(path) == 0:
+            return None
+        return os.path.normpath(path)
+
+    def _remap_path(self, path):
+        if path is None:
+            return None
+        path = str(path)
+        if len(path) == 0:
+            return path
+        if self.og_dataset_base is None or self.local_dataset_base is None:
+            return path
+
+        norm_path = os.path.normpath(path)
+        og_base = self.og_dataset_base
+
+        if norm_path == og_base or norm_path.startswith(og_base + os.sep):
+            rel = os.path.relpath(norm_path, og_base)
+            if rel == ".":
+                return self.local_dataset_base
+            return os.path.join(self.local_dataset_base, rel)
+        return path
+
     def __len__(self):
         return len(self.all_scene_paths)
 
@@ -150,7 +184,8 @@ class Dataset(Dataset):
         return scene_name.rsplit("_", 1)[0]
 
     def _load_point_light_rays(self, base_dir: str, scene_name: str, num_views: int) -> torch.Tensor:
-        rays_path = os.path.join(base_dir, "point_light_rays", f"{scene_name}.npy")
+        base_dir = self._remap_path(base_dir)
+        rays_path = self._remap_path(os.path.join(base_dir, "point_light_rays", f"{scene_name}.npy"))
         if not os.path.exists(rays_path):
             raise FileNotFoundError(f"Point light rays file not found: {rays_path}")
         rays = np.load(rays_path)  # [N, 10]
@@ -166,7 +201,8 @@ class Dataset(Dataset):
         return torch.stack(sampled, dim=0)  # [v, num_rays, 10]
 
     def _load_scene_images_by_indices(self, metadata_dir, scene_name, image_indices):
-        relit_scene_path = os.path.join(metadata_dir, scene_name + ".json")
+        metadata_dir = self._remap_path(metadata_dir)
+        relit_scene_path = self._remap_path(os.path.join(metadata_dir, scene_name + ".json"))
         if not os.path.exists(relit_scene_path):
             raise FileNotFoundError(f"Relit scene JSON not found: {relit_scene_path}")
 
@@ -179,7 +215,7 @@ class Dataset(Dataset):
                 f"but need frame index {max(image_indices)}"
             )
 
-        relit_image_paths = [relit_frames[ic]["image_path"] for ic in image_indices]
+        relit_image_paths = [self._remap_path(relit_frames[ic]["image_path"]) for ic in image_indices]
         missing_images = [img_path for img_path in relit_image_paths if not os.path.exists(img_path)]
         if missing_images:
             if len(missing_images) > 3:
@@ -193,7 +229,8 @@ class Dataset(Dataset):
         return relit_images
 
     def _load_envmaps_or_zeros(self, base_dir, scene_name, image_indices):
-        envmaps_dir = os.path.join(base_dir, "envmaps", scene_name)
+        base_dir = self._remap_path(base_dir)
+        envmaps_dir = self._remap_path(os.path.join(base_dir, "envmaps", scene_name))
         env_ldr_list = []
         env_hdr_list = []
         missing_slots = []
@@ -294,6 +331,7 @@ class Dataset(Dataset):
         images = []
         intrinsics = []
         for cur_frame, cur_image_path in zip(frames_chosen, image_paths_chosen):
+            cur_image_path = self._remap_path(cur_image_path)
             try:
                 # Try to open the image file
                 image = PIL.Image.open(cur_image_path)
@@ -446,7 +484,7 @@ class Dataset(Dataset):
             raise RuntimeError(error_msg)
         
         try:
-            scene_path = self.all_scene_paths[idx].strip()
+            scene_path = self._remap_path(self.all_scene_paths[idx].strip())
             
             # Check if file exists
             if not os.path.exists(scene_path):
@@ -496,7 +534,7 @@ class Dataset(Dataset):
                 if ic < 0 or ic >= len(frames):
                     raise IndexError(f"Image index {ic} out of range for scene {scene_name} (has {len(frames)} frames)")
             
-            image_paths_chosen = [frames[ic]["image_path"] for ic in image_indices]
+            image_paths_chosen = [self._remap_path(frames[ic]["image_path"]) for ic in image_indices]
             frames_chosen = [frames[ic] for ic in image_indices]
             
             # Check if all image paths exist
@@ -528,7 +566,7 @@ class Dataset(Dataset):
             # Extract base directory from scene_path (e.g., ".../train/metadata/...")
             # This is needed for both relit images and albedo loading
             scene_path_dir = os.path.dirname(scene_path)
-            base_dir = os.path.dirname(scene_path_dir)  # Go up from metadata to train/test
+            base_dir = self._remap_path(os.path.dirname(scene_path_dir))  # Go up from metadata to train/test
             
             point_light_rays = None
 
@@ -536,7 +574,7 @@ class Dataset(Dataset):
             if self.use_relit_images:
                 
                 # Find all scenes with the same object_id but different env_name
-                metadata_dir = os.path.join(base_dir, 'metadata')
+                metadata_dir = self._remap_path(os.path.join(base_dir, 'metadata'))
                 if not os.path.exists(metadata_dir):
                     error_msg = f"Metadata directory not found: {metadata_dir}"
                     print(f"Error: {error_msg}")
@@ -585,7 +623,7 @@ class Dataset(Dataset):
                 # Sample one relit scene for relit image supervision
                 relit_scene_name = random.choice(candidate_scenes)
                 # print(f"chose relit scene: {relit_scene_name}")
-                relit_scene_path = os.path.join(metadata_dir, relit_scene_name + '.json')
+                relit_scene_path = self._remap_path(os.path.join(metadata_dir, relit_scene_name + '.json'))
                 
                 # Load relit scene JSON
                 if not os.path.exists(relit_scene_path):
@@ -604,7 +642,7 @@ class Dataset(Dataset):
                     raise IndexError(error_msg)
                 
                 # Load relit images with same indices
-                relit_image_paths = [relit_frames[ic]["image_path"] for ic in image_indices]
+                relit_image_paths = [self._remap_path(relit_frames[ic]["image_path"]) for ic in image_indices]
                 relit_frames_chosen = [relit_frames[ic] for ic in image_indices]
                 
                 # Check if all relit image paths exist
@@ -637,7 +675,7 @@ class Dataset(Dataset):
                 if self.use_relight_envmap:
                     envmaps_loaded = False
                     if should_load_envmap:
-                        envmaps_dir = os.path.join(base_dir, 'envmaps', lighting_source_scene_name)
+                        envmaps_dir = self._remap_path(os.path.join(base_dir, 'envmaps', lighting_source_scene_name))
                         # For pure envmap scenes the directory must exist; for combined it's optional
                         has_envmaps_dir = os.path.exists(envmaps_dir)
                         if has_envmaps_dir:
@@ -645,8 +683,8 @@ class Dataset(Dataset):
                             env_hdr_list = []
                             all_found = True
                             for ic in image_indices:
-                                env_ldr_path = os.path.join(envmaps_dir, f"{ic:05d}_ldr.png")
-                                env_hdr_path = os.path.join(envmaps_dir, f"{ic:05d}_hdr.png")
+                                env_ldr_path = self._remap_path(os.path.join(envmaps_dir, f"{ic:05d}_ldr.png"))
+                                env_hdr_path = self._remap_path(os.path.join(envmaps_dir, f"{ic:05d}_hdr.png"))
                                 if not os.path.exists(env_ldr_path) or not os.path.exists(env_hdr_path):
                                     if actual_lighting_type == "envmap":
                                         raise FileNotFoundError(f"Environment map file not found: {env_ldr_path} or {env_hdr_path}")
@@ -702,11 +740,11 @@ class Dataset(Dataset):
                         env_h, env_w = 256, 512
                         if len(candidate_scenes_by_type["envmap"]) > 0:
                             sample_env_scene = candidate_scenes_by_type["envmap"][0]
-                            sample_envmaps_dir = os.path.join(base_dir, 'envmaps', sample_env_scene)
+                            sample_envmaps_dir = self._remap_path(os.path.join(base_dir, 'envmaps', sample_env_scene))
                             if os.path.exists(sample_envmaps_dir):
                                 sample_env_files = [f for f in os.listdir(sample_envmaps_dir) if f.endswith('_ldr.png')]
                                 if sample_env_files:
-                                    sample_env_path = os.path.join(sample_envmaps_dir, sample_env_files[0])
+                                    sample_env_path = self._remap_path(os.path.join(sample_envmaps_dir, sample_env_files[0]))
                                     sample_env_img = PIL.Image.open(sample_env_path)
                                     env_h, env_w = sample_env_img.size[1], sample_env_img.size[0]
                         env_ldr = torch.zeros(len(image_indices), 3, env_h, env_w, dtype=torch.float32).clone()
@@ -716,7 +754,7 @@ class Dataset(Dataset):
                 if self.use_relight_point_light:
                     point_light_loaded = False
                     if should_load_point_light:
-                        rays_path = os.path.join(base_dir, "point_light_rays", f"{lighting_source_scene_name}.npy")
+                        rays_path = self._remap_path(os.path.join(base_dir, "point_light_rays", f"{lighting_source_scene_name}.npy"))
                         if os.path.exists(rays_path):
                             point_light_rays = self._load_point_light_rays(
                                 base_dir=base_dir,
@@ -812,13 +850,13 @@ class Dataset(Dataset):
                 if self.white_env_as_albedo:
                     # Load albedo from white_env_0 scene instead of albedos folder
                     white_env_scene_name = object_id + '_white_env_0'
-                    metadata_dir = os.path.join(base_dir, 'metadata')
+                    metadata_dir = self._remap_path(os.path.join(base_dir, 'metadata'))
                     if not os.path.exists(metadata_dir):
                         error_msg = f"Metadata directory not found: {metadata_dir}"
                         print(f"Error: {error_msg}")
                         raise FileNotFoundError(error_msg)
                     
-                    white_env_scene_path = os.path.join(metadata_dir, white_env_scene_name + '.json')
+                    white_env_scene_path = self._remap_path(os.path.join(metadata_dir, white_env_scene_name + '.json'))
                     if not os.path.exists(white_env_scene_path):
                         error_msg = f"White env scene JSON not found: {white_env_scene_path}"
                         print(f"Error: {error_msg}")
@@ -836,7 +874,7 @@ class Dataset(Dataset):
                         raise IndexError(error_msg)
                     
                     # Load white env images with same indices
-                    white_env_image_paths = [white_env_frames[ic]["image_path"] for ic in image_indices]
+                    white_env_image_paths = [self._remap_path(white_env_frames[ic]["image_path"]) for ic in image_indices]
                     white_env_frames_chosen = [white_env_frames[ic] for ic in image_indices]
                     
                     # Check if all white env image paths exist
@@ -850,11 +888,11 @@ class Dataset(Dataset):
                     albedos, _, _ = self.preprocess_frames(white_env_frames_chosen, white_env_image_paths)
                 else:
                     # Load albedo images from albedos folder (shared across all scenes with same object_id)
-                    albedos_dir = os.path.join(base_dir, 'albedos', object_id)
+                    albedos_dir = self._remap_path(os.path.join(base_dir, 'albedos', object_id))
                     if os.path.exists(albedos_dir):
                         albedo_list = []
                         for ic in image_indices:
-                            albedo_path = os.path.join(albedos_dir, f"{ic:05d}.png")
+                            albedo_path = self._remap_path(os.path.join(albedos_dir, f"{ic:05d}.png"))
                             
                             if not os.path.exists(albedo_path):
                                 error_msg = f"Albedo file not found: {albedo_path}"
