@@ -29,7 +29,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.batch_size_per_gpu = 8 \
     training.checkpoint_dir = /mnt/filesystem-z1/ckpt/dpt_decoder_256 \
     training.dataset_path = /mnt/filesystem-z1/lvsmPlus_objaverse/test/full_list.txt \
-    training.LVSM_checkpoint_dir = mnt/filesystem-z1/ckpts/dpt_decoder_256 \
+    training.LVSM_checkpoint_dir = /mnt/filesystem-z1/ckpts/dpt_decoder_256 \
     training.wandb_exp_name = LVSM_edit_dense_general_256_dptTransfer \
     training.warmup = 3000 \
     training.vis_every = 1000 \
