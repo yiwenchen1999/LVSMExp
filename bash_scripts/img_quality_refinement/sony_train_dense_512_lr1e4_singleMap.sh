@@ -86,7 +86,6 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
-    training.single_env_map = true
 "
 
 echo ""
