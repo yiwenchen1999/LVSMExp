@@ -17,10 +17,14 @@ cd LVSMExp
 
 python -m pip install -U pip setuptools wheel
 # B200 (sm_100) needs newer CUDA/PyTorch wheels than cu118.
-python -m pip uninstall -y torch torchvision torchaudio xformers || true
-python -m pip install --index-url https://download.pytorch.org/whl/cu128 torch torchvision torchaudio
-python -m pip install xformers
+# 2) 先装项目其余依赖（当前 requirements 已去掉 torch 固定）
+python -m pip install -U pip setuptools wheel
 python -m pip install -r requirements.txt
+# 3) 最后强制装“同一来源、同一 CUDA 通道”的 torch 三件套 + xformers
+python -m pip install --upgrade --force-reinstall --no-cache-dir \
+  --index-url https://download.pytorch.org/whl/cu128 \
+  torch torchvision torchaudio
+python -m pip install --upgrade --force-reinstall --no-cache-dir xformers lpips
 
 python - <<'PY'
 import torch
@@ -38,8 +42,8 @@ rsync -avh --partial --inplace --progress \
 # filetransfer
 rsync -avhP --partial --append-verify --info=progress2 --mkpath \
   -e "ssh -T" \
-  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/full_list.txt \
-  /mnt/data-disk/lvsmPlus_objaverse/test/full_list.txt
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/test/envmaps/ \
+  /mnt/data-disk/lvsmPlus_objaverse/test/envmaps/
 
 
 # mount disks:

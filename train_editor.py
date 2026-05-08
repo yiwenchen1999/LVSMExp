@@ -14,8 +14,8 @@ from setup import init_config, init_distributed, init_wandb_and_backup
 from utils.metric_utils import visualize_intermediate_results
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
-DEBUG_LOG_PATH = "/Users/yiwenchen/Desktop/ResearchProjects/LightingDiffusion/3dgs/LVSMExp/.cursor/debug-3a0a87.log"
-DEBUG_SESSION_ID = "3a0a87"
+DEBUG_LOG_PATH = "/home/yiwen/.cursor/debug-3926cc.log"
+DEBUG_SESSION_ID = "3926cc"
 
 
 def _debug_log(run_id, hypothesis_id, location, message, data):
@@ -128,39 +128,11 @@ if isinstance(relight_signals, str):
     relight_signals = [relight_signals]
 config.training.relight_signals = list(relight_signals)
 print(f"------0.0.1 relight_signals: {config.training.relight_signals}------")
-# #region agent log
-_debug_log(
-    run_id=f"rank-{os.environ.get('RANK', 'na')}",
-    hypothesis_id="H1",
-    location="train_editor.py:config_init",
-    message="Torch/CUDA runtime snapshot at startup",
-    data={
-        "torch_version": torch.__version__,
-        "torch_compiled_cuda": torch.version.cuda,
-        "cuda_available": torch.cuda.is_available(),
-        "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-        "cuda_arch_list": torch.cuda.get_arch_list() if hasattr(torch.cuda, "get_arch_list") else [],
-    },
-)
-# #endregion
 
 os.environ["OMP_NUM_THREADS"] = str(config.training.get("num_threads", 1))
 
 # Set up DDP for training/inference and Fix random seed
 ddp_info = init_distributed(seed=777)
-# #region agent log
-_debug_log(
-    run_id=f"rank-{os.environ.get('RANK', 'na')}",
-    hypothesis_id="H2",
-    location="train_editor.py:post_init_distributed",
-    message="Distributed/device assignment snapshot",
-    data={
-        "local_rank": int(os.environ.get("LOCAL_RANK", -1)),
-        "rank": int(os.environ.get("RANK", -1)) if os.environ.get("RANK") is not None else -1,
-        "device_repr": str(ddp_info.device),
-    },
-)
-# #endregion
 dist.barrier()
 
 # Set up wandb and backup source code
@@ -223,18 +195,6 @@ total_num_epochs = int(total_param_update_steps * total_batch_size / len(dataset
 module, class_name = config.model.class_name.rsplit(".", 1)
 LVSM = importlib.import_module(module).__dict__[class_name]
 model = LVSM(config).to(ddp_info.device)
-# #region agent log
-_debug_log(
-    run_id=f"rank-{os.environ.get('RANK', 'na')}",
-    hypothesis_id="H3",
-    location="train_editor.py:model_to_device",
-    message="Model moved to target device",
-    data={
-        "target_device": str(ddp_info.device),
-        "param_device": str(next(model.parameters()).device),
-    },
-)
-# #endregion
 
 dpt_transfer_cfg = config.training.get("dpt_transfer", {})
 dpt_transfer_enabled = bool(dpt_transfer_cfg.get("enabled", False))
