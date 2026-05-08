@@ -96,8 +96,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     training.relight_signals = \"[envmap]\" \
     training.warmup = 3000 \
     training.vis_every = 1000 \
-    training.lr = 0.00001 \
-    training.single_env_map = true
+    training.lr = 0.0001 \
 "
 
 echo ""
