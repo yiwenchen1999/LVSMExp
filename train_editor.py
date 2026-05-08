@@ -519,21 +519,10 @@ while cur_train_step <= total_train_steps:
             scaler.unscale_(optimizer) 
             # For all gradients, we safely change the NaN -> 0., inf -> 1e-6, -inf -> 1e-6.
             with torch.no_grad():
-                non_contiguous_grad_params = []
                 stride_mismatch_grad_params = []
                 for n, p in optimized_param_dict.items():
                     if p.requires_grad and (p.grad is not None):
                         p.grad.nan_to_num_(nan=0.0, posinf=1e-6, neginf=-1e-6)
-                        if not p.grad.is_contiguous():
-                            non_contiguous_grad_params.append(
-                                {
-                                    "name": n,
-                                    "grad_stride_before": list(p.grad.stride()),
-                                    "param_stride": list(p.stride()),
-                                }
-                            )
-                            p.grad = p.grad.contiguous()
-                            non_contiguous_grad_params[-1]["grad_stride_after"] = list(p.grad.stride())
                         if p.grad.layout == torch.strided and p.grad.stride() != p.stride():
                             stride_mismatch_grad_params.append(
                                 {
@@ -542,35 +531,22 @@ while cur_train_step <= total_train_steps:
                                     "grad_stride_before": list(p.grad.stride()),
                                 }
                             )
-                            fixed_grad = torch.empty_like(
-                                p.grad,
+                            # Keep grad layout exactly aligned with param layout/stride
+                            # for fused AdamW kernel requirements.
+                            fixed_grad = torch.empty_strided(
+                                size=p.grad.size(),
+                                stride=p.stride(),
                                 device=p.grad.device,
                                 dtype=p.grad.dtype,
-                                memory_format=torch.contiguous_format,
                             )
                             fixed_grad.copy_(p.grad)
                             p.grad = fixed_grad
                             stride_mismatch_grad_params[-1]["grad_stride_after"] = list(p.grad.stride())
 
-                if len(non_contiguous_grad_params) > 0 and cur_param_update_step < 3:
-                    #region agent log
-                    _debug_log(
-                        run_id="baseline",
-                        hypothesis_id="H4",
-                        location="train_editor.py:grad_contiguous_fix",
-                        message="made non-contiguous grads contiguous before fused AdamW",
-                        data={
-                            "cur_train_step": cur_train_step,
-                            "cur_param_update_step": cur_param_update_step,
-                            "num_fixed_params": len(non_contiguous_grad_params),
-                            "fixed_params": non_contiguous_grad_params[:10],
-                        },
-                    )
-                    #endregion
                 if len(stride_mismatch_grad_params) > 0 and cur_param_update_step < 3:
                     #region agent log
                     _debug_log(
-                        run_id="baseline",
+                        run_id="post-fix",
                         hypothesis_id="H5",
                         location="train_editor.py:grad_stride_alignment_fix",
                         message="aligned grad stride with param stride before fused AdamW",
