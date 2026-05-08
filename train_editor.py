@@ -14,8 +14,8 @@ from setup import init_config, init_distributed, init_wandb_and_backup
 from utils.metric_utils import visualize_intermediate_results
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
-DEBUG_LOG_PATH = "/home/yiwen/.cursor/debug-3926cc.log"
-DEBUG_SESSION_ID = "3926cc"
+DEBUG_LOG_PATH = "~/.cursor/debug-fbb43a.log"
+DEBUG_SESSION_ID = "fbb43a"
 
 
 def _debug_log(run_id, hypothesis_id, location, message, data):
@@ -71,6 +71,71 @@ def _collect_optimizer_layout_snapshot(optimizer, optimized_param_dict):
             }
         )
     return summary
+
+
+def _collect_optimizer_mismatch_summary(optimizer, optimized_param_dict, max_items=20):
+    mismatches = []
+    checked = 0
+    for name, param in optimized_param_dict.items():
+        if not param.requires_grad:
+            continue
+        grad = param.grad
+        state = optimizer.state.get(param, {})
+        exp_avg = state.get("exp_avg", None)
+        exp_avg_sq = state.get("exp_avg_sq", None)
+        checked += 1
+
+        if grad is None:
+            continue
+
+        reasons = []
+        if grad.device != param.device:
+            reasons.append("grad_device!=param_device")
+        if grad.dtype != param.dtype:
+            reasons.append("grad_dtype!=param_dtype")
+        if grad.layout != param.layout:
+            reasons.append("grad_layout!=param_layout")
+        if exp_avg is not None:
+            if exp_avg.device != param.device:
+                reasons.append("exp_avg_device!=param_device")
+            if exp_avg.dtype != param.dtype:
+                reasons.append("exp_avg_dtype!=param_dtype")
+            if exp_avg.layout != param.layout:
+                reasons.append("exp_avg_layout!=param_layout")
+        if exp_avg_sq is not None:
+            if exp_avg_sq.device != param.device:
+                reasons.append("exp_avg_sq_device!=param_device")
+            if exp_avg_sq.dtype != param.dtype:
+                reasons.append("exp_avg_sq_dtype!=param_dtype")
+            if exp_avg_sq.layout != param.layout:
+                reasons.append("exp_avg_sq_layout!=param_layout")
+
+        if reasons:
+            mismatches.append(
+                {
+                    "name": name,
+                    "reasons": reasons,
+                    "param_dtype": str(param.dtype),
+                    "param_device": str(param.device),
+                    "param_layout": str(param.layout),
+                    "param_stride": list(param.stride()),
+                    "grad_dtype": str(grad.dtype),
+                    "grad_device": str(grad.device),
+                    "grad_layout": str(grad.layout),
+                    "grad_stride": list(grad.stride()),
+                    "exp_avg_dtype": str(exp_avg.dtype) if exp_avg is not None else None,
+                    "exp_avg_device": str(exp_avg.device) if exp_avg is not None else None,
+                    "exp_avg_layout": str(exp_avg.layout) if exp_avg is not None else None,
+                    "exp_avg_stride": list(exp_avg.stride()) if exp_avg is not None else None,
+                    "exp_avg_sq_dtype": str(exp_avg_sq.dtype) if exp_avg_sq is not None else None,
+                    "exp_avg_sq_device": str(exp_avg_sq.device) if exp_avg_sq is not None else None,
+                    "exp_avg_sq_layout": str(exp_avg_sq.layout) if exp_avg_sq is not None else None,
+                    "exp_avg_sq_stride": list(exp_avg_sq.stride()) if exp_avg_sq is not None else None,
+                }
+            )
+            if len(mismatches) >= max_items:
+                break
+    return {"checked_param_count": checked, "mismatch_count": len(mismatches), "mismatches": mismatches}
 
 
 def _group_params_with_decay(named_params, weight_decay, lr):
@@ -242,7 +307,7 @@ optimizer, optimized_param_dict, all_param_dict = create_optimizer_for_stage(
 optim_param_list = list(optimized_param_dict.values())
 #region agent log
 _debug_log(
-    run_id="pre-fix",
+    run_id="baseline",
     hypothesis_id="H1",
     location="train_editor.py:optimizer_init",
     message="optimizer created",
@@ -423,7 +488,7 @@ while cur_train_step <= total_train_steps:
                 if len(non_contiguous_grad_params) > 0 and cur_param_update_step < 3:
                     #region agent log
                     _debug_log(
-                        run_id="post-fix",
+                        run_id="baseline",
                         hypothesis_id="H4",
                         location="train_editor.py:grad_contiguous_fix",
                         message="made non-contiguous grads contiguous before fused AdamW",
@@ -438,7 +503,7 @@ while cur_train_step <= total_train_steps:
                 if len(stride_mismatch_grad_params) > 0 and cur_param_update_step < 3:
                     #region agent log
                     _debug_log(
-                        run_id="post-fix",
+                        run_id="baseline",
                         hypothesis_id="H5",
                         location="train_editor.py:grad_stride_alignment_fix",
                         message="aligned grad stride with param stride before fused AdamW",
@@ -482,7 +547,24 @@ while cur_train_step <= total_train_steps:
                 if cur_param_update_step < 2:
                     #region agent log
                     _debug_log(
-                        run_id="pre-fix",
+                        run_id="baseline",
+                        hypothesis_id="H2",
+                        location="train_editor.py:before_scaler_step_mismatch_summary",
+                        message="optimizer mismatch summary before scaler.step",
+                        data={
+                            "cur_train_step": cur_train_step,
+                            "cur_param_update_step": cur_param_update_step,
+                            "optimizer_fused": optimizer.defaults.get("fused", None),
+                            "summary": _collect_optimizer_mismatch_summary(
+                                optimizer, optimized_param_dict
+                            ),
+                        },
+                    )
+                    #endregion
+                if cur_param_update_step < 2:
+                    #region agent log
+                    _debug_log(
+                        run_id="baseline",
                         hypothesis_id="H2",
                         location="train_editor.py:before_scaler_step",
                         message="before scaler.step snapshot",
@@ -501,13 +583,16 @@ while cur_train_step <= total_train_steps:
                 except RuntimeError as e:
                     #region agent log
                     _debug_log(
-                        run_id="pre-fix",
+                        run_id="baseline",
                         hypothesis_id="H3",
                         location="train_editor.py:scaler_step_exception",
                         message="scaler.step runtime error",
                         data={
                             "error": str(e),
                             "optimizer_fused": optimizer.defaults.get("fused", None),
+                            "mismatch_summary": _collect_optimizer_mismatch_summary(
+                                optimizer, optimized_param_dict
+                            ),
                             "full_snapshot": _collect_optimizer_layout_snapshot(
                                 optimizer, optimized_param_dict
                             )[:50],

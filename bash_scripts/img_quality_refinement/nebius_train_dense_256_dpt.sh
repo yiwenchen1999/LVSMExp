@@ -34,12 +34,11 @@ torchrun --nproc_per_node 8 --nnodes 1 \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
-    training.single_env_map = true \
     training.og_dataset_base = ${OG_DATASET_BASE} \
     training.local_dataset_base = ${LOCAL_DATASET_BASE} \
     training.dpt_transfer.enabled = true \
     training.dpt_transfer.train_stage = ${TRAIN_STAGE} \
-    training.dpt_transfer.freeze_backbone_in_stage1 = true \
+    training.dpt_transfer.freeze_backbone_in_stage1 = false \
     training.dpt_transfer.stage1_steps = ${STAGE1_STEPS} \
     training.dpt_transfer.stage2_unfreeze = all \
     training.dpt_transfer.distill_weight = ${DISTILL_WEIGHT} \
