@@ -9,4 +9,5 @@ python preprocess_scripts/preprocess_stanford_orb_objaverse_like.py \
   --input-root "${INPUT_ROOT}" \
   --output-root "${OUTPUT_ROOT}" \
   --target-size 512 \
-  --no-adjust-fov
+  --no-adjust-fov \
+  --env-gt-root /projects/vig/Datasets/stanfordORB/ground_truth

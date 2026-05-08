@@ -4,10 +4,15 @@ Convert Stanford-ORB scenes into an Objaverse-like layout:
 
   <output_root>/train/images/<scene>/<frame:05d>.png
   <output_root>/train/metadata/<scene>.json
+  <output_root>/train/envmaps/<scene>/<frame:05d>_ldr.png, _hdr.png (if --env-gt-root)
   <output_root>/train/full_list.txt
   <output_root>/test/images/<scene>/<frame:05d>.png
   <output_root>/test/metadata/<scene>.json
+  <output_root>/test/envmaps/<scene>/<frame:05d>_ldr.png, _hdr.png (if --env-gt-root)
   <output_root>/test/full_list.txt
+
+Envmaps follow preprocess_objaverse naming (LDR/HDR split via split_envmap_ldr_hdr).
+Stanford ORB horizontal rotation matches preprocess_stanford_orb (roll -width/4).
 
 This intentionally does NOT create point_light_rays/.
 """
@@ -15,7 +20,13 @@ This intentionally does NOT create point_light_rays/.
 import argparse
 from pathlib import Path
 
-from preprocess_stanford_orb import collect_scene_dirs, process_scene, write_full_list
+from preprocess_stanford_orb import (
+    HAS_IMAGEIO,
+    HAS_PYEXR,
+    collect_scene_dirs,
+    process_scene,
+    write_full_list,
+)
 
 
 def parse_args():
@@ -46,6 +57,13 @@ def parse_args():
         help="Explicitly disable FOV adjustment (resize/crop scaling only).",
     )
     parser.set_defaults(adjust_fov=False)
+    parser.add_argument(
+        "--env-gt-root",
+        type=str,
+        default="data_samples/stanford_ORB_gt",
+        help="GT root with per-scene env EXRs: <root>/<scene>/env_map/<frame_stem>.exr "
+        "(same stems as image filenames in transforms). Use empty string to skip envmaps.",
+    )
     return parser.parse_args()
 
 
@@ -62,6 +80,19 @@ def main():
     print(f"[Info] output_root={output_root}")
     print("[Info] point_light_rays folder is intentionally omitted.")
 
+    env_gt_root = None
+    if args.env_gt_root and str(args.env_gt_root).strip():
+        env_gt_path = Path(args.env_gt_root).expanduser().resolve()
+        if not env_gt_path.exists():
+            print(f"[Warn] env-gt-root does not exist: {env_gt_path}, skipping envmap processing")
+        elif not (HAS_PYEXR or HAS_IMAGEIO):
+            print("[Warn] Neither pyexr nor imageio available, skipping envmap processing")
+        else:
+            env_gt_root = env_gt_path
+            print(f"[Info] env_gt_root={env_gt_root}")
+    else:
+        print("[Info] envmap export disabled (--env-gt-root empty).")
+
     for split in ["train", "test"]:
         scene_dirs = collect_scene_dirs(input_root, split)
         if not scene_dirs:
@@ -77,6 +108,7 @@ def main():
                 target_fov=args.target_fov,
                 target_size=args.target_size,
                 adjust_fov=args.adjust_fov,
+                env_gt_root=env_gt_root,
             )
 
         write_full_list(output_root, split)

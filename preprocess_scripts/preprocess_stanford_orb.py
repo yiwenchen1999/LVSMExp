@@ -400,8 +400,9 @@ def process_scene(
     target_fov: float,
     target_size: int,
     adjust_fov: bool,
+    env_gt_root: Path | None = None,
 ):
-    """Legacy: process single split only (used when --merged is False)."""
+    """Process one split. Optional envmaps from env_gt_root (same layout/rotation as merged mode)."""
     transforms_path = scene_dir / f"transforms_{split}.json"
     if not transforms_path.exists():
         return None
@@ -420,9 +421,32 @@ def process_scene(
     out_images_dir.mkdir(parents=True, exist_ok=True)
     out_meta_dir.mkdir(parents=True, exist_ok=True)
 
-    frames_out, _ = _process_frames_from_split(
+    frames_out, frame_id_map = _process_frames_from_split(
         scene_dir, tf_data, split, 0, out_images_dir, target_fov, target_size, adjust_fov
     )
+
+    out_envmaps_dir = output_root / split / "envmaps" / scene_name
+    if env_gt_root is not None and (HAS_PYEXR or HAS_IMAGEIO):
+        env_scene_dir = env_gt_root / scene_name / "env_map"
+        if env_scene_dir.exists():
+            out_envmaps_dir.mkdir(parents=True, exist_ok=True)
+            n_env = 0
+            for output_idx, frame_id in frame_id_map:
+                for ext in [".exr", ".hdr"]:
+                    env_path = env_scene_dir / f"{frame_id}{ext}"
+                    if env_path.exists():
+                        env_raw = read_env_hdr(env_path)
+                        if env_raw is not None:
+                            # Stanford collection: rotate 90° to the right (left 1/4 warps to right)
+                            w = env_raw.shape[1]
+                            env_raw = np.roll(env_raw, shift=-w // 4, axis=1)
+                            env_ldr, env_hdr = split_envmap_ldr_hdr(env_raw)
+                            Image.fromarray(env_ldr).save(out_envmaps_dir / f"{output_idx:05d}_ldr.png")
+                            Image.fromarray(env_hdr).save(out_envmaps_dir / f"{output_idx:05d}_hdr.png")
+                            n_env += 1
+                        break
+            if n_env > 0:
+                print(f"  [Env] {scene_name} ({split}): {n_env} envmaps processed")
 
     scene_meta = {"scene_name": scene_name, "frames": frames_out}
     meta_path = out_meta_dir / f"{scene_name}.json"
@@ -585,6 +609,7 @@ def main():
                     target_fov=args.target_fov,
                     target_size=args.target_size,
                     adjust_fov=args.adjust_fov,
+                    env_gt_root=env_gt_root,
                 )
             write_full_list(output_root, split)
 
