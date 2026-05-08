@@ -31,11 +31,11 @@ export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_merged_test_plus_envmaps/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_512}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_finetune}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_512_lr1e4_singleMap}"
 
-############################
+############################ls
 # Logging
 ############################
 echo "=============================================="

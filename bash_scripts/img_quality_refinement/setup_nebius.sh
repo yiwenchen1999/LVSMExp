@@ -37,7 +37,7 @@ mkdir ckpt/dpt_decoder_256
 rsync -avh --partial --inplace --progress \
   -e "ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes" \
   chen.yiwe@xfer.discovery.neu.edu:/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt/dense_relight_env_progressive/ckpt_0000000000026000.pt  \
-  ckpt/dpt_decoder_256/
+  ckpt/relight_finetune/
 
 # filetransfer
 rsync -avhP --partial --append-verify --info=progress2 --mkpath \
