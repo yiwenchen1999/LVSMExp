@@ -1,5 +1,5 @@
 model:
-  class_name: model.LVSM_scene_encoder_decoder_wEditor_backup_goodLatentProgressive.LatentSceneEditor
+  class_name: model.LVSM_scene_encoder_decoder_wEdito.LatentSceneEditor
 
   image_tokenizer:
     image_size: 256
