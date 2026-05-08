@@ -1,0 +1,38 @@
+euNorth:(proj1)
+key_id:
+NAKI72MCK9EIY4PPS6HU
+secret_key:
+KJoDCMxzbVpcUHA9Ezm/8FbSXWNwBUX4/Yc0NrO3
+
+meWest:(proj2)
+key_id:
+NAKIVS3TH5GDQICA0C7G
+secret_key:
+zB2wwm36vauxrxIvQhfkt/V7pF+U5evn97zfzHqj
+
+#install aws:
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+#set keys:
+aws configure set aws_access_key_id NAKI72MCK9EIY4PPS6HU
+aws configure set aws_secret_access_key KJoDCMxzbVpcUHA9Ezm/8FbSXWNwBUX4/Yc0NrO3
+
+aws configure set region eu-north1
+aws configure set endpoint_url https://storage.eu-north1.nebius.cloud
+
+aws s3 ls s3://rose-anteater-bucket-9 --endpoint-url https://storage.eu-north1.nebius.cloud
+
+rclone copy /mnt/filesystem-g4/lvsmPlus_objaverse/test nebius:rose-anteater-bucket-9/test \
+  --transfers 32 \
+  --checkers 16 \
+  --progress
+
+  mkdir -p /mnt/filesystem-g4/lvsmPlus_objaverse
+
+# filetransfer
+rsync -avhP --partial --append-verify --info=progress2 --mkpath \
+  -e "ssh -T" \
+  chen.yiwe@xfer.discovery.neu.edu:/scratch/chen.yiwe/temp_objaverse/lvsmPlus_objaverse/ \
+  /mnt/filesystem-g4/lvsmPlus_objaverse/
