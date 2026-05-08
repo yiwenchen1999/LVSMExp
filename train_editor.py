@@ -138,6 +138,73 @@ def _collect_optimizer_mismatch_summary(optimizer, optimized_param_dict, max_ite
     return {"checked_param_count": checked, "mismatch_count": len(mismatches), "mismatches": mismatches}
 
 
+def _collect_optimizer_state_integrity(optimizer, optimized_param_dict, max_items=30):
+    offenders = []
+    checked = 0
+    grad_param_count = 0
+    missing_state_count = 0
+    for name, param in optimized_param_dict.items():
+        if not param.requires_grad:
+            continue
+        checked += 1
+        grad = param.grad
+        if grad is None:
+            continue
+        grad_param_count += 1
+        state = optimizer.state.get(param, {})
+        exp_avg = state.get("exp_avg", None)
+        exp_avg_sq = state.get("exp_avg_sq", None)
+        reasons = []
+        if (exp_avg is None) != (exp_avg_sq is None):
+            reasons.append("moment_state_half_missing")
+        if exp_avg is None and exp_avg_sq is None:
+            missing_state_count += 1
+            # first step can legitimately have no moments; do not mark as offender.
+            continue
+        if exp_avg.shape != param.shape:
+            reasons.append("exp_avg_shape!=param_shape")
+        if exp_avg_sq.shape != param.shape:
+            reasons.append("exp_avg_sq_shape!=param_shape")
+        if grad.shape != param.shape:
+            reasons.append("grad_shape!=param_shape")
+        if not param.is_contiguous():
+            reasons.append("param_non_contiguous")
+        if not grad.is_contiguous():
+            reasons.append("grad_non_contiguous")
+        if not exp_avg.is_contiguous():
+            reasons.append("exp_avg_non_contiguous")
+        if not exp_avg_sq.is_contiguous():
+            reasons.append("exp_avg_sq_non_contiguous")
+        if reasons:
+            offenders.append(
+                {
+                    "name": name,
+                    "reasons": reasons,
+                    "param_shape": list(param.shape),
+                    "grad_shape": list(grad.shape),
+                    "exp_avg_shape": list(exp_avg.shape),
+                    "exp_avg_sq_shape": list(exp_avg_sq.shape),
+                    "param_stride": list(param.stride()),
+                    "grad_stride": list(grad.stride()),
+                    "exp_avg_stride": list(exp_avg.stride()),
+                    "exp_avg_sq_stride": list(exp_avg_sq.stride()),
+                    "param_is_contiguous": bool(param.is_contiguous()),
+                    "grad_is_contiguous": bool(grad.is_contiguous()),
+                    "exp_avg_is_contiguous": bool(exp_avg.is_contiguous()),
+                    "exp_avg_sq_is_contiguous": bool(exp_avg_sq.is_contiguous()),
+                }
+            )
+            if len(offenders) >= max_items:
+                break
+    return {
+        "checked_param_count": checked,
+        "grad_param_count": grad_param_count,
+        "missing_state_count": missing_state_count,
+        "offender_count": len(offenders),
+        "offenders": offenders,
+    }
+
+
 def _group_params_with_decay(named_params, weight_decay, lr):
     decay_params, nodecay_params = [], []
     for _, param in named_params:
@@ -565,6 +632,22 @@ while cur_train_step <= total_train_steps:
                     #region agent log
                     _debug_log(
                         run_id="baseline",
+                        hypothesis_id="H6",
+                        location="train_editor.py:before_scaler_step_state_integrity",
+                        message="optimizer state integrity before scaler.step",
+                        data={
+                            "cur_train_step": cur_train_step,
+                            "cur_param_update_step": cur_param_update_step,
+                            "integrity": _collect_optimizer_state_integrity(
+                                optimizer, optimized_param_dict
+                            ),
+                        },
+                    )
+                    #endregion
+                if cur_param_update_step < 2:
+                    #region agent log
+                    _debug_log(
+                        run_id="baseline",
                         hypothesis_id="H2",
                         location="train_editor.py:before_scaler_step",
                         message="before scaler.step snapshot",
@@ -591,6 +674,9 @@ while cur_train_step <= total_train_steps:
                             "error": str(e),
                             "optimizer_fused": optimizer.defaults.get("fused", None),
                             "mismatch_summary": _collect_optimizer_mismatch_summary(
+                                optimizer, optimized_param_dict
+                            ),
+                            "state_integrity": _collect_optimizer_state_integrity(
                                 optimizer, optimized_param_dict
                             ),
                             "full_snapshot": _collect_optimizer_layout_snapshot(
