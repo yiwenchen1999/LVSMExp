@@ -3,7 +3,7 @@
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --time=168:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
@@ -34,16 +34,16 @@ export XDG_DATA_HOME=/scratch2/$USER/.local/share
 export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
-export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_merged_test_plus_envmaps/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_512}"
+export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/relight_finetune}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
-export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_512_lr1e4_singleMap}"
+export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_polyhaven_lr1e4_singleMap}"
 
 ############################
 # Logging
 ############################
 echo "=============================================="
-echo "SBATCH: Relight general dense 512 + singleMap"
+echo "SBATCH: Relight general dense polyhaven + singleMap"
 echo "=============================================="
 echo "Host: $(hostname)"
 echo "JobID: ${SLURM_JOB_ID:-N/A}"
@@ -83,7 +83,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd $PROJ
 
-  torchrun --nproc_per_node 4 --nnodes 1 \
+  torchrun --nproc_per_node 2 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29501 \
