@@ -16,8 +16,8 @@
 # - stage1 warmup with frozen backbone
 # - stage2 joint finetune with smaller backbone LR
 # - gates: l12 on first, l9/l6/l3 progressively enabled
-TRAIN_STAGE=${TRAIN_STAGE:-auto}
-STAGE1_STEPS=${STAGE1_STEPS:-5000}
+TRAIN_STAGE=${TRAIN_STAGE:-stage2}
+STAGE1_STEPS=${STAGE1_STEPS:-0}
 DISTILL_WEIGHT=${DISTILL_WEIGHT:-0.0}
 BACKBONE_LR_SCALE=${BACKBONE_LR_SCALE:-0.1}
 OG_DATASET_BASE=${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}
