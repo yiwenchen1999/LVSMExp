@@ -16,7 +16,18 @@ git clone https://github.com/yiwenchen1999/LVSMExp.git
 cd LVSMExp
 
 python -m pip install -U pip setuptools wheel
+# B200 (sm_100) needs newer CUDA/PyTorch wheels than cu118.
+python -m pip uninstall -y torch torchvision torchaudio xformers || true
+python -m pip install --index-url https://download.pytorch.org/whl/cu128 torch torchvision torchaudio
+python -m pip install xformers
 python -m pip install -r requirements.txt
+
+python - <<'PY'
+import torch
+print("torch", torch.__version__)
+print("compiled_cuda", torch.version.cuda)
+print("arch_list", torch.cuda.get_arch_list())
+PY
 
 mkdir ckpt/dpt_decoder_256
 rsync -avh --partial --inplace --progress \
