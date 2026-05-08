@@ -163,13 +163,32 @@ def auto_resume_job(
     if not reset_training_state:
         try:
             optimizer.load_state_dict(checkpoint["optimizer"])
-            # Move optimizer state to the correct device
-            # This is necessary when using fused optimizers and loading from CPU
-            device = next(model.parameters()).device
-            for state in optimizer.state.values():
-                for k, v in state.items():
-                    if isinstance(v, torch.Tensor):
-                        state[k] = v.to(device)
+            # Align optimizer states with current params (device/dtype/layout).
+            # This is critical for fused AdamW after resume, especially when
+            # stage switches or mixed-precision settings changed.
+            for group in optimizer.param_groups:
+                for param in group["params"]:
+                    state = optimizer.state.get(param, None)
+                    if not state:
+                        continue
+
+                    param_device = param.device
+                    param_dtype = param.dtype
+
+                    for k, v in state.items():
+                        if not isinstance(v, torch.Tensor):
+                            continue
+
+                        if k in ("exp_avg", "exp_avg_sq"):
+                            # Fused AdamW expects params/grads/moments to share
+                            # dtype/device/layout. Keep moments contiguous.
+                            state[k] = v.to(
+                                device=param_device,
+                                dtype=param_dtype,
+                            ).contiguous()
+                        else:
+                            # Keep scalar/bookkeeping states on the param device.
+                            state[k] = v.to(device=param_device)
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
             forward_pass_step = checkpoint["fwdbwd_pass_step"]
             param_update_step = checkpoint["param_update_step"]
