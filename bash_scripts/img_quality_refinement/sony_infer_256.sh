@@ -75,9 +75,9 @@ singularity exec --nv $BIND $SIF bash -lc "
   torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
-    --rdzv_endpoint localhost:29501 \
+    --rdzv_endpoint localhost:29502 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense.yaml \
-    training.batch_size_per_gpu = 8 \
+    training.batch_size_per_gpu = 1 \
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
