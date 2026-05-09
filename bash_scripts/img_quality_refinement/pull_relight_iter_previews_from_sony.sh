@@ -7,7 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DEST_DIR="${DEST_DIR:-${REPO_ROOT}/result_previews/resolution_comparisons/infer_256}"
 REMOTE_HOST="${REMOTE_HOST:-mfml1}"
-REMOTE_CKPT_DIR="${REMOTE_CKPT_DIR:-/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/relight_result_256}"
+REMOTE_CKPT_DIR="${REMOTE_CKPT_DIR:-/music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt/relight_result_256
+}"
 
 mkdir -p "${DEST_DIR}"
 

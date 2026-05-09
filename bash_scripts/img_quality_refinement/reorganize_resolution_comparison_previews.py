@@ -12,7 +12,8 @@ Outputs under the same parent as infer_*:
       row4 pred — all files live directly under infer_*_flattened (no iter_* subfolders).
 
   (2) single_image / infer_* / <scene_stem> / iter_XXXXXXXX /
-      Split tiles: input_view_00..03, view_01_gt … view_08_pred (names adjusted to n_views).
+      Split tiles: input_view_00..03, view_01_gt … view_08_pred (names adjusted to n_views),
+      plus envldr_view_01..N when envldr_<scene>.jpg exists.
 
 Usage (default --base is repo/result_previews/resolution_comparisons):
   bash bash_scripts/img_quality_refinement/reorganize_resolution_comparison_previews.sh
@@ -88,6 +89,29 @@ def split_supervision_strip(path: Path, tile_w: int, tile_h: int) -> tuple[list[
         x0 = t * tile_w
         tiles.append(im.crop((x0, 0, x0 + tile_w, tile_h)))
     return tiles, n_views
+
+
+def split_envldr_strip(path: Path, n_views: int, tile_h_ref: int) -> list[Image.Image]:
+    """
+    Split envldr strip into per-target-view envmaps.
+    Each view is expected to be one LDR env image (typically 512x256).
+    """
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    if h != tile_h_ref:
+        # Keep only top rows if there is accidental extra padding.
+        im = im.crop((0, 0, w, tile_h_ref))
+        w, h = im.size
+    if n_views <= 0:
+        raise ValueError(f"{path}: invalid n_views={n_views}")
+    if w % n_views != 0:
+        raise ValueError(f"{path}: width {w} not divisible by n_views {n_views}")
+    tile_w = w // n_views
+    tiles = []
+    for i in range(n_views):
+        x0 = i * tile_w
+        tiles.append(im.crop((x0, 0, x0 + tile_w, h)))
+    return tiles
 
 
 def hstack(images: list[Image.Image]) -> Image.Image:
@@ -197,6 +221,16 @@ def write_single_scene(
         sup_tiles[b + 0].save(out_scene_iter / f"view_{v + 1:02d}_gt.jpg", quality=95)
         sup_tiles[b + 1].save(out_scene_iter / f"view_{v + 1:02d}_relit_gt.jpg", quality=95)
         sup_tiles[b + 2].save(out_scene_iter / f"view_{v + 1:02d}_relit_pred.jpg", quality=95)
+
+    env_path = None
+    for cand in (iter_dir / f"envldr_{stem}.jpg", iter_dir / f"envldr_{stem}.png"):
+        if cand.exists():
+            env_path = cand
+            break
+    if env_path is not None:
+        env_tiles = split_envldr_strip(env_path, n_views, th_in)
+        for v, tile in enumerate(env_tiles):
+            tile.save(out_scene_iter / f"envldr_view_{v + 1:02d}.jpg", quality=95)
 
 
 def process_infer_dir(base: Path, infer_name: str, dry_run: bool) -> None:
