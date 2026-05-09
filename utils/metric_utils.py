@@ -262,6 +262,18 @@ def visualize_intermediate_results(out_dir, result):
         Image.fromarray(visualized_image).save(
             os.path.join(out_dir, f"supervision_{safe_scene_name}.jpg")
         )
+        # Save target-view LDR envmaps when available.
+        # Layout matches other strips: target views are concatenated left-to-right.
+        if hasattr(target, "env_ldr") and target.env_ldr is not None:
+            env_ldr = target.env_ldr
+            if env_ldr.ndim == 5:
+                b_env, v_env, c_env, h_env, w_env = env_ldr.size()
+                env_images = env_ldr.reshape(b_env * v_env, c_env, h_env, w_env).detach().cpu()
+                env_grid = rearrange(env_images, "(b v) c h w -> (b h) (v w) c", v=v_env)
+                env_grid = (env_grid.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                Image.fromarray(env_grid).save(
+                    os.path.join(out_dir, f"envldr_{safe_scene_name}.jpg")
+                )
         with open(os.path.join(out_dir, f"scene_name.txt"), "w") as f:
             f.write(scene_name)
 
