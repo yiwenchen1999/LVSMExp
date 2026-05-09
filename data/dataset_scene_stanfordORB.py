@@ -3,6 +3,7 @@
 import random
 import traceback
 import os
+import re
 import numpy as np
 import PIL
 import torch
@@ -16,6 +17,7 @@ class Dataset(Dataset):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.cross_split_relight = bool(self.config.training.get("cross_split_relight", False))
         self.og_dataset_base = self._normalize_base_path(
             self.config.training.get("og_dataset_base", None)
         )
@@ -32,6 +34,42 @@ class Dataset(Dataset):
         except Exception as e:
             print(f"Error reading dataset paths from '{self.config.training.dataset_path}'")
             raise e
+
+        self.context_scene_paths = None
+        self.target_scene_paths = None
+        self.context_scene_path_by_name = {}
+        self.target_scene_path_by_name = {}
+        self.target_scene_names_by_prefix = {}
+        if self.cross_split_relight:
+            context_dataset_path = self.config.training.get("context_dataset_path", None)
+            if context_dataset_path is None:
+                dataset_path = str(self.config.training.dataset_path)
+                context_dataset_path = dataset_path.replace(f"{os.sep}test{os.sep}", f"{os.sep}train{os.sep}")
+            context_dataset_path = self._remap_path(context_dataset_path)
+            if not os.path.exists(context_dataset_path):
+                raise FileNotFoundError(f"Context split list not found: {context_dataset_path}")
+
+            with open(context_dataset_path, "r") as f:
+                context_scene_paths = [self._remap_path(p.strip()) for p in f.read().splitlines() if p.strip()]
+
+            self.context_scene_paths = context_scene_paths
+            self.target_scene_paths = list(self.all_scene_paths)
+            self.all_scene_paths = self.target_scene_paths
+
+            for scene_path in self.context_scene_paths:
+                scene_name = os.path.basename(scene_path).replace(".json", "")
+                self.context_scene_path_by_name[scene_name] = scene_path
+
+            for scene_path in self.target_scene_paths:
+                scene_name = os.path.basename(scene_path).replace(".json", "")
+                self.target_scene_path_by_name[scene_name] = scene_path
+                scene_prefix = self._extract_scene_prefix(scene_name)
+                self.target_scene_names_by_prefix.setdefault(scene_prefix, []).append(scene_name)
+
+            print(
+                f"cross_split_relight enabled: context scenes={len(self.context_scene_paths)}, "
+                f"target scenes={len(self.target_scene_paths)}"
+            )
         
         # Condition reverse: swap input/relit sources so input comes from relit scene
         # and relit supervision + lighting comes from the current scene
@@ -40,7 +78,9 @@ class Dataset(Dataset):
         # Filter scenes if whiteEnvInput is enabled
         # Only keep scenes ending with "white_env_0" as input images
         self.whiteEnvInput = self.config.training.get("whiteEnvInput", False)
-        if self.whiteEnvInput:
+        if self.cross_split_relight:
+            pass
+        elif self.whiteEnvInput:
             total_scenes_before = len(self.all_scene_paths)
             filtered_scene_paths = []
             for scene_path in self.all_scene_paths:
@@ -182,6 +222,128 @@ class Dataset(Dataset):
                 return scene_name[:idx]
         # Fallback for unknown naming
         return scene_name.rsplit("_", 1)[0]
+
+    def _extract_scene_prefix(self, scene_name: str) -> str:
+        match = re.match(r"^(.*?_scene)\d+$", scene_name)
+        if match:
+            return match.group(1)
+        return self._extract_object_id(scene_name)
+
+    def _sample_view_indices(self, num_frames: int, num_samples: int):
+        if num_frames < num_samples:
+            raise ValueError(f"Not enough frames to sample {num_samples} views from {num_frames} frames")
+        return sorted(random.sample(range(num_frames), num_samples))
+
+    def _load_scene_json(self, scene_path: str):
+        scene_path = self._remap_path(scene_path)
+        if not os.path.exists(scene_path):
+            raise FileNotFoundError(f"Scene JSON not found: {scene_path}")
+        with open(scene_path, "r") as f:
+            data_json = json.load(f)
+        frames = data_json.get("frames", [])
+        if len(frames) == 0:
+            raise ValueError(f"No frames in scene JSON: {scene_path}")
+        scene_name = data_json.get("scene_name", os.path.basename(scene_path).replace(".json", ""))
+        return data_json, scene_name, frames, scene_path
+
+    def _getitem_cross_split(self, idx):
+        target_scene_path = self._remap_path(self.all_scene_paths[idx].strip())
+        _, scene_name, _, _ = self._load_scene_json(target_scene_path)
+
+        context_scene_path = self.context_scene_path_by_name.get(scene_name, None)
+        if context_scene_path is None:
+            scene_prefix = self._extract_scene_prefix(scene_name)
+            context_candidates = [
+                p for n, p in self.context_scene_path_by_name.items()
+                if self._extract_scene_prefix(n) == scene_prefix
+            ]
+            if len(context_candidates) == 0:
+                raise ValueError(f"No context scene in train split for target scene: {scene_name}")
+            context_scene_path = random.choice(context_candidates)
+
+        _, context_scene_name, context_frames, context_scene_path = self._load_scene_json(context_scene_path)
+        scene_prefix = self._extract_scene_prefix(scene_name)
+        relit_candidates = [
+            n for n in self.target_scene_names_by_prefix.get(scene_prefix, [])
+            if n != scene_name
+        ]
+        if len(relit_candidates) == 0:
+            raise ValueError(f"No relit target candidates found for scene: {scene_name}")
+
+        relit_scene_name = random.choice(relit_candidates)
+        relit_scene_path = self.target_scene_path_by_name[relit_scene_name]
+        _, _, relit_frames, relit_scene_path = self._load_scene_json(relit_scene_path)
+
+        num_input_views = int(self.config.training.num_input_views)
+        num_target_views = int(self.config.training.num_target_views)
+        context_indices = self._sample_view_indices(len(context_frames), num_input_views)
+        target_indices = self._sample_view_indices(len(relit_frames), num_target_views)
+
+        context_paths = [self._remap_path(context_frames[i]["image_path"]) for i in context_indices]
+        target_paths = [self._remap_path(relit_frames[i]["image_path"]) for i in target_indices]
+        context_frames_chosen = [context_frames[i] for i in context_indices]
+        target_frames_chosen = [relit_frames[i] for i in target_indices]
+
+        context_images, context_intrinsics, context_c2ws = self.preprocess_frames(context_frames_chosen, context_paths)
+        target_images, target_intrinsics, target_c2ws = self.preprocess_frames(target_frames_chosen, target_paths)
+
+        input_images = torch.cat([context_images, target_images], dim=0)
+        input_intrinsics = torch.cat([context_intrinsics, target_intrinsics], dim=0)
+        input_c2ws = torch.cat([context_c2ws, target_c2ws], dim=0)
+
+        scene_scale_factor = self.config.training.get("scene_scale_factor", 1.35)
+        input_c2ws = self.preprocess_poses(input_c2ws, scene_scale_factor)
+
+        relit_images = input_images.clone()
+        env_ldr = None
+        env_hdr = None
+        if self.use_relight_envmap:
+            context_base_dir = self._remap_path(os.path.dirname(os.path.dirname(context_scene_path)))
+            target_base_dir = self._remap_path(os.path.dirname(os.path.dirname(relit_scene_path)))
+            context_env_ldr, context_env_hdr = self._load_envmaps_or_zeros(
+                base_dir=context_base_dir,
+                scene_name=context_scene_name,
+                image_indices=context_indices,
+            )
+            target_env_ldr, target_env_hdr = self._load_envmaps_or_zeros(
+                base_dir=target_base_dir,
+                scene_name=relit_scene_name,
+                image_indices=target_indices,
+            )
+            env_ldr = torch.cat([context_env_ldr, target_env_ldr], dim=0)
+            env_hdr = torch.cat([context_env_hdr, target_env_hdr], dim=0)
+
+        point_light_rays = None
+        if self.use_relight_point_light:
+            total_views = input_images.shape[0]
+            point_light_rays = torch.zeros(
+                total_views,
+                self.point_light_num_rays,
+                10,
+                dtype=torch.float32,
+            )
+
+        image_indices = torch.tensor(context_indices + target_indices).long().unsqueeze(-1)
+        scene_indices = torch.full_like(image_indices, idx)
+        indices = torch.cat([image_indices, scene_indices], dim=-1)
+
+        result_dict = {
+            "image": input_images,
+            "c2w": input_c2ws,
+            "envmap_c2w": input_c2ws.clone(),
+            "fxfycxcy": input_intrinsics,
+            "index": indices,
+            "scene_name": scene_name,
+            "relit_images": relit_images,
+            "relit_scene_name": relit_scene_name,
+            "context_scene_name": context_scene_name,
+        }
+        if self.use_relight_envmap:
+            result_dict["env_ldr"] = env_ldr
+            result_dict["env_hdr"] = env_hdr
+        if self.use_relight_point_light:
+            result_dict["point_light_rays"] = point_light_rays
+        return result_dict
 
     def _load_point_light_rays(self, base_dir: str, scene_name: str, num_views: int) -> torch.Tensor:
         base_dir = self._remap_path(base_dir)
@@ -484,6 +646,9 @@ class Dataset(Dataset):
             raise RuntimeError(error_msg)
         
         try:
+            if self.cross_split_relight:
+                return self._getitem_cross_split(idx)
+
             scene_path = self._remap_path(self.all_scene_paths[idx].strip())
             
             # Check if file exists
