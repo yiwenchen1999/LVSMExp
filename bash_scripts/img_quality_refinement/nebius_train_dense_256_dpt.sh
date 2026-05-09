@@ -31,7 +31,7 @@ torchrun --nproc_per_node 8 --nnodes 1 \
     training.dataset_path = /mnt/data-disk/lvsmPlus_objaverse/test/full_list.txt \
     training.LVSM_checkpoint_dir = /mnt/data-disk/ckpt/dpt_decoder_256 \
     training.wandb_exp_name = LVSM_edit_dense_general_256_dptTransfer \
-    training.warmup = 3000 \
+    training.warmup = 1000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
     training.og_dataset_base = ${OG_DATASET_BASE} \
