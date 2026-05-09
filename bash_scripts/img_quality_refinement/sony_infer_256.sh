@@ -84,7 +84,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.relight_signals = \"[envmap]\" \
     training.warmup = 3000 \
-    training.vis_every = 1000 \
+    training.vis_every = 1 \
     training.lr = 0.0001 \
 "
 
