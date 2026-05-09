@@ -27,9 +27,9 @@ torchrun --nproc_per_node 8 --nnodes 1 \
     --rdzv_id 28635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_singleMap_dpt_transfer.yaml \
     training.batch_size_per_gpu = 16 \
-    training.checkpoint_dir = /mnt/data-disk/ckpt/dpt_decoder_256 \
-    training.dataset_path = /mnt/data-disk/lvsmPlus_objaverse/test/full_list.txt \
-    training.LVSM_checkpoint_dir = /mnt/data-disk/ckpt/dpt_decoder_256 \
+    training.checkpoint_dir = ckpt/dpt_decoder_256 \
+    training.dataset_path = /mnt/data-disk2/lvsmPlus_objaverse/test/full_list.txt \
+    training.LVSM_checkpoint_dir = ckpt/dpt_decoder_256 \
     training.wandb_exp_name = LVSM_edit_dense_general_256_dptTransfer \
     training.warmup = 1000 \
     training.vis_every = 1000 \
