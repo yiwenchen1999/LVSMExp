@@ -48,6 +48,10 @@ training:
   dataset_path: data_samples/processed_stanford_ORB_objaverse_like/test/full_list.txt
   context_dataset_path: data_samples/processed_stanford_ORB_objaverse_like/train/full_list.txt
   cross_split_relight: true
+  cross_split_context_env_mode: zeros  # options: zeros, load
+  cross_split_fix_envmap_size: true
+  cross_split_envmap_h: 256
+  cross_split_envmap_w: 512
   editor_condition_source: target
 
   relight_signals: [envmap]

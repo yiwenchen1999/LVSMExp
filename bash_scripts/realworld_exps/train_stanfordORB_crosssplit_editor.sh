@@ -12,7 +12,7 @@
 export HF_HOME=/projects/vig/yiwenc/caches
 export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 
-torchrun --nproc_per_node 4 --nnodes 1 \
+torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29521 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_stanfordORB_crosssplit.yaml \
     training.dataset_path = data_samples/processed_stanford_ORB_objaverse_like/test/full_list.txt \

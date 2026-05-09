@@ -169,6 +169,16 @@ class Dataset(Dataset):
         # Check if we should use white_env_0 scene images as albedo instead of loading from albedos folder
         self.white_env_as_albedo = self.config.training.get("white_env_as_albedo", False)
 
+        # Cross-split envmap behavior controls
+        self.cross_split_context_env_mode = str(
+            self.config.training.get("cross_split_context_env_mode", "zeros")
+        ).lower()
+        self.cross_split_fix_envmap_size = bool(
+            self.config.training.get("cross_split_fix_envmap_size", True)
+        )
+        self.cross_split_envmap_h = int(self.config.training.get("cross_split_envmap_h", 256))
+        self.cross_split_envmap_w = int(self.config.training.get("cross_split_envmap_w", 512))
+
 
     def _normalize_base_path(self, path):
         if path is None:
@@ -246,6 +256,17 @@ class Dataset(Dataset):
         scene_name = data_json.get("scene_name", os.path.basename(scene_path).replace(".json", ""))
         return data_json, scene_name, frames, scene_path
 
+    def _resize_env_batch(self, env_batch: torch.Tensor, target_h: int, target_w: int):
+        # env_batch: [v, 3, h, w]
+        if env_batch.shape[-2] == target_h and env_batch.shape[-1] == target_w:
+            return env_batch
+        return torch.nn.functional.interpolate(
+            env_batch,
+            size=(target_h, target_w),
+            mode="bilinear",
+            align_corners=False,
+        )
+
     def _getitem_cross_split(self, idx):
         target_scene_path = self._remap_path(self.all_scene_paths[idx].strip())
         _, scene_name, _, _ = self._load_scene_json(target_scene_path)
@@ -298,18 +319,41 @@ class Dataset(Dataset):
         env_ldr = None
         env_hdr = None
         if self.use_relight_envmap:
-            context_base_dir = self._remap_path(os.path.dirname(os.path.dirname(context_scene_path)))
             target_base_dir = self._remap_path(os.path.dirname(os.path.dirname(relit_scene_path)))
-            context_env_ldr, context_env_hdr = self._load_envmaps_or_zeros(
-                base_dir=context_base_dir,
-                scene_name=context_scene_name,
-                image_indices=context_indices,
-            )
             target_env_ldr, target_env_hdr = self._load_envmaps_or_zeros(
                 base_dir=target_base_dir,
                 scene_name=relit_scene_name,
                 image_indices=target_indices,
             )
+
+            if self.cross_split_fix_envmap_size:
+                target_h = self.cross_split_envmap_h
+                target_w = self.cross_split_envmap_w
+            else:
+                target_h = target_env_ldr.shape[-2]
+                target_w = target_env_ldr.shape[-1]
+
+            target_env_ldr = self._resize_env_batch(target_env_ldr, target_h, target_w)
+            target_env_hdr = self._resize_env_batch(target_env_hdr, target_h, target_w)
+
+            if self.cross_split_context_env_mode == "load":
+                context_base_dir = self._remap_path(os.path.dirname(os.path.dirname(context_scene_path)))
+                context_env_ldr, context_env_hdr = self._load_envmaps_or_zeros(
+                    base_dir=context_base_dir,
+                    scene_name=context_scene_name,
+                    image_indices=context_indices,
+                )
+                context_env_ldr = self._resize_env_batch(context_env_ldr, target_h, target_w)
+                context_env_hdr = self._resize_env_batch(context_env_hdr, target_h, target_w)
+            else:
+                # Default cross-split behavior: no context env exists, so feed zeros.
+                context_env_ldr = torch.zeros(
+                    num_input_views, 3, target_h, target_w, dtype=torch.float32
+                )
+                context_env_hdr = torch.zeros(
+                    num_input_views, 3, target_h, target_w, dtype=torch.float32
+                )
+
             env_ldr = torch.cat([context_env_ldr, target_env_ldr], dim=0)
             env_hdr = torch.cat([context_env_hdr, target_env_hdr], dim=0)
 
