@@ -1,5 +1,5 @@
-# Editor training: general dense relighting at 512x512 image resolution with single env-map sampling.
-# Base: LVSM_scene_encoder_decoder_wEditor_general_dense_512.yaml + single_env_map enabled.
+# Editor training: general dense relighting at 512x512 image resolution.
+# single_env_map / view_selector.min_frame_dist match LVSM_scene_encoder_decoder_wEditor_general_dense.yaml.
 
 model:
   class_name: model.LVSM_scene_encoder_decoder_wEditor.LatentSceneEditor
@@ -49,7 +49,7 @@ training:
   dataset_name: data.dataset_scene.Dataset
   dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt
   whiteEnvInput: false
-  single_env_map: true
+  single_env_map: false  # If true, randomly sample one view's env map instead of using all views
   relight_signals: ["envmap"]
   multi_edit:
     enable: false
@@ -85,7 +85,7 @@ training:
   use_tf32: true
   view_selector:
     max_frame_dist: 60
-    min_frame_dist: 13
+    min_frame_dist: 15
   vis_every: 1000
   wandb_exp_name: LVSM_edit_dense_general_512_lr1e4_singleMap
   wandb_log_every: 50

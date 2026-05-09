@@ -85,7 +85,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.relight_signals = \"[envmap]\" \
     training.warmup = 3000 \
     training.vis_every = 1 \
-    training.lr = 0.0001 \
+    training.lr = 0.0000 \
 "
 
 echo ""
