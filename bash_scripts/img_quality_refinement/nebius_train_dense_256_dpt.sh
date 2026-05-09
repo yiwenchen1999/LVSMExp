@@ -21,7 +21,7 @@ STAGE1_STEPS=${STAGE1_STEPS:-0}
 DISTILL_WEIGHT=${DISTILL_WEIGHT:-0.0}
 BACKBONE_LR_SCALE=${BACKBONE_LR_SCALE:-0.1}
 OG_DATASET_BASE=${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}
-LOCAL_DATASET_BASE=${LOCAL_DATASET_BASE:-/mnt/data-disk}
+LOCAL_DATASET_BASE=${LOCAL_DATASET_BASE:-/mnt/data-disk2}
 
 torchrun --nproc_per_node 8 --nnodes 1 \
     --rdzv_id 28635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
@@ -48,6 +48,6 @@ torchrun --nproc_per_node 8 --nnodes 1 \
     training.dpt_transfer.gate_init.l6 = 0.0 \
     training.dpt_transfer.gate_init.l3 = 0.0 \
     training.dpt_transfer.gate_ramp_steps.l9_start = 0 \
-    training.dpt_transfer.gate_ramp_steps.l6_start = 0 \
-    training.dpt_transfer.gate_ramp_steps.l3_start = 0 \
-    training.dpt_transfer.gate_ramp_steps.ramp_len = 0
+    training.dpt_transfer.gate_ramp_steps.l6_start = 2000 \
+    training.dpt_transfer.gate_ramp_steps.l3_start = 4000 \
+    training.dpt_transfer.gate_ramp_steps.ramp_len = 2000
