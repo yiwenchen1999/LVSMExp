@@ -7,11 +7,17 @@ Convert data_samples/obj_with_light to an Objaverse-like layout:
   <output_root>/train/full_list.txt
   <output_root>/test/images/<scene>/<frame:05d>.png
   <output_root>/test/metadata/<scene>.json
+  <output_root>/test/envmaps/<scene>/<frame:05d>_ldr.png, _hdr.png
   <output_root>/test/full_list.txt
 
 Per scene convention:
   - source <scene>/test/inputs     -> output split=train
   - source <scene>/test (gt_*)     -> output split=test
+
+Envmap handling (test split only):
+  - reads gt_env_<id>.hdr/.exr and gt_world_to_env_<id>.txt
+  - rotates envmap to the corresponding gt_camera_<id>.txt frame
+  - writes Objaverse-style LDR/HDR PNG pairs
 """
 
 import argparse
@@ -21,6 +27,20 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+
+try:
+    import pyexr
+
+    HAS_PYEXR = True
+except ImportError:
+    HAS_PYEXR = False
+
+try:
+    import imageio
+
+    HAS_IMAGEIO = True
+except ImportError:
+    HAS_IMAGEIO = False
 
 
 def read_camera_txt(path: Path):
@@ -106,6 +126,150 @@ def extract_frame_id(name: str, pattern: str):
     return int(m.group(1))
 
 
+def read_env_hdr(path: Path) -> np.ndarray | None:
+    """Read HDR envmap from EXR/HDR file and return float RGB."""
+    suffix = path.suffix.lower()
+    if suffix == ".exr" and HAS_PYEXR:
+        try:
+            rgb = pyexr.read(str(path))
+            if rgb is not None and rgb.ndim >= 3 and rgb.shape[-1] >= 3:
+                return rgb[:, :, :3].astype(np.float64)
+            return None
+        except Exception:
+            return None
+
+    if suffix in (".hdr", ".exr") and HAS_IMAGEIO:
+        try:
+            rgb = imageio.imread(str(path))
+            if rgb is None:
+                return None
+            if rgb.ndim == 2:
+                rgb = np.stack([rgb] * 3, axis=-1)
+            if rgb.ndim >= 3 and rgb.shape[-1] >= 3:
+                return rgb[:, :, :3].astype(np.float64)
+            return None
+        except Exception:
+            return None
+    return None
+
+
+def split_envmap_ldr_hdr(env_raw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Convert linear HDR envmap into Objaverse-style LDR/HDR uint8 PNG arrays."""
+    env_ldr = np.clip(env_raw, 0, 1) ** (1 / 2.2)
+    env_hdr = np.log1p(10 * np.clip(env_raw, 0, None))
+    max_val = float(np.max(env_hdr))
+    if max_val > 1e-8:
+        env_hdr = np.clip(env_hdr / max_val, 0, 1)
+    else:
+        env_hdr = np.clip(env_hdr, 0, 1)
+    return (np.uint8(env_ldr * 255), np.uint8(env_hdr * 255))
+
+
+def read_world_to_env_rotation(path: Path) -> np.ndarray:
+    """Read world_to_env transform and return its 3x3 rotation block."""
+    rows = [list(map(float, line.split())) for line in path.read_text().splitlines() if line.strip()]
+    mat = np.array(rows, dtype=np.float64)
+    if mat.shape == (4, 4):
+        return mat[:3, :3]
+    if mat.shape == (3, 4):
+        return mat[:, :3]
+    if mat.shape == (3, 3):
+        return mat
+    raise ValueError(f"Invalid world_to_env format: {path}, got shape={mat.shape}")
+
+
+def _dirs_from_equirect_uv(height: int, width: int) -> np.ndarray:
+    """
+    Build direction grid for dataset's equirect convention:
+      +Z -> top, -Z -> bottom, +X -> center, +Y -> u=0.25.
+    """
+    u = (np.arange(width, dtype=np.float64) + 0.5) / float(width)
+    v = (np.arange(height, dtype=np.float64) + 0.5) / float(height)
+    uu, vv = np.meshgrid(u, v, indexing="xy")
+
+    phi = (0.5 - uu) * (2.0 * np.pi)
+    theta = vv * np.pi
+    sin_theta = np.sin(theta)
+
+    x = sin_theta * np.cos(phi)
+    y = sin_theta * np.sin(phi)
+    z = np.cos(theta)
+    return np.stack([x, y, z], axis=-1)  # [H, W, 3]
+
+
+def _equirect_uv_from_dirs(dirs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Convert xyz directions to normalized equirect UV in dataset convention."""
+    x = dirs[..., 0]
+    y = dirs[..., 1]
+    z = np.clip(dirs[..., 2], -1.0, 1.0)
+    phi = np.arctan2(y, x)
+    theta = np.arccos(z)
+    u = np.mod(0.5 - phi / (2.0 * np.pi), 1.0)
+    v = np.clip(theta / np.pi, 0.0, 1.0)
+    return u, v
+
+
+def _sample_equirect_bilinear(env: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Bilinear sample equirect image; wraps horizontally and clamps vertically."""
+    h, w = env.shape[:2]
+    x = u * w - 0.5
+    y = v * h - 0.5
+
+    x0 = np.floor(x).astype(np.int64)
+    y0 = np.floor(y).astype(np.int64)
+    x1 = x0 + 1
+    y1 = y0 + 1
+
+    wx = (x - x0)[..., None]
+    wy = (y - y0)[..., None]
+
+    x0 = np.mod(x0, w)
+    x1 = np.mod(x1, w)
+    y0 = np.clip(y0, 0, h - 1)
+    y1 = np.clip(y1, 0, h - 1)
+
+    Ia = env[y0, x0]
+    Ib = env[y0, x1]
+    Ic = env[y1, x0]
+    Id = env[y1, x1]
+
+    top = Ia * (1.0 - wx) + Ib * wx
+    bottom = Ic * (1.0 - wx) + Id * wx
+    return top * (1.0 - wy) + bottom * wy
+
+
+def rotate_envmap_to_camera(env_raw: np.ndarray, R_w2env: np.ndarray, R_w2c: np.ndarray) -> np.ndarray:
+    """
+    Rotate per-frame envmap into the corresponding camera coordinate frame.
+    Uses world_to_env and world_to_camera rotations.
+    """
+    h, w = env_raw.shape[:2]
+    dirs_cam = _dirs_from_equirect_uv(h, w)
+
+    # d_env = R_w2env * d_world, d_world = R_c2w * d_cam
+    # => d_env = (R_w2env * R_c2w) * d_cam
+    R_c2w = R_w2c.T
+    R_cam2env = R_w2env @ R_c2w
+
+    dirs_env = dirs_cam @ R_cam2env.T
+
+    # Align camera-frame convention with envmap convention used by obj_with_light.
+    # Keep upside-down behavior here (z flip). Left-right flip is applied later on
+    # fully processed outputs (LDR/HDR), per user request.
+    axis_fix = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, -1.0],
+        ],
+        dtype=np.float64,
+    )
+    dirs_env = dirs_env @ axis_fix.T
+
+    u_src, v_src = _equirect_uv_from_dirs(dirs_env)
+    return _sample_equirect_bilinear(env_raw, u_src, v_src)
+
+
 def process_split(
     scene_name: str,
     src_img_dir: Path,
@@ -118,11 +282,16 @@ def process_split(
     split: str,
     target_size: int,
     apply_mask: bool,
+    enable_test_envmaps: bool,
 ):
     out_images_dir = output_root / split / "images" / scene_name
     out_meta_dir = output_root / split / "metadata"
+    process_test_envmaps = split == "test" and enable_test_envmaps
+    out_envmaps_dir = output_root / split / "envmaps" / scene_name
     out_images_dir.mkdir(parents=True, exist_ok=True)
     out_meta_dir.mkdir(parents=True, exist_ok=True)
+    if process_test_envmaps:
+        out_envmaps_dir.mkdir(parents=True, exist_ok=True)
 
     img_pattern = rf"{re.escape(img_prefix)}(\d+)\.png$"
     cam_pattern = rf"{re.escape(cam_prefix)}(\d+)\.txt$"
@@ -147,6 +316,22 @@ def process_split(
             if fid is not None:
                 mask_map[fid] = p
 
+    env_map = {}
+    env_w2e_map = {}
+    if process_test_envmaps:
+        for p in src_img_dir.glob("gt_env_*.hdr"):
+            fid = extract_frame_id(p.name, r"gt_env_(\d+)\.hdr$")
+            if fid is not None:
+                env_map[fid] = p
+        for p in src_img_dir.glob("gt_env_*.exr"):
+            fid = extract_frame_id(p.name, r"gt_env_(\d+)\.exr$")
+            if fid is not None:
+                env_map[fid] = p
+        for p in src_img_dir.glob("gt_world_to_env_*.txt"):
+            fid = extract_frame_id(p.name, r"gt_world_to_env_(\d+)\.txt$")
+            if fid is not None:
+                env_w2e_map[fid] = p
+
     common_ids = sorted(set(img_map.keys()) & set(cam_map.keys()))
     if apply_mask:
         common_ids = sorted(set(common_ids) & set(mask_map.keys()))
@@ -154,6 +339,8 @@ def process_split(
         return None
 
     frames = []
+    n_env_written = 0
+    n_env_skipped = 0
     for out_idx, fid in enumerate(common_ids):
         src_img = img_map[fid]
         src_cam = cam_map[fid]
@@ -168,9 +355,35 @@ def process_split(
         Image.fromarray(rgb_out).save(out_img)
         frames.append(build_frame_entry(out_img, K_out, w2c))
 
+        if process_test_envmaps:
+            env_path = env_map.get(fid)
+            w2e_path = env_w2e_map.get(fid)
+            if env_path is None or w2e_path is None:
+                n_env_skipped += 1
+            else:
+                env_raw = read_env_hdr(env_path)
+                if env_raw is None:
+                    n_env_skipped += 1
+                else:
+                    try:
+                        R_w2env = read_world_to_env_rotation(w2e_path)
+                        R_w2c = w2c[:3, :3]
+                        env_rot = rotate_envmap_to_camera(env_raw, R_w2env, R_w2c)
+                        env_ldr, env_hdr = split_envmap_ldr_hdr(env_rot)
+                        # Apply left-right flip on fully processed envmaps (not on source envmap).
+                        env_ldr = np.flip(env_ldr, axis=1).copy()
+                        env_hdr = np.flip(env_hdr, axis=1).copy()
+                        Image.fromarray(env_ldr).save(out_envmaps_dir / f"{out_idx:05d}_ldr.png")
+                        Image.fromarray(env_hdr).save(out_envmaps_dir / f"{out_idx:05d}_hdr.png")
+                        n_env_written += 1
+                    except Exception:
+                        n_env_skipped += 1
+
     scene_meta = {"scene_name": scene_name, "frames": frames}
     out_json = out_meta_dir / f"{scene_name}.json"
     out_json.write_text(json.dumps(scene_meta, indent=2))
+    if process_test_envmaps:
+        print(f"  [Env] {scene_name}/{split}: written={n_env_written}, skipped={n_env_skipped}")
     return out_json
 
 
@@ -232,6 +445,10 @@ def main():
     if not input_root.exists():
         raise FileNotFoundError(f"Input root does not exist: {input_root}")
 
+    envmap_enabled = HAS_PYEXR or HAS_IMAGEIO
+    if not envmap_enabled:
+        print("[Warn] Neither pyexr nor imageio found. test envmap export will be skipped.")
+
     scene_dirs = [d for d in sorted(input_root.iterdir()) if d.is_dir()]
     if not scene_dirs:
         print(f"[Warn] No scene folders found under {input_root}")
@@ -259,6 +476,7 @@ def main():
             split="train",
             target_size=args.target_size,
             apply_mask=args.apply_mask,
+            enable_test_envmaps=envmap_enabled,
         )
         if train_json is not None:
             n_train += 1
@@ -275,6 +493,7 @@ def main():
             split="test",
             target_size=args.target_size,
             apply_mask=args.apply_mask,
+            enable_test_envmaps=envmap_enabled,
         )
         if test_json is not None:
             n_test += 1
