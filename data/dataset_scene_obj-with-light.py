@@ -289,25 +289,33 @@ class Dataset(Dataset):
         scene_scale_factor = self.config.training.get("scene_scale_factor", 1.35)
         input_c2ws = self.preprocess_poses(input_c2ws, scene_scale_factor)
 
-        # Relit supervision uses the test split of the same scene with the same frame indices.
-        relit_paths = [self._remap_path(target_frames[i]["image_path"]) for i in all_indices]
-        relit_frames_chosen = [target_frames[i] for i in all_indices]
-        relit_images, _, _ = self.preprocess_frames(relit_frames_chosen, relit_paths)
+        # Relit supervision: only target views from test split are meaningful.
+        # For context views (sampled from train split), use zero placeholders.
+        relit_target_images = target_images.clone()
+        relit_context_zeros = torch.zeros_like(context_images)
+        relit_images = torch.cat([relit_context_zeros, relit_target_images], dim=0)
 
         env_ldr = None
         env_hdr = None
         if self.use_relight_envmap:
             target_base_dir = self._remap_path(os.path.dirname(os.path.dirname(target_scene_path)))
-            env_ldr, env_hdr = self._load_envmaps_or_zeros(
+            target_env_ldr, target_env_hdr = self._load_envmaps_or_zeros(
                 base_dir=target_base_dir,
                 scene_name=target_scene_name,
-                image_indices=all_indices,
+                image_indices=target_indices,
             )
             if self.cross_split_fix_envmap_size:
                 target_h = self.cross_split_envmap_h
                 target_w = self.cross_split_envmap_w
-                env_ldr = self._resize_env_batch(env_ldr, target_h, target_w)
-                env_hdr = self._resize_env_batch(env_hdr, target_h, target_w)
+                target_env_ldr = self._resize_env_batch(target_env_ldr, target_h, target_w)
+                target_env_hdr = self._resize_env_batch(target_env_hdr, target_h, target_w)
+
+            env_h = target_env_ldr.shape[-2]
+            env_w = target_env_ldr.shape[-1]
+            context_env_ldr = torch.zeros(num_input_views, 3, env_h, env_w, dtype=torch.float32)
+            context_env_hdr = torch.zeros(num_input_views, 3, env_h, env_w, dtype=torch.float32)
+            env_ldr = torch.cat([context_env_ldr, target_env_ldr], dim=0)
+            env_hdr = torch.cat([context_env_hdr, target_env_hdr], dim=0)
 
         point_light_rays = None
         if self.use_relight_point_light:
