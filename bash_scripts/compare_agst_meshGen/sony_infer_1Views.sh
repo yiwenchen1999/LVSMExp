@@ -36,7 +36,7 @@ export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/test_relight_2view/ckpt_0000000000
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_256}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_256_lr1e4_singleMap}"
 export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-2}"
-export NUM_TARGET_VIEWS="${NUM_TARGET_VIEWS:-4}"
+export NUM_TARGET_VIEWS="${NUM_TARGET_VIEWS:-8}"
 export SINGLE_VIEW_INPUT_MODE="${SINGLE_VIEW_INPUT_MODE:-true}"
 
 ############################ls
@@ -95,8 +95,8 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.single_view_input_mode = $SINGLE_VIEW_INPUT_MODE \
     training.resume_ckpt = \"$RESUME_CKPT\" \
     training.reset_training_state = true \
-    training.num_views = 6 \
-    training.max_frame_dist = 30 \
+    training.num_views = 10 \
+    training.max_frame_dist = 100 \
     training.warmup = 3000 \
     training.vis_every = 1 \
     training.lr = 0.0000 \

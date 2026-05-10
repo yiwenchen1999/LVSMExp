@@ -13,6 +13,8 @@ Expected per-iter files:
 Outputs:
   <run_name>_flattened/<scene>_iter_XXXXXXXX.jpg
   single_image/<run_name>/<scene>/iter_XXXXXXXX/...
+      Also: camera_poses.json, camera_context/target_view_XX.json;
+      target_envldr_view_XX.jpg, target_envhdr_view_XX.png, context_* similarly (when source strips exist).
 """
 
 from __future__ import annotations
@@ -111,12 +113,12 @@ def write_camera_splits(iter_dir: Path, stem: str, out_scene_iter: Path) -> None
     data = json.loads(src.read_text(encoding="utf-8"))
     scene_name = str(data.get("scene_name", ""))
     for i, entry in enumerate(data.get("context_views", []), start=1):
-        payload = {"scene_name": scene_name, "role": "context", **entry}
+        payload = {**entry, "scene_name": scene_name, "role": "context"}
         (out_scene_iter / f"camera_context_view_{i:02d}.json").write_text(
             json.dumps(payload, indent=2), encoding="utf-8"
         )
     for i, entry in enumerate(data.get("target_views", []), start=1):
-        payload = {"scene_name": scene_name, "role": "target", **entry}
+        payload = {**entry, "scene_name": scene_name, "role": "target"}
         (out_scene_iter / f"camera_target_view_{i:02d}.json").write_text(
             json.dumps(payload, indent=2), encoding="utf-8"
         )

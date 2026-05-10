@@ -13,7 +13,9 @@ Outputs under the same parent as infer_*:
 
   (2) single_image / infer_* / <scene_stem> / iter_XXXXXXXX /
       Split tiles: input_view_00..(N-1), view_01_* … (names adjusted to n_views),
-      plus envldr_view_01..N when envldr_<scene>.jpg exists.
+      plus envldr_view_01..N when envldr_<scene> exists (legacy),
+      target_envldr_*/target_envhdr_*/context_envldr_*/context_envhdr_* per-view when present,
+      camera_poses.json + camera_*_view_XX.json when camera_poses_<scene>.json exists.
 
 Usage (default --base is repo/result_previews/resolution_comparisons):
   bash bash_scripts/img_quality_refinement/reorganize_resolution_comparison_previews.sh
@@ -24,6 +26,8 @@ Usage (default --base is repo/result_previews/resolution_comparisons):
 from __future__ import annotations
 
 import argparse
+import json
+import shutil
 from pathlib import Path
 
 from PIL import Image
@@ -121,6 +125,85 @@ def split_envldr_strip(path: Path, n_views: int, tile_h_ref: int) -> list[Image.
         x0 = i * tile_w
         tiles.append(im.crop((x0, 0, x0 + tile_w, h)))
     return tiles
+
+
+def split_equal_width_strip(path: Path, n_parts: int, crop_height: int | None = None) -> list[Image.Image]:
+    """Split a horizontal strip into n_parts equal tiles (optional height crop from top)."""
+    if n_parts <= 0:
+        raise ValueError(f"{path}: invalid n_parts={n_parts}")
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    if crop_height is not None and h != crop_height:
+        im = im.crop((0, 0, w, crop_height))
+        w, h = im.size
+    if w % n_parts != 0:
+        raise ValueError(f"{path}: width {w} not divisible by n_parts {n_parts}")
+    tw = w // n_parts
+    tiles = []
+    for i in range(n_parts):
+        x0 = i * tw
+        tiles.append(im.crop((x0, 0, x0 + tw, h)))
+    return tiles
+
+
+def first_existing(paths: list[Path]) -> Path | None:
+    for p in paths:
+        if p.is_file():
+            return p
+    return None
+
+
+def write_camera_splits(iter_dir: Path, stem: str, out_scene_iter: Path) -> None:
+    src = iter_dir / f"camera_poses_{stem}.json"
+    if not src.is_file():
+        return
+    shutil.copy2(src, out_scene_iter / "camera_poses.json")
+    data = json.loads(src.read_text(encoding="utf-8"))
+    scene_name = str(data.get("scene_name", ""))
+    for i, entry in enumerate(data.get("context_views", []), start=1):
+        payload = {**entry, "scene_name": scene_name, "role": "context"}
+        (out_scene_iter / f"camera_context_view_{i:02d}.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+    for i, entry in enumerate(data.get("target_views", []), start=1):
+        payload = {**entry, "scene_name": scene_name, "role": "target"}
+        (out_scene_iter / f"camera_target_view_{i:02d}.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+
+
+def write_split_named_env_strips(
+    iter_dir: Path,
+    stem: str,
+    out_scene_iter: Path,
+    n_input: int,
+    n_target: int,
+) -> None:
+    specs: list[tuple[str, int, str]] = [
+        ("target_envldr", n_target, ".jpg"),
+        ("target_envhdr", n_target, ".png"),
+        ("context_envldr", n_input, ".jpg"),
+        ("context_envhdr", n_input, ".png"),
+    ]
+    for name_prefix, n_parts, ext in specs:
+        if n_parts <= 0:
+            continue
+        path = first_existing(
+            [iter_dir / f"{name_prefix}_{stem}.png", iter_dir / f"{name_prefix}_{stem}.jpg"]
+        )
+        if path is None:
+            continue
+        try:
+            tiles = split_equal_width_strip(path, n_parts, crop_height=None)
+        except ValueError as e:
+            print(f"Warning: skip {path}: {e}")
+            continue
+        for v, tile in enumerate(tiles, start=1):
+            out_p = out_scene_iter / f"{name_prefix}_view_{v:02d}{ext}"
+            if ext == ".png":
+                tile.save(out_p, compress_level=6)
+            else:
+                tile.save(out_p, quality=95)
 
 
 def hstack(images: list[Image.Image]) -> Image.Image:
@@ -242,6 +325,10 @@ def write_single_scene(
         env_tiles = split_envldr_strip(env_path, n_views, th_in)
         for v, tile in enumerate(env_tiles):
             tile.save(out_scene_iter / f"envldr_view_{v + 1:02d}.jpg", quality=95)
+
+    num_input = len(in_tiles)
+    write_split_named_env_strips(iter_dir, stem, out_scene_iter, num_input, n_views)
+    write_camera_splits(iter_dir, stem, out_scene_iter)
 
 
 def process_infer_dir(base: Path, infer_name: str, dry_run: bool, num_input_views: int) -> None:

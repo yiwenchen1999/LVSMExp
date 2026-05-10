@@ -85,11 +85,11 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.relight_signals = \"[envmap]\" \
     training.num_input_views = 2 \
-    training.num_target_views = 4 \
+    training.num_target_views = 8 \
     training.resume_ckpt = \"$RESUME_CKPT\" \
     training.reset_training_state = true \
-    training.num_views = 6 \
-    training.max_frame_dist = 30 \
+    training.num_views = 10 \
+    training.max_frame_dist = 100 \
     training.warmup = 3000 \
     training.vis_every = 1 \
     training.lr = 0.0000 \
