@@ -20,6 +20,9 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.dataset_path = /projects/vig/Datasets/stanfordORB/lvsm_stanford_orb/train/full_list.txt \
     training.checkpoint_dir = ckpt/realworld_exps \
     training.wandb_exp_name = realworld_exps \
+    training.num_input_views = 16 \
+    training.num_target_views = 1 \
+    training.num_views = 17 \
     training.warmup = 3000 \
-    training.vis_every = 1000 \
+    training.vis_every = 1 \
     training.lr = 0.0001

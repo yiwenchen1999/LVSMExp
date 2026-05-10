@@ -13,7 +13,7 @@ export HF_HOME=/projects/vig/yiwenc/caches
 export HF_ACCELERATE_CONFIG_DIR=/projects/vig/yiwenc/caches/accelerate
 
 torchrun --nproc_per_node 1 --nnodes 1 \
-    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29522 \
+    --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29524 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_obj-with-light_crosssplit.yaml \
     training.dataset_path = /projects/vig/Datasets/obj-with-light/lvsm_format/test/full_list.txt \
     training.context_dataset_path = /projects/vig/Datasets/obj-with-light/lvsm_format/train/full_list.txt \
@@ -24,6 +24,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.wandb_exp_name = test_relight_obj-with-light \
     training.num_input_views = 16 \
     training.num_target_views = 1 \
+    training.batch_size_per_gpu = 1 \
     training.num_views = 17 \
     training.warmup = 1500 \
     training.vis_every = 1 \

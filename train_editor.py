@@ -399,36 +399,41 @@ lr_scheduler = create_lr_scheduler(
 print(f"------3.0 optimizer set up------")
 
 
-# Load checkpoint: if checkpoint_dir exists, load directly; otherwise use LVSM_checkpoint_dir for initialization
-if config.training.get("checkpoint_dir", "") and os.path.exists(config.training.checkpoint_dir):
-    # Check if checkpoint exists in checkpoint_dir
-    ckpt_files = [f for f in os.listdir(config.training.checkpoint_dir) if f.endswith(".pt")] if os.path.isdir(config.training.checkpoint_dir) else []
-    if ckpt_files or os.path.isfile(config.training.checkpoint_dir):
-        # Directly load from checkpoint_dir
-        if config.training.get("resume_ckpt", "") != "":
-            ckpt_load_path = config.training.resume_ckpt
-        else:
-            ckpt_load_path = config.training.checkpoint_dir
-        reset_training_state = config.training.get("reset_training_state", False)
-        optimizer, lr_scheduler, cur_train_step, cur_param_update_step = auto_resume_job(
-            ckpt_load_path,
-            model,
-            optimizer,
-            lr_scheduler,
-            reset_training_state,
-        )
-        print(f"------4.0 checkpoint loaded from {ckpt_load_path} and training state resumed------")
-    else:
-        # No checkpoint in checkpoint_dir, but we already initialized from LVSM if LVSM_checkpoint_dir was provided
-        # Start from scratch with initialized weights
-        cur_train_step = 0
-        cur_param_update_step = 0
-        print(f"------4.0 no checkpoint found in checkpoint_dir, starting from initialized weights------")
+# Load checkpoint: prefer continuing from checkpoint_dir; if none yet, use resume_ckpt (e.g. 256->512 transfer).
+checkpoint_dir = config.training.get("checkpoint_dir", "") or ""
+resume_ckpt = config.training.get("resume_ckpt", "") or ""
+has_output_ckpt = False
+if checkpoint_dir and os.path.exists(checkpoint_dir):
+    if os.path.isdir(checkpoint_dir):
+        ckpt_files = [f for f in os.listdir(checkpoint_dir) if f.endswith(".pt")]
+        has_output_ckpt = len(ckpt_files) > 0
+    elif os.path.isfile(checkpoint_dir) and checkpoint_dir.endswith(".pt"):
+        has_output_ckpt = True
+
+if has_output_ckpt:
+    ckpt_load_path = checkpoint_dir
+elif resume_ckpt:
+    ckpt_load_path = resume_ckpt
 else:
-    # No checkpoint_dir, start fresh (may have been initialized from LVSM)
+    ckpt_load_path = None
+
+if ckpt_load_path:
+    reset_training_state = config.training.get("reset_training_state", False)
+    optimizer, lr_scheduler, cur_train_step, cur_param_update_step = auto_resume_job(
+        ckpt_load_path,
+        model,
+        optimizer,
+        lr_scheduler,
+        reset_training_state,
+    )
+    print(f"------4.0 checkpoint loaded from {ckpt_load_path} and training state resumed------")
+else:
     cur_train_step = 0
     cur_param_update_step = 0
-    print(f"------4.0 no checkpoint_dir specified, starting fresh------")
+    if checkpoint_dir:
+        print(f"------4.0 no checkpoint to load (empty checkpoint_dir and no resume_ckpt), using initialized weights------")
+    else:
+        print(f"------4.0 no checkpoint_dir specified, starting fresh------")
 
 enable_grad_scaler = config.training.use_amp and config.training.amp_dtype == "fp16"
 scaler = torch.amp.GradScaler('cuda', enabled=enable_grad_scaler)
