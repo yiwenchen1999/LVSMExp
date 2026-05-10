@@ -81,7 +81,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CKPT_DIR\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
-    training.wandb_exp_name = \"$WANDB_EXP_NAME\
+    training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.relight_signals = \"[envmap]\" \
     training.num_input_views = 2 \
     training.num_target_views = 4 \
