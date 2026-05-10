@@ -26,6 +26,7 @@ DISTILL_WEIGHT=${DISTILL_WEIGHT:-0.0}
 BACKBONE_LR_SCALE=${BACKBONE_LR_SCALE:-1}
 OG_DATASET_BASE=${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}
 LOCAL_DATASET_BASE=${LOCAL_DATASET_BASE:-/mnt/data-disk2}
+DATALOADER_SEED=${DATALOADER_SEED:-779}
 
 RESUME_CKPT=${RESUME_CKPT:-ckpt/dpt_decoder_512/ckpt_0000000000002000.pt}
 CHECKPOINT_DIR=${CHECKPOINT_DIR:-ckpt/dpt_decoder_512_1e5}
@@ -44,6 +45,7 @@ torchrun --nproc_per_node 8 --nnodes 1 \
     training.lr = 0.00001 \
     training.og_dataset_base = ${OG_DATASET_BASE} \
     training.local_dataset_base = ${LOCAL_DATASET_BASE} \
+    training.seed = ${DATALOADER_SEED} \
     training.reset_training_state = true \
     training.dpt_transfer.enabled = true \
     training.dpt_transfer.train_stage = ${TRAIN_STAGE} \

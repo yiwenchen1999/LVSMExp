@@ -263,8 +263,10 @@ print(f"------0.0.1 relight_signals: {config.training.relight_signals}------")
 
 os.environ["OMP_NUM_THREADS"] = str(config.training.get("num_threads", 1))
 
-# Set up DDP for training/inference and Fix random seed
-ddp_info = init_distributed(seed=777)
+# Set up DDP for training/inference and fix random seed.
+# Allow per-experiment override from config (e.g. training.seed=779 in launch script).
+training_seed = int(config.training.get("seed", 777))
+ddp_info = init_distributed(seed=training_seed)
 dist.barrier()
 
 # Set up wandb and backup source code
