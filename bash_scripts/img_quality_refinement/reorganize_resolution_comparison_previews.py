@@ -2,8 +2,8 @@
 """
 Reorganize resolution comparison previews (infer_256 / infer_512):
 
-  infer_* / iter_* / input_<scene>.jpg       — 4 context views stitched horizontally
-  infer_* / iter_* / supervision_<scene>.jpg — 8 target views × (gt | relit_gt | pred)
+  infer_* / iter_* / input_<scene>.jpg       — N context views stitched horizontally (default N=4; use --num-input-views)
+  infer_* / iter_* / supervision_<scene>.jpg — M target views × (gt | relit_gt | pred) per view
 
 Outputs under the same parent as infer_*:
 
@@ -12,7 +12,7 @@ Outputs under the same parent as infer_*:
       row4 pred — all files live directly under infer_*_flattened (no iter_* subfolders).
 
   (2) single_image / infer_* / <scene_stem> / iter_XXXXXXXX /
-      Split tiles: input_view_00..03, view_01_gt … view_08_pred (names adjusted to n_views),
+      Split tiles: input_view_00..(N-1), view_01_* … (names adjusted to n_views),
       plus envldr_view_01..N when envldr_<scene>.jpg exists.
 
 Usage (default --base is repo/result_previews/resolution_comparisons):
@@ -52,18 +52,27 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print planned outputs only.",
     )
+    p.add_argument(
+        "--num-input-views",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Number of context views in the horizontal input strip (default: 4; mesh-gen 2-view uses 2).",
+    )
     return p.parse_args()
 
 
-def split_input_strip(path: Path) -> tuple[list[Image.Image], int, int]:
-    """4 context views stitched horizontally; tile_w = W // 4."""
+def split_input_strip(path: Path, num_input_views: int) -> tuple[list[Image.Image], int, int]:
+    """N context views stitched horizontally; tile_w = W // N."""
+    if num_input_views < 1:
+        raise ValueError(f"num_input_views must be >= 1, got {num_input_views}")
     im = Image.open(path).convert("RGB")
     w, h = im.size
-    if w % 4 != 0:
-        raise ValueError(f"{path}: input width {w} not divisible by 4")
-    tw = w // 4
+    if w % num_input_views != 0:
+        raise ValueError(f"{path}: input width {w} not divisible by num_input_views={num_input_views}")
+    tw = w // num_input_views
     tiles = []
-    for i in range(4):
+    for i in range(num_input_views):
         tiles.append(im.crop((i * tw, 0, (i + 1) * tw, h)))
     return tiles, tw, h
 
@@ -163,6 +172,7 @@ def scene_stems(iter_dir: Path) -> list[str]:
 def build_scene_column(
     iter_dir: Path,
     stem: str,
+    num_input_views: int,
 ) -> tuple[Image.Image, int, int, int]:
     """Returns (4-row RGB image, tile_w, tile_h, n_views)."""
     inp_path = next(p for p in (iter_dir / f"input_{stem}.jpg", iter_dir / f"input_{stem}.png") if p.exists())
@@ -170,7 +180,7 @@ def build_scene_column(
         p for p in (iter_dir / f"supervision_{stem}.jpg", iter_dir / f"supervision_{stem}.png") if p.exists()
     )
 
-    in_tiles, tw_in, th_in = split_input_strip(inp_path)
+    in_tiles, tw_in, th_in = split_input_strip(inp_path, num_input_views)
     sup_tiles, n_views = split_supervision_strip(sup_path, tw_in, th_in)
 
     row1 = hstack(in_tiles)
@@ -197,6 +207,7 @@ def write_single_scene(
     stem: str,
     out_scene_iter: Path,
     n_views_ref: int,
+    num_input_views: int,
     dry_run: bool,
 ) -> None:
     inp_path = next(p for p in (iter_dir / f"input_{stem}.jpg", iter_dir / f"input_{stem}.png") if p.exists())
@@ -204,7 +215,7 @@ def write_single_scene(
         p for p in (iter_dir / f"supervision_{stem}.jpg", iter_dir / f"supervision_{stem}.png") if p.exists()
     )
 
-    in_tiles, tw_in, th_in = split_input_strip(inp_path)
+    in_tiles, tw_in, th_in = split_input_strip(inp_path, num_input_views)
     sup_tiles, n_views = split_supervision_strip(sup_path, tw_in, th_in)
     if n_views != n_views_ref:
         raise ValueError(f"{iter_dir}: view count mismatch for {stem}: {n_views} vs {n_views_ref}")
@@ -233,7 +244,7 @@ def write_single_scene(
             tile.save(out_scene_iter / f"envldr_view_{v + 1:02d}.jpg", quality=95)
 
 
-def process_infer_dir(base: Path, infer_name: str, dry_run: bool) -> None:
+def process_infer_dir(base: Path, infer_name: str, dry_run: bool, num_input_views: int) -> None:
     infer_dir = base / infer_name
     if not infer_dir.is_dir():
         print(f"Skip (missing): {infer_dir}")
@@ -257,7 +268,7 @@ def process_infer_dir(base: Path, infer_name: str, dry_run: bool) -> None:
 
         n_views: int | None = None
         for stem in stems:
-            col, _, _, nv = build_scene_column(it, stem)
+            col, _, _, nv = build_scene_column(it, stem, num_input_views)
             if n_views is None:
                 n_views = nv
             elif nv != n_views:
@@ -272,7 +283,7 @@ def process_infer_dir(base: Path, infer_name: str, dry_run: bool) -> None:
 
         for stem in stems:
             out_si = single_root / stem / it.name
-            write_single_scene(it, stem, out_si, int(n_views), dry_run)
+            write_single_scene(it, stem, out_si, int(n_views), num_input_views, dry_run)
 
     if not dry_run:
         print(f"Flattened grids: {flat_dir}")
@@ -287,7 +298,7 @@ def main() -> None:
 
     for name in args.infer:
         print(f"=== {name} ===")
-        process_infer_dir(base, name, args.dry_run)
+        process_infer_dir(base, name, args.dry_run, args.num_input_views)
 
     print("Done.")
 

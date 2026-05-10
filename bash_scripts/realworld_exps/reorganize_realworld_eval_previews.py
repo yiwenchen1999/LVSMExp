@@ -5,7 +5,10 @@ Reorganize realworld eval previews under result_previews/realworld_eval.
 Expected per-iter files:
   input_<scene>.jpg/png
   supervision_<scene>.jpg/png
-  envldr_<scene>.jpg/png   (optional)
+  envldr_<scene>.jpg/png   (optional, legacy)
+  target_envldr_<scene>.png, target_envhdr_<scene>.png   (optional; from metric_utils)
+  context_envldr_<scene>.png, context_envhdr_<scene>.png   (optional)
+  camera_poses_<scene>.json   (optional)
 
 Outputs:
   <run_name>_flattened/<scene>_iter_XXXXXXXX.jpg
@@ -15,6 +18,8 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import json
+import shutil
 from pathlib import Path
 
 from PIL import Image
@@ -88,6 +93,68 @@ def split_envldr_strip(path: Path, n_views: int) -> list[Image.Image]:
         x0 = i * tile_w
         tiles.append(im.crop((x0, 0, x0 + tile_w, h)))
     return tiles
+
+
+def first_existing(paths: list[Path]) -> Path | None:
+    for p in paths:
+        if p.is_file():
+            return p
+    return None
+
+
+def write_camera_splits(iter_dir: Path, stem: str, out_scene_iter: Path) -> None:
+    """Copy full camera_poses JSON and write per-view context/target JSON slices."""
+    src = iter_dir / f"camera_poses_{stem}.json"
+    if not src.is_file():
+        return
+    shutil.copy2(src, out_scene_iter / "camera_poses.json")
+    data = json.loads(src.read_text(encoding="utf-8"))
+    scene_name = str(data.get("scene_name", ""))
+    for i, entry in enumerate(data.get("context_views", []), start=1):
+        payload = {"scene_name": scene_name, "role": "context", **entry}
+        (out_scene_iter / f"camera_context_view_{i:02d}.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+    for i, entry in enumerate(data.get("target_views", []), start=1):
+        payload = {"scene_name": scene_name, "role": "target", **entry}
+        (out_scene_iter / f"camera_target_view_{i:02d}.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+
+
+def write_split_env_strips(
+    iter_dir: Path,
+    stem: str,
+    out_scene_iter: Path,
+    n_input: int,
+    n_target: int,
+) -> None:
+    """Split metric_utils env strips (LDR/HDR, context/target) into per-view files."""
+    specs: list[tuple[str, int, str]] = [
+        ("target_envldr", n_target, ".jpg"),
+        ("target_envhdr", n_target, ".png"),
+        ("context_envldr", n_input, ".jpg"),
+        ("context_envhdr", n_input, ".png"),
+    ]
+    for name_prefix, n_parts, ext in specs:
+        if n_parts <= 0:
+            continue
+        path = first_existing(
+            [iter_dir / f"{name_prefix}_{stem}.png", iter_dir / f"{name_prefix}_{stem}.jpg"]
+        )
+        if path is None:
+            continue
+        try:
+            tiles = split_envldr_strip(path, n_parts)
+        except ValueError as e:
+            print(f"Warning: skip {path}: {e}")
+            continue
+        for v, tile in enumerate(tiles, start=1):
+            out_p = out_scene_iter / f"{name_prefix}_view_{v:02d}{ext}"
+            if ext == ".png":
+                tile.save(out_p, compress_level=6)
+            else:
+                tile.save(out_p, quality=95)
 
 
 def hstack(images: list[Image.Image]) -> Image.Image:
@@ -183,6 +250,9 @@ def write_single_scene(iter_dir: Path, stem: str, out_scene_iter: Path, dry_run:
     if env_path is not None:
         for v, tile in enumerate(split_envldr_strip(env_path, n_views)):
             tile.save(out_scene_iter / f"envldr_view_{v + 1:02d}.jpg", quality=95)
+
+    write_split_env_strips(iter_dir, stem, out_scene_iter, len(in_tiles), n_views)
+    write_camera_splits(iter_dir, stem, out_scene_iter)
 
 
 def process_run_dir(base: Path, run_name: str, dry_run: bool) -> None:
