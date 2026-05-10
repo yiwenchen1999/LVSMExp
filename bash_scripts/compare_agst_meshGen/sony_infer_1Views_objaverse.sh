@@ -32,7 +32,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/test/full_list.txt}"
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/test_relight_1view_objaverse}"
-export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/test_relight_2view/ckpt_0000000000026000.pt}"
+export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/relight_result_256/ckpt_0000000000026000.pt}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_256}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_256_lr1e4_singleMap}"
 export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-2}"
