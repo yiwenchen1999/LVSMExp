@@ -89,7 +89,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.resume_ckpt = \"$RESUME_CKPT\" \
     training.reset_training_state = true \
     training.num_views = 10 \
-    training.max_frame_dist = 100 \
+    training.max_frame_dist = 50 \
     training.warmup = 3000 \
     training.vis_every = 1 \
     training.lr = 0.0000 \
