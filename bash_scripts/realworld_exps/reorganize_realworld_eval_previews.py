@@ -13,6 +13,7 @@ Expected per-iter files:
 Outputs:
   <run_name>_flattened/<scene>_iter_XXXXXXXX.jpg
   single_image/<run_name>/<scene>/iter_XXXXXXXX/...
+      input_view_XX.jpg, input512_view_XX.png (if input512_* exists)
       Also: camera_poses.json, camera_context/target_view_XX.json;
       target_envldr_view_XX.jpg, target_envhdr_view_XX.png, context_* similarly (when source strips exist).
 """
@@ -49,12 +50,28 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def split_input_strip(path: Path, tile_w: int) -> tuple[list[Image.Image], int]:
+def infer_input_view_count(path: Path) -> int:
+    """Infer number of input views from strip width/height ratio."""
     im = Image.open(path).convert("RGB")
     w, h = im.size
-    if w % tile_w != 0:
-        raise ValueError(f"{path}: input width {w} not divisible by tile_w {tile_w}")
-    n_inputs = w // tile_w
+    if h <= 0:
+        raise ValueError(f"{path}: invalid image height {h}")
+    ratio = w / h
+    n_views = int(round(ratio))
+    if n_views <= 0:
+        raise ValueError(f"{path}: invalid inferred n_views={n_views} from ratio={ratio:.4f}")
+    return n_views
+
+
+def split_input_strip(path: Path, expected_n_views: int | None = None) -> tuple[list[Image.Image], int]:
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    n_inputs = expected_n_views if expected_n_views is not None else infer_input_view_count(path)
+    if n_inputs <= 0:
+        raise ValueError(f"{path}: invalid n_inputs={n_inputs}")
+    if w % n_inputs != 0:
+        raise ValueError(f"{path}: input width {w} not divisible by n_inputs {n_inputs}")
+    tile_w = w // n_inputs
     tiles = []
     for i in range(n_inputs):
         tiles.append(im.crop((i * tile_w, 0, (i + 1) * tile_w, h)))
@@ -206,10 +223,17 @@ def paired_paths(iter_dir: Path, stem: str) -> tuple[Path, Path]:
     return inp, sup
 
 
+def optional_input512_path(iter_dir: Path, stem: str) -> Path | None:
+    for p in (iter_dir / f"input512_{stem}.jpg", iter_dir / f"input512_{stem}.png"):
+        if p.exists():
+            return p
+    return None
+
+
 def build_scene_column(iter_dir: Path, stem: str) -> tuple[Image.Image, int, int]:
     inp_path, sup_path = paired_paths(iter_dir, stem)
-    sup_tiles, tile_w, n_views = split_supervision_strip(sup_path)
-    in_tiles, _ = split_input_strip(inp_path, tile_w)
+    sup_tiles, _, n_views = split_supervision_strip(sup_path)
+    in_tiles, _ = split_input_strip(inp_path)
 
     row1 = hstack(in_tiles)
     gts, relits, preds = [], [], []
@@ -229,14 +253,25 @@ def build_scene_column(iter_dir: Path, stem: str) -> tuple[Image.Image, int, int
 
 def write_single_scene(iter_dir: Path, stem: str, out_scene_iter: Path, dry_run: bool) -> None:
     inp_path, sup_path = paired_paths(iter_dir, stem)
-    sup_tiles, tile_w, n_views = split_supervision_strip(sup_path)
-    in_tiles, _ = split_input_strip(inp_path, tile_w)
+    sup_tiles, _, n_views = split_supervision_strip(sup_path)
+    in_tiles, _ = split_input_strip(inp_path)
     if dry_run:
         return
 
     out_scene_iter.mkdir(parents=True, exist_ok=True)
     for i, tile in enumerate(in_tiles):
         tile.save(out_scene_iter / f"input_view_{i:02d}.jpg", quality=95)
+
+    input512_path = optional_input512_path(iter_dir, stem)
+    if input512_path is not None:
+        try:
+            in512_tiles, _ = split_input_strip(input512_path, expected_n_views=len(in_tiles))
+        except ValueError as e:
+            print(f"Warning: skip {input512_path}: {e}")
+            in512_tiles = []
+        for i, tile in enumerate(in512_tiles):
+            out_p = out_scene_iter / f"input512_view_{i:02d}.png"
+            tile.save(out_p, compress_level=6)
 
     for v in range(n_views):
         b = v * 3

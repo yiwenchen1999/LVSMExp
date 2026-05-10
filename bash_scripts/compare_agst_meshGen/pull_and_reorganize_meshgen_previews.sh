@@ -23,7 +23,7 @@ DEST_DIR="${DEST_DIR:-${REPO_ROOT}/result_previews/compare_agst_meshGen}"
 NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-2}"
 
 # Space-separated; export RUN_NAMES="foo bar" to override.
-RUN_NAMES_DEFAULT=(test_relight_2view test_relight_2view_objaverse)
+RUN_NAMES_DEFAULT=(test_relight_1view_objaverse test_relight_1view_polyhaven)
 RUN_NAMES=(${RUN_NAMES:-})
 
 SSH_OPTS=(ssh

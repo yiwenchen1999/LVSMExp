@@ -27,21 +27,21 @@ BACKBONE_LR_SCALE=${BACKBONE_LR_SCALE:-1}
 OG_DATASET_BASE=${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}
 LOCAL_DATASET_BASE=${LOCAL_DATASET_BASE:-/mnt/data-disk2}
 
-RESUME_CKPT=${RESUME_CKPT:-ckpt/dpt_decoder_256}
-CHECKPOINT_DIR=${CHECKPOINT_DIR:-ckpt/dpt_decoder_512}
+RESUME_CKPT=${RESUME_CKPT:-ckpt/dpt_decoder_512/ckpt_0000000000002000.pt}
+CHECKPOINT_DIR=${CHECKPOINT_DIR:-ckpt/dpt_decoder_512_1e5}
 
 torchrun --nproc_per_node 8 --nnodes 1 \
     --rdzv_id 28636 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml \
-    training.batch_size_per_gpu = 16 \
+    training.batch_size_per_gpu = 8 \
     training.checkpoint_dir = ${CHECKPOINT_DIR} \
     training.resume_ckpt = ${RESUME_CKPT} \
     training.dataset_path = /mnt/data-disk2/lvsmPlus_objaverse/test/full_list.txt \
     training.LVSM_checkpoint_dir = ckpt/LVSM_object_encoder_decoder_512 \
     training.wandb_exp_name = LVSM_edit_dense_general_512_dptTransfer_from256 \
-    training.warmup = 3000 \
+    training.warmup = 1000 \
     training.vis_every = 1000 \
-    training.lr = 0.0001 \
+    training.lr = 0.00001 \
     training.og_dataset_base = ${OG_DATASET_BASE} \
     training.local_dataset_base = ${LOCAL_DATASET_BASE} \
     training.reset_training_state = true \

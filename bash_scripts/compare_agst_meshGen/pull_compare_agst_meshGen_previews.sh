@@ -21,7 +21,7 @@ REMOTE_CKPT_ROOT="${REMOTE_CKPT_ROOT:-/music-shared-disk/group/ct/yiwen/codes/LV
 DEST_ROOT="${DEST_ROOT:-${REPO_ROOT}/result_previews/compare_agst_meshGen}"
 
 # Space-separated list of run folder names under ckpt/
-RUN_NAMES="${RUN_NAMES:-test_relight_1view_objaverse}"
+RUN_NAMES="${RUN_NAMES:-test_relight_2view test_relight_2view_objaverse}"
 
 # Local shell must not expand *; keep it literal for remote expansion.
 for RUN_NAME in ${RUN_NAMES}; do
