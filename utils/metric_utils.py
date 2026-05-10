@@ -11,6 +11,7 @@ import numpy as np
 from easydict import EasyDict as edict
 import json
 from rich import print
+import torch.nn.functional as F
 
 import warnings
 # Suppress warnings for LPIPS loss loading
@@ -88,6 +89,48 @@ def _save_camera_pose_json(out_dir: str, safe_scene_name: str, input_data, targe
     }
     with open(os.path.join(out_dir, f"camera_poses_{safe_scene_name}.json"), "w") as f:
         json.dump(pose_payload, f, indent=2)
+
+
+def _save_input512_views_if_needed(
+    out_dir: str,
+    safe_scene_name: str,
+    input_views: torch.Tensor,
+    view_indices=None,
+):
+    """
+    When input view resolution is not 512x512, additionally save 512x512 inputs.
+    Saves:
+      - input512_<scene>.jpg              (stitched strip)
+      - input512_<frame_idx>.png or input512_view_<i>.png (per-view)
+    """
+    if input_views is None or input_views.ndim != 4:
+        return
+
+    _, _, h, w = input_views.shape
+    if h == 512 and w == 512:
+        return
+
+    resized = F.interpolate(
+        input_views.detach().cpu().to(torch.float32),
+        size=(512, 512),
+        mode="bicubic",
+        align_corners=False,
+        antialias=True,
+    ).clamp(0.0, 1.0)
+
+    strip = rearrange(resized, "v c h w -> h (v w) c")
+    strip = (strip.numpy() * 255.0).astype(np.uint8)
+    Image.fromarray(strip).save(os.path.join(out_dir, f"input512_{safe_scene_name}.jpg"))
+
+    num_views = resized.shape[0]
+    for vi in range(num_views):
+        frame = resized[vi]
+        frame_np = (frame.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
+        if view_indices is not None and vi < len(view_indices):
+            fname = f"input512_{int(view_indices[vi]):05d}.png"
+        else:
+            fname = f"input512_view_{vi:02d}.png"
+        Image.fromarray(frame_np).save(os.path.join(out_dir, fname))
 
 @torch.no_grad()
 def compute_psnr(
@@ -363,6 +406,15 @@ def visualize_intermediate_results(out_dir, result):
     Image.fromarray(input_grid).save(
         os.path.join(out_dir, f"input_{safe_scene_name}.jpg")
     )
+    input_indices = None
+    if hasattr(input, "index") and input.index is not None:
+        input_indices = input.index[0, :, 0].detach().cpu().tolist()
+    _save_input512_views_if_needed(
+        out_dir=out_dir,
+        safe_scene_name=safe_scene_name,
+        input_views=input.image[0],
+        view_indices=input_indices,
+    )
 
 
 def _save_images(result, batch_idx, out_dir):
@@ -508,6 +560,13 @@ def export_all_views_results(
             ctx_frame = input_img[vi].cpu().float()
             ctx_np = (ctx_frame.permute(1, 2, 0).numpy() * 255.0).clip(0, 255).astype(np.uint8)
             Image.fromarray(ctx_np).save(os.path.join(sample_dir, f"input_{ctx_idx:05d}.png"))
+
+        _save_input512_views_if_needed(
+            out_dir=sample_dir,
+            safe_scene_name=safe_scene_name,
+            input_views=input_img,
+            view_indices=input_indices,
+        )
 
         if is_interpolated:
             # Interpolated: save all rendered frames sequentially and the video
