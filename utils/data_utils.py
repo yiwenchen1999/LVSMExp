@@ -77,6 +77,9 @@ class ProcessData(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        # Keep dataset sampling behavior unchanged while allowing encoder-side
+        # single-view conditioning when explicitly enabled.
+        self.single_view_input_mode = bool(self.config.training.get("single_view_input_mode", False))
 
     @torch.no_grad()
     def compute_rays(self, c2w, fxfycxcy, h=None, w=None, device="cuda"):
@@ -227,12 +230,13 @@ class ProcessData(nn.Module):
         
 
         input_dict, target_dict = {}, {}
+        encoder_num_input_views = 1 if self.single_view_input_mode else int(self.config.training.num_input_views)
 
         # render_all_views mode: input = first num_input_views, target = ALL views
         render_all_views = self.config.inference.get("render_all_views", False)
         is_inference = self.config.inference.get("if_inference", False)
         if render_all_views and is_inference:
-            num_input = self.config.training.num_input_views
+            num_input = encoder_num_input_views
             for key, value in data_batch.items():
                 if not isinstance(value, torch.Tensor):
                     input_dict[key] = value
@@ -254,7 +258,7 @@ class ProcessData(nn.Module):
                     input_dict[key] = value
                     target_dict[key] = value
                     continue
-                input_dict[key] = value[:, :self.config.training.num_input_views, ...]
+                input_dict[key] = value[:, :encoder_num_input_views, ...]
                 target_dict[key] = input_dict[key].clone()
 
             height, width = data_batch["image"].shape[3], data_batch["image"].shape[4]
@@ -299,7 +303,7 @@ class ProcessData(nn.Module):
                 # Chain tensors use shape [b, steps, v, ...].
                 # Keep steps dimension intact and apply view split/gather on dim=2.
                 if value.dim() >= 3:
-                    input_dict[key] = value[:, :, :self.config.training.num_input_views, ...]
+                    input_dict[key] = value[:, :, :encoder_num_input_views, ...]
                     to_expand_dim = value.shape[3:]
                     expanded_index = index.view(
                         index.shape[0], 1, index.shape[1], *(1,) * len(to_expand_dim)
@@ -313,7 +317,7 @@ class ProcessData(nn.Module):
                     input_dict[key] = value
                     target_dict[key] = value
                 continue
-            input_dict[key] = value[:, :self.config.training.num_input_views, ...]
+            input_dict[key] = value[:, :encoder_num_input_views, ...]
 
             to_expand_dim = value.shape[2:] # [b, v, (value dim)] -> [value dim], e.g. [c, h, w] or [4] or [4, 4]
             expanded_index = index.view(index.shape[0], index.shape[1], *(1,) * len(to_expand_dim)).expand(-1, -1, *to_expand_dim)

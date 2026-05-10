@@ -31,10 +31,13 @@ export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/test_relight_2view_objaverse}"
-export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/test_relight_2view/ckpt_00000000.pt}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/test_relight_1view_objaverse}"
+export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/test_relight_2view/ckpt_0000000000026000.pt}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_256}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_256_lr1e4_singleMap}"
+export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-2}"
+export NUM_TARGET_VIEWS="${NUM_TARGET_VIEWS:-4}"
+export SINGLE_VIEW_INPUT_MODE="${SINGLE_VIEW_INPUT_MODE:-true}"
 
 ############################ls
 # Logging
@@ -48,6 +51,9 @@ echo "DATASET_PATH: $DATASET_PATH"
 echo "CKPT_DIR: $CKPT_DIR"
 echo "LVSM_CKPT_DIR: $LVSM_CKPT_DIR"
 echo "WANDB_EXP_NAME: $WANDB_EXP_NAME"
+echo "NUM_INPUT_VIEWS: $NUM_INPUT_VIEWS"
+echo "NUM_TARGET_VIEWS: $NUM_TARGET_VIEWS"
+echo "SINGLE_VIEW_INPUT_MODE: $SINGLE_VIEW_INPUT_MODE"
 echo "----------------------------------------------"
 echo ""
 
@@ -84,8 +90,9 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.relight_signals = \"[envmap]\" \
-    training.num_input_views = 1 \
-    training.num_target_views = 4 \
+    training.num_input_views = $NUM_INPUT_VIEWS \
+    training.num_target_views = $NUM_TARGET_VIEWS \
+    training.single_view_input_mode = $SINGLE_VIEW_INPUT_MODE \
     training.resume_ckpt = \"$RESUME_CKPT\" \
     training.reset_training_state = true \
     training.num_views = 6 \
