@@ -17,6 +17,78 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, message="The parameter 'pretrained' is deprecated since 0.13")
 warnings.filterwarnings("ignore", category=UserWarning, message="Arguments other than a weight enum.*")
 
+
+def _safe_scene_name(scene_name: str) -> str:
+    return "".join(c for c in scene_name if c.isalnum() or c in ("_", "-"))[:100]
+
+
+def _to_uint8_strip(images: torch.Tensor, normalize_per_image: bool = False):
+    """Convert [v, c, h, w] tensor images to stitched uint8 strip [h, v*w, c]."""
+    if images is None or (not isinstance(images, torch.Tensor)) or images.ndim != 4:
+        return None
+
+    img = images.detach().cpu().to(torch.float32).clone()
+    if img.shape[1] == 1:
+        img = img.repeat(1, 3, 1, 1)
+
+    if normalize_per_image:
+        flat = img.reshape(img.shape[0], -1)
+        max_vals = flat.max(dim=1).values.clamp(min=1e-6).reshape(-1, 1, 1, 1)
+        img = img / max_vals
+
+    img = img.clamp(0.0, 1.0)
+    strip = rearrange(img, "v c h w -> h (v w) c")
+    return (strip.numpy() * 255.0).astype(np.uint8)
+
+
+def _save_envmap_strip(out_dir: str, safe_scene_name: str, prefix: str, env_tensor: torch.Tensor):
+    strip = _to_uint8_strip(env_tensor, normalize_per_image=("hdr" in prefix))
+    if strip is None:
+        return
+    Image.fromarray(strip).save(os.path.join(out_dir, f"{prefix}_{safe_scene_name}.png"))
+
+
+def _build_pose_entries(view_indices, c2w_tensor, intrinsics_tensor):
+    entries = []
+    for i, view_idx in enumerate(view_indices):
+        item = {"view_index": int(view_idx)}
+        if c2w_tensor is not None and i < c2w_tensor.shape[0]:
+            item["c2w"] = c2w_tensor[i].detach().cpu().to(torch.float32).tolist()
+        if intrinsics_tensor is not None and i < intrinsics_tensor.shape[0]:
+            item["fxfycxcy"] = intrinsics_tensor[i].detach().cpu().to(torch.float32).tolist()
+        entries.append(item)
+    return entries
+
+
+def _save_camera_pose_json(out_dir: str, safe_scene_name: str, input_data, target_data):
+    input_indices = []
+    target_indices = []
+    input_c2w = None
+    target_c2w = None
+    input_intrinsics = None
+    target_intrinsics = None
+
+    if hasattr(input_data, "index") and input_data.index is not None:
+        input_indices = input_data.index[0, :, 0].detach().cpu().tolist()
+    if hasattr(target_data, "index") and target_data.index is not None:
+        target_indices = target_data.index[0, :, 0].detach().cpu().tolist()
+    if hasattr(input_data, "c2w") and input_data.c2w is not None:
+        input_c2w = input_data.c2w[0]
+    if hasattr(target_data, "c2w") and target_data.c2w is not None:
+        target_c2w = target_data.c2w[0]
+    if hasattr(input_data, "fxfycxcy") and input_data.fxfycxcy is not None:
+        input_intrinsics = input_data.fxfycxcy[0]
+    if hasattr(target_data, "fxfycxcy") and target_data.fxfycxcy is not None:
+        target_intrinsics = target_data.fxfycxcy[0]
+
+    pose_payload = {
+        "scene_name": input_data.scene_name[0] if hasattr(input_data, "scene_name") else "unknown",
+        "context_views": _build_pose_entries(input_indices, input_c2w, input_intrinsics),
+        "target_views": _build_pose_entries(target_indices, target_c2w, target_intrinsics),
+    }
+    with open(os.path.join(out_dir, f"camera_poses_{safe_scene_name}.json"), "w") as f:
+        json.dump(pose_payload, f, indent=2)
+
 @torch.no_grad()
 def compute_psnr(
     ground_truth: Float[Tensor, "batch channel height width"],
@@ -257,29 +329,29 @@ def visualize_intermediate_results(out_dir, result):
         
         # Use scene_name for filename
         scene_name = target.scene_name[0] if hasattr(target, 'scene_name') else "unknown"
-        safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
+        safe_scene_name = _safe_scene_name(scene_name)
 
         Image.fromarray(visualized_image).save(
             os.path.join(out_dir, f"supervision_{safe_scene_name}.jpg")
         )
-        # Save target-view LDR envmaps when available.
-        # Layout matches other strips: target views are concatenated left-to-right.
+        # Save context/target envmaps (LDR + HDR) when available.
         if hasattr(target, "env_ldr") and target.env_ldr is not None:
-            env_ldr = target.env_ldr
-            if env_ldr.ndim == 5:
-                b_env, v_env, c_env, h_env, w_env = env_ldr.size()
-                env_images = env_ldr.reshape(b_env * v_env, c_env, h_env, w_env).detach().cpu()
-                env_grid = rearrange(env_images, "(b v) c h w -> (b h) (v w) c", v=v_env)
-                env_grid = (env_grid.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-                Image.fromarray(env_grid).save(
-                    os.path.join(out_dir, f"envldr_{safe_scene_name}.jpg")
-                )
+            _save_envmap_strip(out_dir, safe_scene_name, "target_envldr", target.env_ldr[0])
+        if hasattr(target, "env_hdr") and target.env_hdr is not None:
+            _save_envmap_strip(out_dir, safe_scene_name, "target_envhdr", target.env_hdr[0])
+        if hasattr(input, "env_ldr") and input.env_ldr is not None:
+            _save_envmap_strip(out_dir, safe_scene_name, "context_envldr", input.env_ldr[0])
+        if hasattr(input, "env_hdr") and input.env_hdr is not None:
+            _save_envmap_strip(out_dir, safe_scene_name, "context_envhdr", input.env_hdr[0])
+
+        # Save context/target camera poses with frame indices and intrinsics.
+        _save_camera_pose_json(out_dir, safe_scene_name, input, target)
         with open(os.path.join(out_dir, f"scene_name.txt"), "w") as f:
             f.write(scene_name)
 
     # Use scene_name for filename
     scene_name = input.scene_name[0] if hasattr(input, 'scene_name') else "unknown"
-    safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
+    safe_scene_name = _safe_scene_name(scene_name)
     
     # Create a grid of input images
     b, v, c, h, w = input.image.size()
