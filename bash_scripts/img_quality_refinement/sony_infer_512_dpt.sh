@@ -100,11 +100,9 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.num_views = 12 \
     training.target_has_input = true \
     training.relight_signals = \"[envmap]\" \
-    inference.if_inference = true \
-    inference.compute_metrics = true \
-    inference.render_video = false \
-    inference.view_idx_file_path = null \
-    inference_out_dir = \"$OUTPUT_DIR\"
+    training.warmup = 3000 \
+    training.vis_every = 1 \
+    training.lr = 0.0000 \
 "
 
 echo ""
