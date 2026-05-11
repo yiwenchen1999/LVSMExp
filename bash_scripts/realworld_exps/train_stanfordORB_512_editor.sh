@@ -43,4 +43,5 @@ torchrun --nproc_per_node "${NPROC_PER_NODE}" --nnodes 1 \
     training.wandb_exp_name = LVSM_edit_stanfordORB_crosssplit_512_nebius \
     training.warmup = 1500 \
     training.vis_every = 1000 \
+    training.save_every = 1000 \
     training.lr = 0.0001
