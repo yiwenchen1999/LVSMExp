@@ -13,6 +13,8 @@
 #   NPROC_PER_NODE default: 1
 #   LVSM_CKPT_512  RESUME_CKPT  CHECKPOINT_DIR
 #   HF_HOME  HF_ACCELERATE_CONFIG_DIR
+#
+# Torch: --standalone avoids c10d rendezvous on localhost:PORT (RendezvousClosedError when port/id clashes).
 
 set -euo pipefail
 
@@ -30,8 +32,7 @@ LVSM_CKPT_512="${LVSM_CKPT_512:-ckpt/LVSM_scene_encoder_decoder_512}"
 RESUME_CKPT="${RESUME_CKPT:-ckpt/realworld_exps_relight_stanfordORB_512}"
 CHECKPOINT_DIR="${CHECKPOINT_DIR:-ckpt/infer_stanfordORB_512_editor}"
 
-torchrun --nproc_per_node "${NPROC_PER_NODE}" --nnodes 1 \
-    --rdzv_id 28637 --rdzv_backend c10d --rdzv_endpoint localhost:29524 \
+torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_stanfordORB_crosssplit_512.yaml \
     training.dataset_path = "${DATASET_ROOT}/test/full_list.txt" \
     training.context_dataset_path = "${DATASET_ROOT}/train/full_list.txt" \
