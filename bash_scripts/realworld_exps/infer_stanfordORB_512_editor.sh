@@ -15,6 +15,7 @@
 #   HF_HOME  HF_ACCELERATE_CONFIG_DIR
 #
 # Torch: --standalone avoids c10d rendezvous on localhost:PORT (RendezvousClosedError when port/id clashes).
+# View counts: use training.num_input_views / num_target_views / num_views (must sum consistently).
 
 set -euo pipefail
 
@@ -45,10 +46,9 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
     training.resume_ckpt = "${RESUME_CKPT}" \
     training.checkpoint_dir = "${CHECKPOINT_DIR}" \
     training.wandb_exp_name = infer_stanfordORB_512_editor \
-    training.input_views = 16 \
-    training.target_views = 1 \
+    training.num_input_views = 16 \
+    training.num_target_views = 1 \
     training.num_views = 17 \
     training.warmup = 1500 \
     training.vis_every = 1 \
-    training.save_every = 1000 \
     training.lr = 0.0000
