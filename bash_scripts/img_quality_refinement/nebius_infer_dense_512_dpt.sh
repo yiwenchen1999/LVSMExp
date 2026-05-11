@@ -48,6 +48,7 @@ torchrun --nproc_per_node "${NPROC_PER_NODE}" --nnodes 1 \
     training.warmup = 1000 \
     training.vis_every = 1 \
     training.lr = 0.00000 \
+    training.batch_size_per_gpu = 1 \
     training.og_dataset_base = ${OG_DATASET_BASE} \
     training.local_dataset_base = ${LOCAL_DATASET_BASE} \
     training.seed = ${DATALOADER_SEED} \
