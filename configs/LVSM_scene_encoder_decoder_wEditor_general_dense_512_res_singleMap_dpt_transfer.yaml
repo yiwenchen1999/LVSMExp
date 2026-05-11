@@ -131,7 +131,9 @@ training:
 inference:
   if_inference: false
   compute_metrics: false
-  view_idx_file_path: ./data/evaluation_index_objaverse_train.json
+  # null => random view_selector in dataset_scene (same as train_editor / sony_infer_512.sh).
+  # For fixed views, override CLI: inference.view_idx_file_path=/path/to/evaluation_index.json
+  view_idx_file_path: null
   render_video: false
   render_video_config:
     traj_type: interpolate

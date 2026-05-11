@@ -18,8 +18,9 @@ config = init_config()
 
 os.environ["OMP_NUM_THREADS"] = str(config.training.get("num_threads", 1))
 
-# Set up DDP training/inference and Fix random seed
-ddp_info = init_distributed(seed=777)
+# Seed matches train_editor.py (default 777; override with training.seed=... on CLI).
+training_seed = int(config.training.get("seed", 777))
+ddp_info = init_distributed(seed=training_seed)
 dist.barrier()
 
 
