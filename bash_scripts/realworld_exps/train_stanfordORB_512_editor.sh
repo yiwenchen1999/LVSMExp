@@ -16,7 +16,7 @@
 set -euo pipefail
 
 DATASET_ROOT="${DATASET_ROOT:-${HOME}/Datasets/stanfordORB/lvsm_stanford_orb}"
-OG_DATASET_BASE="${OG_DATASET_BASE:-/work/vig/Datasets/stanfordORB}"
+OG_DATASET_BASE="${OG_DATASET_BASE:-/projects/vig/Datasets/stanfordORB}"
 LOCAL_DATASET_BASE="${LOCAL_DATASET_BASE:-${HOME}/Datasets/stanfordORB}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
 
