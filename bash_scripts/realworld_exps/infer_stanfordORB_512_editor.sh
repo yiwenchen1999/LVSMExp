@@ -1,6 +1,6 @@
 #!/bin/bash
-# Nebius VM (non-Slurm): Stanford ORB 512 cross-split editor finetune.
-# Run from the LVSMExp repo root:  bash bash_scripts/realworld_exps/train_stanfordORB_512_editor.sh
+# Nebius VM (non-Slurm): Stanford ORB 512 cross-split editor inference / vis-only (lr=0).
+# Run from the LVSMExp repo root:  bash bash_scripts/realworld_exps/infer_stanfordORB_512_editor.sh
 #
 # - init_from_LvSM: 512 Images2LatentScene (default ckpt/LVSM_scene_encoder_decoder_512 under repo).
 # - resume_ckpt: 256-res Stanford ORB editor weights; strict=False after LVSM init.
@@ -9,11 +9,14 @@
 # Optional env (same idea as bash_scripts/img_quality_refinement/nebius_train_dense_512_dpt.sh):
 #   DATASET_ROOT   default: $HOME/Datasets/stanfordORB/lvsm_stanford_orb
 #   OG_DATASET_BASE / LOCAL_DATASET_BASE: remap paths inside full_list (e.g. xfer /work/vig/... -> this VM)
-#   NPROC_PER_NODE default: 4 (override for your GPU count)
+#   CUDA_VISIBLE_DEVICES  default: 8 (physical GPU id on the host)
+#   NPROC_PER_NODE default: 1
 #   LVSM_CKPT_512  RESUME_CKPT  CHECKPOINT_DIR
 #   HF_HOME  HF_ACCELERATE_CONFIG_DIR
 
 set -euo pipefail
+
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-7}"
 
 DATASET_ROOT="${DATASET_ROOT:-${HOME}/Datasets/stanfordORB/lvsm_stanford_orb}"
 OG_DATASET_BASE="${OG_DATASET_BASE:-/projects/vig/Datasets/stanfordORB}"
