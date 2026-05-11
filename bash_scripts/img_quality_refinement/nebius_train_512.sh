@@ -1,5 +1,12 @@
-OG_DATASET_BASE=${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}
-LOCAL_DATASET_BASE=${LOCAL_DATASET_BASE:-/mnt/data-disk}
+#!/usr/bin/env bash
+# Nebius VM: general dense 512 editor (singleMap config). Run from LVSMExp repo root.
+#
+# training.og_dataset_base / training.local_dataset_base: paths in dataset list files often
+# still point at the machine where lists were built; Dataset remaps og_dataset_base -> local_dataset_base.
+# Override if your list paths use a different prefix than the defaults below.
+
+OG_DATASET_BASE="${OG_DATASET_BASE:-/scratch/chen.yiwe/temp_objaverse}"
+LOCAL_DATASET_BASE="${LOCAL_DATASET_BASE:-/mnt/data-disk}"
 
 torchrun --nproc_per_node 8 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29501 \
@@ -12,5 +19,5 @@ torchrun --nproc_per_node 8 --nnodes 1 \
     training.warmup = 3000 \
     training.vis_every = 1000 \
     training.lr = 0.0001 \
-    training.og_dataset_base = ${OG_DATASET_BASE} \
-    training.local_dataset_base = ${LOCAL_DATASET_BASE} 
+    training.og_dataset_base = "${OG_DATASET_BASE}" \
+    training.local_dataset_base = "${LOCAL_DATASET_BASE}"
