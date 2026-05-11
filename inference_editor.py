@@ -16,6 +16,16 @@ from utils.metric_utils import export_results, export_all_views_results, summari
 # Load config and read(override) arguments from CLI
 config = init_config()
 
+# Top-level output dir: from YAML inference_out_dir, or inference.out_dir, or default.
+_out = config.get("inference_out_dir")
+if not _out:
+    inf = config.get("inference")
+    if inf is not None:
+        _out = inf.get("out_dir")
+if not _out:
+    _out = "experiments/evaluation/inference_editor"
+config.inference_out_dir = _out
+
 os.environ["OMP_NUM_THREADS"] = str(config.training.get("num_threads", 1))
 
 # Seed matches train_editor.py (default 777; override with training.seed=... on CLI).

@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
-# Inference for 512x512 DPT-transfer editor ckpt (trained with nebius_train_dense_512_dpt.sh).
-# Mirrors bash_scripts/img_quality_refinement/sony_infer_512.sh (paths, Singularity) but runs
-# inference_editor.py + configs/.../general_dense_512_res_singleMap_dpt_transfer.yaml.
-#
-# Frame / view sampling parity with sony_infer_512.sh:
-#   - training.seed=777 (default; sony_infer_512 does not override seed → 777 in train_editor)
-#   - training.view_selector min_frame_dist/max_frame_dist = 15 / 60 (same as singleMap + DPT yamls)
-#   - training.single_env_map=false (matches general_dense_512_singleMap.yaml used by sony_infer_512)
-#   - inference.view_idx_file_path=null in base yaml so dataset uses random view_selector (not eval JSON)
+# Same as bash_scripts/img_quality_refinement/sony_infer_512.sh but uses the DPT decoder-head
+# config (trained with e.g. nebius_train_dense_512_dpt.sh).
 #
 # Usage:
 #   bash bash_scripts/img_quality_refinement/sony_infer_512_dpt.sh
-#   CKPT_DIR=... OUTPUT_DIR=... DATASET_PATH=... bash ...
+#   DATASET_PATH=/path/to/full_list.txt CKPT_DIR=... bash ...
 
 set -euo pipefail
 
@@ -36,25 +29,24 @@ export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt}"
-export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/dpt_decoder_512_1e5}"
+export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/infer_512_dpt}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/infer_512_dpt_transfer}"
-
-export TRAINING_SEED="${TRAINING_SEED:-777}"
+export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_512_dptTransfer_vis}"
+RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/dpt_decoder_512_1e5/ckpt_0000000000002000.pt}"
+echo "RESUME_CKPT: $RESUME_CKPT"
 
 ############################
 # Logging
 ############################
 echo "=============================================="
-echo "Inference: 512 DPT-transfer editor (Sony)"
+echo "Relight dense 512 + DPT head (Sony, vis-only)"
 echo "=============================================="
 echo "Host: $(hostname)"
 echo "PROJ: $PROJ"
 echo "DATASET_PATH: $DATASET_PATH"
 echo "CKPT_DIR: $CKPT_DIR"
 echo "LVSM_CKPT_DIR: $LVSM_CKPT_DIR"
-echo "OUTPUT_DIR: $OUTPUT_DIR"
-echo "TRAINING_SEED (view sampling): $TRAINING_SEED"
+echo "WANDB_EXP_NAME: $WANDB_EXP_NAME"
 echo "----------------------------------------------"
 echo ""
 
@@ -62,8 +54,6 @@ if [ ! -d "$DATASET_PATH" ] && [ ! -f "$DATASET_PATH" ]; then
   echo "ERROR: Dataset path not found: $DATASET_PATH"
   exit 1
 fi
-
-mkdir -p "$OUTPUT_DIR"
 
 ############################
 # Run (torchrun inside Singularity)
@@ -85,20 +75,15 @@ singularity exec --nv $BIND $SIF bash -lc "
   torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
-    --rdzv_endpoint localhost:29511 \
-    inference_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml \
+    --rdzv_endpoint localhost:29501 \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml \
     training.batch_size_per_gpu = 1 \
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CKPT_DIR\" \
+    training.resume_ckpt = \"$RESUME_CKPT\" \
+    training.reset_training_state = true \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
-    training.seed = $TRAINING_SEED \
-    training.single_env_map = false \
-    training.view_selector.min_frame_dist = 15 \
-    training.view_selector.max_frame_dist = 60 \
-    training.num_input_views = 4 \
-    training.num_target_views = 8 \
-    training.num_views = 12 \
-    training.target_has_input = true \
+    training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.relight_signals = \"[envmap]\" \
     training.warmup = 3000 \
     training.vis_every = 1 \
@@ -107,5 +92,5 @@ singularity exec --nv $BIND $SIF bash -lc "
 
 echo ""
 echo "=============================================="
-echo "Done. Results: $OUTPUT_DIR"
+echo "Done. Checkpoints: $CKPT_DIR"
 echo "=============================================="
