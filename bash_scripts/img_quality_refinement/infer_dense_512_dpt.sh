@@ -24,6 +24,8 @@ export XDG_CACHE_HOME=/scratch/chen.yiwe/.cache
 export XDG_CONFIG_HOME=/scratch/chen.yiwe/.config
 export XDG_DATA_HOME=/scratch/chen.yiwe/.local/share
 
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-7}"
+
 # Stage controls (override from shell if needed).
 TRAIN_STAGE=${TRAIN_STAGE:-auto}                  # stage1 | stage2 | auto
 STAGE1_STEPS=${STAGE1_STEPS:-5000}
