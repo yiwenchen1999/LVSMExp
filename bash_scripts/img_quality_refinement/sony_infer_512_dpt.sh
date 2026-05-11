@@ -32,7 +32,7 @@ export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/obja
 export CKPT_DIR="${CKPT_DIR:-$PROJ/ckpt/infer_512_dpt}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_edit_dense_general_512_dptTransfer_vis}"
-RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/dpt_decoder_512_1e5/ckpt_0000000000002000.pt}"
+RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt/dpt_decoder_512_1e5/ckpt_0000000000012000.pt}"
 echo "RESUME_CKPT: $RESUME_CKPT"
 
 ############################
