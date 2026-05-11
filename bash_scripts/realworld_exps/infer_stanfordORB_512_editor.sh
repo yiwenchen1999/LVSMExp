@@ -41,6 +41,9 @@ torchrun --nproc_per_node "${NPROC_PER_NODE}" --nnodes 1 \
     training.resume_ckpt = "${RESUME_CKPT}" \
     training.checkpoint_dir = "${CHECKPOINT_DIR}" \
     training.wandb_exp_name = infer_stanfordORB_512_editor \
+    training.input_views = 16 \
+    training.target_views = 1 \
+    training.num_views = 17 \
     training.warmup = 1500 \
     training.vis_every = 1 \
     training.save_every = 1000 \
