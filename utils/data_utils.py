@@ -234,24 +234,57 @@ class ProcessData(nn.Module):
 
         # load_all mode: dataset has already reordered views as
         # [evenly-sampled condition views..., remaining views in original order].
-        # Keep deterministic split and supervise on all loaded frames.
+        # Keep deterministic split for input. For training memory safety, target
+        # can be capped to a sampled subset while preserving temporal order.
         load_all_frames = bool(self.config.training.get("load_all_frames", False))
         if load_all_frames:
+            is_inference = bool(self.config.inference.get("if_inference", False))
+            max_target_views = int(self.config.training.get("load_all_max_target_views", 32))
             num_input = encoder_num_input_views
+            num_views = data_batch["c2w"].size(1)
+            bs = data_batch["c2w"].size(0)
+            target_index = None
+
+            if (not is_inference) and max_target_views > 0 and num_views > max_target_views:
+                device = data_batch["c2w"].device
+                sampled_idx = []
+                for _ in range(bs):
+                    cur = torch.randperm(num_views, device=device)[:max_target_views]
+                    sampled_idx.append(torch.sort(cur).values)
+                target_index = torch.stack(sampled_idx, dim=0)  # [b, cap]
+
             for key, value in data_batch.items():
                 if not isinstance(value, torch.Tensor):
                     input_dict[key] = value
                     target_dict[key] = value
                     continue
+                if value.dim() < 2:
+                    input_dict[key] = value
+                    target_dict[key] = value
+                    continue
                 if key.startswith("chain_") and value.dim() >= 3:
                     input_dict[key] = value[:, :, :num_input, ...]
-                    target_dict[key] = value
+                    if target_index is None:
+                        target_dict[key] = value
+                    else:
+                        to_expand_dim = value.shape[3:]
+                        expanded_index = target_index.view(
+                            target_index.shape[0], 1, target_index.shape[1], *(1,) * len(to_expand_dim)
+                        ).expand(-1, value.shape[1], -1, *to_expand_dim)
+                        target_dict[key] = torch.gather(value, dim=2, index=expanded_index)
                     if key == "chain_relit_images":
                         input_dict["pass_relit_images"] = input_dict[key]
                         target_dict["pass_relit_images"] = target_dict[key]
                 else:
                     input_dict[key] = value[:, :num_input, ...]
-                    target_dict[key] = value
+                    if target_index is None:
+                        target_dict[key] = value
+                    else:
+                        to_expand_dim = value.shape[2:]
+                        expanded_index = target_index.view(
+                            target_index.shape[0], target_index.shape[1], *(1,) * len(to_expand_dim)
+                        ).expand(-1, -1, *to_expand_dim)
+                        target_dict[key] = torch.gather(value, dim=1, index=expanded_index)
 
             height, width = data_batch["image"].shape[3], data_batch["image"].shape[4]
             input_dict["image_h_w"] = (height, width)

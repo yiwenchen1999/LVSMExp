@@ -41,6 +41,7 @@ export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_video_making_train_load_all}"
 export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
 export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export LOAD_ALL_FRAMES="${LOAD_ALL_FRAMES:-true}"
+export LOAD_ALL_MAX_TARGET_VIEWS="${LOAD_ALL_MAX_TARGET_VIEWS:-32}"
 
 ############################
 # Logging
@@ -54,6 +55,7 @@ echo "DATASET_PATH: $DATASET_PATH"
 echo "CHECKPOINT_DIR: $CHECKPOINT_DIR"
 echo "RESUME_CKPT: $RESUME_CKPT"
 echo "LOAD_ALL_FRAMES: $LOAD_ALL_FRAMES"
+echo "LOAD_ALL_MAX_TARGET_VIEWS: $LOAD_ALL_MAX_TARGET_VIEWS"
 echo "----------------------------------------------"
 echo ""
 
@@ -91,6 +93,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.batch_size_per_gpu = 1 \
     training.load_all_frames = ${LOAD_ALL_FRAMES} \
+    training.load_all_max_target_views = ${LOAD_ALL_MAX_TARGET_VIEWS} \
     training.lr = ${LEARNING_RATE} \
     training.warmup = ${WARMUP_STEPS} \
     training.dpt_transfer.enabled = true \
