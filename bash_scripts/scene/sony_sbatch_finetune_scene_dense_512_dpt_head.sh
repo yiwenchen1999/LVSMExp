@@ -3,12 +3,13 @@
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --time=168:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
-# Finetune DPT head on scene-dense dataset (Sony cluster, Singularity).
+# Finetune DPT + reconstructor/editor backbones on scene-dense dataset
+# (Sony cluster, Singularity).
 # Starts from object-centric pretrained DPT checkpoint:
 #   /music-shared-disk/group/ct/yiwen/codes/LVSMExp/ckpt_dpt/dpt_decoder_512_1e5
 
@@ -52,6 +53,20 @@ export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
 export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
 
+# For scene style shift, always co-tune reconstruction/editor backbones.
+if [ "${TRAIN_STAGE}" != "stage2" ]; then
+  echo "INFO: forcing TRAIN_STAGE=stage2 to co-tune backbones."
+  TRAIN_STAGE="stage2"
+fi
+if [ "${STAGE2_UNFREEZE}" != "all" ]; then
+  echo "INFO: forcing STAGE2_UNFREEZE=all to unfreeze backbones."
+  STAGE2_UNFREEZE="all"
+fi
+if [ "${BACKBONE_LR_SCALE}" = "0" ] || [ "${BACKBONE_LR_SCALE}" = "0.0" ]; then
+  echo "INFO: BACKBONE_LR_SCALE was 0, forcing to 1.0."
+  BACKBONE_LR_SCALE="1.0"
+fi
+
 ############################
 # Logging
 ############################
@@ -94,7 +109,7 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd \"$PROJ\"
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 4 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29531 \

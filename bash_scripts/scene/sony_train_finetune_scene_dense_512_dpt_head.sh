@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run scene-dense DPT-head finetuning on an ALLOCATED Sony GPU node.
+# Run scene-dense DPT + backbone finetuning on an ALLOCATED Sony GPU node.
 # Use this after entering an allocated GPU shell (e.g. via sbash/salloc).
 # No SBATCH directives and no srun; this runs directly in current shell.
 
@@ -44,6 +44,20 @@ export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
 export BATCH_SIZE_PER_GPU="${BATCH_SIZE_PER_GPU:-4}"
 export MASTER_PORT="${MASTER_PORT:-29531}"
+
+# For scene style shift, always co-tune reconstruction/editor backbones.
+if [ "${TRAIN_STAGE}" != "stage2" ]; then
+  echo "INFO: forcing TRAIN_STAGE=stage2 to co-tune backbones."
+  TRAIN_STAGE="stage2"
+fi
+if [ "${STAGE2_UNFREEZE}" != "all" ]; then
+  echo "INFO: forcing STAGE2_UNFREEZE=all to unfreeze backbones."
+  STAGE2_UNFREEZE="all"
+fi
+if [ "${BACKBONE_LR_SCALE}" = "0" ] || [ "${BACKBONE_LR_SCALE}" = "0.0" ]; then
+  echo "INFO: BACKBONE_LR_SCALE was 0, forcing to 1.0."
+  BACKBONE_LR_SCALE="1.0"
+fi
 
 # If not set explicitly, infer GPU count from CUDA_VISIBLE_DEVICES.
 if [ -n "${NPROC_PER_NODE:-}" ]; then
