@@ -243,7 +243,7 @@ class ProcessData(nn.Module):
             num_input = encoder_num_input_views
             num_views = data_batch["c2w"].size(1)
             bs = data_batch["c2w"].size(0)
-            target_index = None
+            target_positions = None
 
             if (not is_inference) and max_target_views > 0 and num_views > max_target_views:
                 device = data_batch["c2w"].device
@@ -251,7 +251,17 @@ class ProcessData(nn.Module):
                 for _ in range(bs):
                     cur = torch.randperm(num_views, device=device)[:max_target_views]
                     sampled_idx.append(torch.sort(cur).values)
-                target_index = torch.stack(sampled_idx, dim=0)  # [b, cap]
+                target_positions = torch.stack(sampled_idx, dim=0)  # [b, cap]
+            else:
+                device = data_batch["c2w"].device
+                target_positions = torch.arange(num_views, device=device, dtype=torch.long).unsqueeze(0).expand(bs, -1)
+
+            # Restore target temporal order using original frame ids in batch["index"][..., 0].
+            # This keeps input ordering unchanged while making target sequence strictly monotonic.
+            if "index" in data_batch and isinstance(data_batch["index"], torch.Tensor) and data_batch["index"].dim() >= 3:
+                frame_ids = torch.gather(data_batch["index"][:, :, 0], dim=1, index=target_positions)
+                frame_sort = torch.argsort(frame_ids, dim=1)
+                target_positions = torch.gather(target_positions, dim=1, index=frame_sort)
 
             for key, value in data_batch.items():
                 if not isinstance(value, torch.Tensor):
@@ -264,27 +274,21 @@ class ProcessData(nn.Module):
                     continue
                 if key.startswith("chain_") and value.dim() >= 3:
                     input_dict[key] = value[:, :, :num_input, ...]
-                    if target_index is None:
-                        target_dict[key] = value
-                    else:
-                        to_expand_dim = value.shape[3:]
-                        expanded_index = target_index.view(
-                            target_index.shape[0], 1, target_index.shape[1], *(1,) * len(to_expand_dim)
-                        ).expand(-1, value.shape[1], -1, *to_expand_dim)
-                        target_dict[key] = torch.gather(value, dim=2, index=expanded_index)
+                    to_expand_dim = value.shape[3:]
+                    expanded_index = target_positions.view(
+                        target_positions.shape[0], 1, target_positions.shape[1], *(1,) * len(to_expand_dim)
+                    ).expand(-1, value.shape[1], -1, *to_expand_dim)
+                    target_dict[key] = torch.gather(value, dim=2, index=expanded_index)
                     if key == "chain_relit_images":
                         input_dict["pass_relit_images"] = input_dict[key]
                         target_dict["pass_relit_images"] = target_dict[key]
                 else:
                     input_dict[key] = value[:, :num_input, ...]
-                    if target_index is None:
-                        target_dict[key] = value
-                    else:
-                        to_expand_dim = value.shape[2:]
-                        expanded_index = target_index.view(
-                            target_index.shape[0], target_index.shape[1], *(1,) * len(to_expand_dim)
-                        ).expand(-1, -1, *to_expand_dim)
-                        target_dict[key] = torch.gather(value, dim=1, index=expanded_index)
+                    to_expand_dim = value.shape[2:]
+                    expanded_index = target_positions.view(
+                        target_positions.shape[0], target_positions.shape[1], *(1,) * len(to_expand_dim)
+                    ).expand(-1, -1, *to_expand_dim)
+                    target_dict[key] = torch.gather(value, dim=1, index=expanded_index)
 
             height, width = data_batch["image"].shape[3], data_batch["image"].shape[4]
             input_dict["image_h_w"] = (height, width)
