@@ -48,7 +48,7 @@ export STAGE1_STEPS="${STAGE1_STEPS:-0}"
 export DISTILL_WEIGHT="${DISTILL_WEIGHT:-0.0}"
 export BACKBONE_LR_SCALE="${BACKBONE_LR_SCALE:-1.0}"
 export STAGE2_UNFREEZE="${STAGE2_UNFREEZE:-all}"  # all | decoder_only
-export LEARNING_RATE="${LEARNING_RATE:-1e-5}"
+export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
 export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
 
@@ -102,6 +102,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CHECKPOINT_DIR\" \
     training.resume_ckpt = \"$RESUME_CKPT\" \
+    training.batch_size_per_gpu = 4 \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.lr = ${LEARNING_RATE} \
