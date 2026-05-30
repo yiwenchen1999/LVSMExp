@@ -232,6 +232,32 @@ class ProcessData(nn.Module):
         input_dict, target_dict = {}, {}
         encoder_num_input_views = 1 if self.single_view_input_mode else int(self.config.training.num_input_views)
 
+        # load_all mode: dataset has already reordered views as
+        # [evenly-sampled condition views..., remaining views in original order].
+        # Keep deterministic split and supervise on all loaded frames.
+        load_all_frames = bool(self.config.training.get("load_all_frames", False))
+        if load_all_frames:
+            num_input = encoder_num_input_views
+            for key, value in data_batch.items():
+                if not isinstance(value, torch.Tensor):
+                    input_dict[key] = value
+                    target_dict[key] = value
+                    continue
+                if key.startswith("chain_") and value.dim() >= 3:
+                    input_dict[key] = value[:, :, :num_input, ...]
+                    target_dict[key] = value
+                    if key == "chain_relit_images":
+                        input_dict["pass_relit_images"] = input_dict[key]
+                        target_dict["pass_relit_images"] = target_dict[key]
+                else:
+                    input_dict[key] = value[:, :num_input, ...]
+                    target_dict[key] = value
+
+            height, width = data_batch["image"].shape[3], data_batch["image"].shape[4]
+            input_dict["image_h_w"] = (height, width)
+            target_dict["image_h_w"] = (height, width)
+            return edict(input_dict), edict(target_dict)
+
         # render_all_views mode: input = first num_input_views, target = ALL views
         render_all_views = self.config.inference.get("render_all_views", False)
         is_inference = self.config.inference.get("if_inference", False)

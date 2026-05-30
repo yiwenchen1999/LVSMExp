@@ -290,7 +290,14 @@ dataset_name = config.training.get("dataset_name", "data.dataset.Dataset")
 module, class_name = dataset_name.rsplit(".", 1)
 Dataset = importlib.import_module(module).__dict__[class_name]
 dataset = Dataset(config)
+load_all_frames = bool(config.training.get("load_all_frames", False))
 batch_size_per_gpu = config.training.batch_size_per_gpu
+if load_all_frames and batch_size_per_gpu != 1:
+    print_rank0(
+        f"load_all_frames=True detected, overriding batch_size_per_gpu "
+        f"from {batch_size_per_gpu} to 1 to handle variable per-scene frame counts."
+    )
+    batch_size_per_gpu = 1
 
 datasampler = DistributedSampler(dataset)
 dataloader = DataLoader(
@@ -300,7 +307,7 @@ dataloader = DataLoader(
     num_workers=config.training.num_workers,
     persistent_workers=True,
     pin_memory=False,
-    drop_last=True,
+    drop_last=False if load_all_frames else True,
     prefetch_factor=config.training.prefetch_factor,
     sampler=datasampler,
 )

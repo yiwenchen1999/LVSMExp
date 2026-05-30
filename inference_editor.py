@@ -9,7 +9,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 import torch.distributed as dist
 from easydict import EasyDict as edict
-from einops import rearrange, repeat
 from setup import init_config, init_distributed
 from utils.metric_utils import export_results, export_all_views_results, summarize_evaluation
 
@@ -52,8 +51,13 @@ Dataset = importlib.import_module(module).__dict__[class_name]
 dataset = Dataset(config)
 
 datasampler = DistributedSampler(dataset)
-# render_all_views requires batch_size=1 because frame counts vary per scene
-_batch_size = 1 if config.inference.get("render_all_views", False) else config.training.batch_size_per_gpu
+load_all_frames = bool(config.training.get("load_all_frames", False))
+# render_all_views / load_all_frames require batch_size=1 because frame counts vary by scene
+_batch_size = (
+    1
+    if (config.inference.get("render_all_views", False) or load_all_frames)
+    else config.training.batch_size_per_gpu
+)
 dataloader = DataLoader(
     dataset,
     batch_size=_batch_size,
@@ -62,7 +66,7 @@ dataloader = DataLoader(
     prefetch_factor=config.training.prefetch_factor,
     persistent_workers=True,
     pin_memory=False,
-    drop_last=False if config.inference.get("render_all_views", False) else True,
+    drop_last=False if (config.inference.get("render_all_views", False) or load_all_frames) else True,
     sampler=datasampler
 )
 dataloader_iter = iter(dataloader)
@@ -115,6 +119,7 @@ model = DDP(model, device_ids=[ddp_info.local_rank])
 if ddp_info.is_main_process:  
     condition_reverse = config.training.get("condition_reverse", False)
     print(f"Running inference; save results to: {config.inference_out_dir}")
+    print(f"load_all_frames={load_all_frames}")
     if condition_reverse:
         print(f"  condition_reverse=True: input images from relit scene, "
               f"relit/lighting from current scene")
@@ -125,6 +130,31 @@ if ddp_info.is_main_process:
     warnings.filterwarnings('ignore', category=FutureWarning)
 
 dist.barrier()
+
+
+def render_views_chunked_with_renderer(
+    m,
+    latent_tokens,
+    ray_o,
+    ray_d,
+    image_h_w,
+    n_patches,
+    d,
+    view_chunk_size=4,
+):
+    """Chunked rendering via model.renderer to preserve DPT multi-scale path."""
+    num_views = ray_o.shape[1]
+    rendered_chunks = []
+    for start in range(0, num_views, view_chunk_size):
+        end = min(start + view_chunk_size, num_views)
+        target_chunk = edict(
+            ray_o=ray_o[:, start:end],
+            ray_d=ray_d[:, start:end],
+            image_h_w=image_h_w,
+        )
+        rendered_chunk = m.renderer(latent_tokens, target_chunk, n_patches, d)
+        rendered_chunks.append(rendered_chunk.cpu())
+    return torch.cat(rendered_chunks, dim=1)
 
 
 def interpolate_camera_poses(c2ws, fxfycxcy, desired_num_frames, device):
@@ -183,13 +213,16 @@ def render_all_views_chunked(m, batch, device, view_chunk_size=4, desired_num_fr
 
     latent_tokens, n_patches, d = m.reconstructor(input_dict)
 
-    n_latent_vectors = config.model.transformer.n_latent_vectors
-    condition_tokens = m._build_editor_condition_tokens(input_dict, d)
+    condition_source = input_dict
+    if hasattr(m, "_select_editor_condition_dict"):
+        condition_source = m._select_editor_condition_dict(input_dict, target_dict)
+    condition_tokens = m._build_editor_condition_tokens(condition_source, d)
     if condition_tokens is not None:
         editor_input = torch.cat([latent_tokens, condition_tokens], dim=1)
         editor_output = m.pass_layers(
             m.transformer_editor, editor_input, gradient_checkpoint=False
         )
+        n_latent_vectors = config.model.transformer.n_latent_vectors
         latent_tokens = editor_output[:, :n_latent_vectors, :]
 
     # Sort target views by frame index (dataset returns context-first ordering)
@@ -228,41 +261,16 @@ def render_all_views_chunked(m, batch, device, view_chunk_size=4, desired_num_fr
         render_ray_o = target_dict.ray_o
         render_ray_d = target_dict.ray_d
 
-    # Chunked rendering of all target views
-    target_pose_cond = m.get_posed_input(
-        ray_o=render_ray_o, ray_d=render_ray_d,
+    rendered_all = render_views_chunked_with_renderer(
+        m=m,
+        latent_tokens=latent_tokens,
+        ray_o=render_ray_o,
+        ray_d=render_ray_d,
+        image_h_w=(h, w),
+        n_patches=n_patches,
+        d=d,
+        view_chunk_size=view_chunk_size,
     )
-    bs, num_views, c_dim, ph, pw = target_pose_cond.size()
-    patch_size = config.model.target_pose_tokenizer.patch_size
-
-    target_pose_tokens = m.target_pose_tokenizer(target_pose_cond)
-    _, n_per_view, _ = target_pose_tokens.size()
-    target_pose_tokens = target_pose_tokens.reshape(bs, num_views * n_per_view, d)
-
-    rendered_chunks = []
-    for start in range(0, num_views, view_chunk_size):
-        cur_sz = min(view_chunk_size, num_views - start)
-        s_idx = start * n_per_view
-        e_idx = (start + cur_sz) * n_per_view
-        cur_pose = rearrange(
-            target_pose_tokens[:, s_idx:e_idx, :],
-            "b (v p) d -> (b v) p d", v=cur_sz, p=n_per_view,
-        )
-        cur_latent = repeat(latent_tokens, "b nl d -> (b v) nl d", v=cur_sz)
-        dec_in = torch.cat((cur_pose, cur_latent), dim=1)
-        dec_in = m.transformer_input_layernorm_decoder(dec_in)
-        dec_out = m.pass_layers(
-            m.transformer_decoder, dec_in, gradient_checkpoint=False
-        )
-        img_tokens, _ = dec_out.split([n_per_view, n_latent_vectors], dim=1)
-        rendered = m.decode_tokens_to_image(
-            image_tokens=img_tokens,
-            v_target=cur_sz,
-            image_h_w=(h, w),
-        ).cpu()
-        rendered_chunks.append(rendered)
-
-    rendered_all = torch.cat(rendered_chunks, dim=1)
     return edict(
         input=input_dict, target=target_dict, render=rendered_all,
         interpolated=interpolated, num_original_views=num_original,
@@ -286,13 +294,16 @@ def render_video_from_all_poses(m, batch, device, view_chunk_size=4, desired_num
 
     latent_tokens, n_patches, d = m.reconstructor(input_dict)
 
-    n_latent_vectors = config.model.transformer.n_latent_vectors
-    condition_tokens = m._build_editor_condition_tokens(input_dict, d)
+    condition_source = input_dict
+    if hasattr(m, "_select_editor_condition_dict"):
+        condition_source = m._select_editor_condition_dict(input_dict, target_dict)
+    condition_tokens = m._build_editor_condition_tokens(condition_source, d)
     if condition_tokens is not None:
         editor_input = torch.cat([latent_tokens, condition_tokens], dim=1)
         editor_output = m.pass_layers(
             m.transformer_editor, editor_input, gradient_checkpoint=False
         )
+        n_latent_vectors = config.model.transformer.n_latent_vectors
         latent_tokens = editor_output[:, :n_latent_vectors, :]
 
     bs = input_dict.c2w.shape[0]
@@ -331,39 +342,16 @@ def render_video_from_all_poses(m, batch, device, view_chunk_size=4, desired_num
         render_c2ws, render_fxfycxcy, h, w, device=device,
     )
 
-    # Chunked rendering (identical pattern to render_all_views_chunked)
-    target_pose_cond = m.get_posed_input(ray_o=render_ray_o, ray_d=render_ray_d)
-    bs, num_views, c_dim, ph, pw = target_pose_cond.size()
-    patch_size = config.model.target_pose_tokenizer.patch_size
-
-    target_pose_tokens = m.target_pose_tokenizer(target_pose_cond)
-    _, n_per_view, _ = target_pose_tokens.size()
-    target_pose_tokens = target_pose_tokens.reshape(bs, num_views * n_per_view, d)
-
-    rendered_chunks = []
-    for start in range(0, num_views, view_chunk_size):
-        cur_sz = min(view_chunk_size, num_views - start)
-        s_idx = start * n_per_view
-        e_idx = (start + cur_sz) * n_per_view
-        cur_pose = rearrange(
-            target_pose_tokens[:, s_idx:e_idx, :],
-            "b (v p) d -> (b v) p d", v=cur_sz, p=n_per_view,
-        )
-        cur_latent = repeat(latent_tokens, "b nl d -> (b v) nl d", v=cur_sz)
-        dec_in = torch.cat((cur_pose, cur_latent), dim=1)
-        dec_in = m.transformer_input_layernorm_decoder(dec_in)
-        dec_out = m.pass_layers(
-            m.transformer_decoder, dec_in, gradient_checkpoint=False
-        )
-        img_tokens, _ = dec_out.split([n_per_view, n_latent_vectors], dim=1)
-        rendered = m.decode_tokens_to_image(
-            image_tokens=img_tokens,
-            v_target=cur_sz,
-            image_h_w=(h, w),
-        ).cpu()
-        rendered_chunks.append(rendered)
-
-    rendered_all = torch.cat(rendered_chunks, dim=1)
+    rendered_all = render_views_chunked_with_renderer(
+        m=m,
+        latent_tokens=latent_tokens,
+        ray_o=render_ray_o,
+        ray_d=render_ray_d,
+        image_h_w=(h, w),
+        n_patches=n_patches,
+        d=d,
+        view_chunk_size=view_chunk_size,
+    )
     return edict(
         input=input_dict, target=target_dict, render=rendered_all,
         interpolated=True, num_original_views=num_original_poses,

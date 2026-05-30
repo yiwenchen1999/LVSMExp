@@ -95,8 +95,9 @@ class Dataset(Dataset):
 
         self.inference = self.config.inference.get("if_inference", False)
         self.render_all_views = self.config.inference.get("render_all_views", False)
+        self.load_all_frames = bool(self.config.training.get("load_all_frames", False))
         # Load file that specifies the input and target view indices to use for inference
-        if self.inference:
+        if self.inference and (not self.load_all_frames):
             self.view_idx_list = dict()
             if self.config.inference.get("view_idx_file_path", None) is not None:
                 if os.path.exists(self.config.inference.view_idx_file_path):
@@ -112,6 +113,8 @@ class Dataset(Dataset):
                             filtered_scene_paths.append(scene)
 
                     self.all_scene_paths = filtered_scene_paths
+        else:
+            self.view_idx_list = dict()
 
         # Check if we should load relit images
         self.use_relit_images = self.config.training.get("use_relit_images", True)
@@ -468,6 +471,41 @@ class Dataset(Dataset):
         image_indices = [start_frame, end_frame] + sampled_frames
         return image_indices
 
+    def load_all_view_selector(self, num_frames):
+        """Load all frames and select evenly spaced condition frames first."""
+        num_input_views = int(self.config.training.num_input_views)
+        if num_input_views <= 0:
+            return None
+        if num_frames < num_input_views:
+            return None
+
+        # Evenly sample condition frames across the whole scene.
+        raw_positions = np.linspace(0, num_frames - 1, num=num_input_views)
+        context_indices = []
+        seen = set()
+        for pos in raw_positions:
+            idx = int(round(float(pos)))
+            idx = max(0, min(num_frames - 1, idx))
+            if idx not in seen:
+                context_indices.append(idx)
+                seen.add(idx)
+
+        # Fill dedup gaps while preserving original frame order.
+        if len(context_indices) < num_input_views:
+            for idx in range(num_frames):
+                if idx not in seen:
+                    context_indices.append(idx)
+                    seen.add(idx)
+                if len(context_indices) >= num_input_views:
+                    break
+
+        if len(context_indices) < num_input_views:
+            return None
+
+        all_indices = list(range(num_frames))
+        remaining_indices = [i for i in all_indices if i not in seen]
+        return context_indices + remaining_indices
+
     def __getitem__(self, idx, max_retries=10, _retry_count=0):
         """
         Get item from dataset with error handling and retry logic.
@@ -505,7 +543,12 @@ class Dataset(Dataset):
             # print(f"scene_name: {scene_name}")
             # print(f"frames: {len(frames)}")
 
-            if self.inference and self.render_all_views:
+            if self.load_all_frames:
+                image_indices = self.load_all_view_selector(len(frames))
+                if image_indices is None:
+                    print(f"load_all_view_selector returned None for scene {scene_name} at index {idx}, trying another random index")
+                    return self.__getitem__(random.randint(0, len(self) - 1), max_retries=max_retries, _retry_count=_retry_count + 1)
+            elif self.inference and self.render_all_views:
                 # Load ALL frames: context from view_idx (or first N), rest as targets
                 if scene_name in self.view_idx_list:
                     context_indices = self.view_idx_list[scene_name]["context"]
