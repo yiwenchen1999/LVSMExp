@@ -125,6 +125,9 @@ class Dataset(Dataset):
         self.use_relight_envmap = "envmap" in self.relight_signals
         self.use_relight_point_light = "point_light" in self.relight_signals
         self.point_light_num_rays = int(self.config.training.get("point_light_num_rays", 1024))
+        self.exclude_white_env0_from_relit_sampling = bool(
+            self.config.training.get("exclude_white_env0_from_relit_sampling", False)
+        )
 
         # Check if we should load albedo images
         self.use_albedos = self.config.training.get("use_albedos", False)
@@ -185,6 +188,9 @@ class Dataset(Dataset):
                 return scene_name[:idx]
         # Fallback for unknown naming
         return scene_name.rsplit("_", 1)[0]
+
+    def _is_white_env0_scene(self, scene_name: str) -> bool:
+        return scene_name.endswith("_white_env_0")
 
     def _load_point_light_rays(self, base_dir: str, scene_name: str, num_views: int) -> torch.Tensor:
         base_dir = self._remap_path(base_dir)
@@ -628,6 +634,11 @@ class Dataset(Dataset):
                 for json_file in all_scene_json_files:
                     candidate_scene_name = json_file[:-5]  # Remove .json extension
                     if not (candidate_scene_name.startswith(object_id + '_') and candidate_scene_name != scene_name):
+                        continue
+                    if (
+                        self.exclude_white_env0_from_relit_sampling
+                        and self._is_white_env0_scene(candidate_scene_name)
+                    ):
                         continue
                     scene_type = self._scene_lighting_type(candidate_scene_name)
                     if scene_type in candidate_scenes_by_type:

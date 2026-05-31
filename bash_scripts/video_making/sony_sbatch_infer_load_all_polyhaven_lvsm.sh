@@ -40,6 +40,7 @@ export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_51
 export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/video_making_load_all}"
 export LOAD_ALL_FRAMES="${LOAD_ALL_FRAMES:-true}"
 export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-10}"
+export EXCLUDE_WHITE_ENV0_FROM_RELIT="${EXCLUDE_WHITE_ENV0_FROM_RELIT:-true}"
 export RENDER_ALL_VIEWS="${RENDER_ALL_VIEWS:-true}"
 export RENDER_VIDEO="${RENDER_VIDEO:-false}"
 export VIEW_CHUNK_SIZE="${VIEW_CHUNK_SIZE:-4}"
@@ -57,6 +58,7 @@ echo "CHECKPOINT_DIR: $CHECKPOINT_DIR"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
 echo "LOAD_ALL_FRAMES: $LOAD_ALL_FRAMES"
 echo "NUM_INPUT_VIEWS: $NUM_INPUT_VIEWS"
+echo "EXCLUDE_WHITE_ENV0_FROM_RELIT: $EXCLUDE_WHITE_ENV0_FROM_RELIT"
 echo "RENDER_ALL_VIEWS: $RENDER_ALL_VIEWS"
 echo "RENDER_VIDEO: $RENDER_VIDEO"
 echo "VIEW_CHUNK_SIZE: $VIEW_CHUNK_SIZE"
@@ -96,6 +98,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.batch_size_per_gpu = 1 \
     training.num_input_views = ${NUM_INPUT_VIEWS} \
     training.load_all_frames = ${LOAD_ALL_FRAMES} \
+    training.exclude_white_env0_from_relit_sampling = ${EXCLUDE_WHITE_ENV0_FROM_RELIT} \
     inference.if_inference = true \
     inference.compute_metrics = true \
     inference.render_all_views = ${RENDER_ALL_VIEWS} \

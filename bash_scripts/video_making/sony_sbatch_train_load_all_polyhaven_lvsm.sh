@@ -43,6 +43,7 @@ export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export LOAD_ALL_FRAMES="${LOAD_ALL_FRAMES:-true}"
 export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-10}"
 export LOAD_ALL_MAX_TARGET_VIEWS="${LOAD_ALL_MAX_TARGET_VIEWS:-32}"
+export EXCLUDE_WHITE_ENV0_FROM_RELIT="${EXCLUDE_WHITE_ENV0_FROM_RELIT:-true}"
 
 ############################
 # Logging
@@ -58,6 +59,7 @@ echo "RESUME_CKPT: $RESUME_CKPT"
 echo "LOAD_ALL_FRAMES: $LOAD_ALL_FRAMES"
 echo "NUM_INPUT_VIEWS: $NUM_INPUT_VIEWS"
 echo "LOAD_ALL_MAX_TARGET_VIEWS: $LOAD_ALL_MAX_TARGET_VIEWS"
+echo "EXCLUDE_WHITE_ENV0_FROM_RELIT: $EXCLUDE_WHITE_ENV0_FROM_RELIT"
 echo "----------------------------------------------"
 echo ""
 
@@ -97,6 +99,7 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.num_input_views = ${NUM_INPUT_VIEWS} \
     training.load_all_frames = ${LOAD_ALL_FRAMES} \
     training.load_all_max_target_views = ${LOAD_ALL_MAX_TARGET_VIEWS} \
+    training.exclude_white_env0_from_relit_sampling = ${EXCLUDE_WHITE_ENV0_FROM_RELIT} \
     training.lr = ${LEARNING_RATE} \
     training.warmup = ${WARMUP_STEPS} \
     training.dpt_transfer.enabled = true \
