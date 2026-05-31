@@ -1220,6 +1220,64 @@ class LatentSceneEditor(nn.Module):
         
         return result
 
+    @torch.no_grad()
+    def render_full_target_for_vis(self, data_batch, view_chunk_size=4):
+        """
+        Render ALL target frames in json order for visualization/video saving.
+
+        Decoupled from the training forward: the training loss may operate on a
+        capped/sampled target subset for memory safety, but for saved images we want
+        the complete, ordered sequence. Rendering is chunked over target views to
+        keep peak memory bounded, and uses the same renderer() path as training so
+        the DPT multi-scale decode stays consistent.
+
+        Returns an edict matching `forward`'s result structure (without loss):
+            input, target (all frames, json order), render (all frames).
+        """
+        input, target = self.process_data(
+            data_batch,
+            has_target_image=True,
+            target_has_input=self.config.training.target_has_input,
+            compute_rays=True,
+            force_full_target=True,
+        )
+
+        latent_tokens, n_patches, d = self.reconstructor(input)
+
+        multi_edit_cfg = self.config.training.get("multi_edit", {})
+        multi_edit_enable = bool(multi_edit_cfg.get("enable", False))
+        multi_edit_mode = multi_edit_cfg.get("mode", "latent_chain")
+
+        chain_info = None
+        if multi_edit_enable and multi_edit_mode == "latent_chain":
+            latent_tokens, chain_info = self._run_multi_edit_chain(latent_tokens, input, d)
+        if (not multi_edit_enable) or (chain_info is None):
+            condition_tokens = self._build_editor_condition_tokens(input, d)
+            latent_tokens = self._apply_editor_once(latent_tokens, condition_tokens)
+
+        v_total = target.ray_o.shape[1]
+        if view_chunk_size is None or view_chunk_size <= 0:
+            view_chunk_size = v_total
+        rendered_chunks = []
+        for start in range(0, v_total, view_chunk_size):
+            end = min(start + view_chunk_size, v_total)
+            sub_target = edict(
+                ray_o=target.ray_o[:, start:end],
+                ray_d=target.ray_d[:, start:end],
+                image_h_w=target.image_h_w,
+            )
+            rendered_chunks.append(
+                self.renderer(latent_tokens, sub_target, n_patches, d, checkpoint_every=None)
+            )
+        rendered_images = torch.cat(rendered_chunks, dim=1)
+
+        return edict(
+            input=input,
+            target=target,
+            loss_metrics=None,
+            render=rendered_images,
+        )
+
     def edit_scene_with_env(self, latent_tokens, input_with_env):
         """
         Edit scene latent tokens using configured lighting conditions from input.

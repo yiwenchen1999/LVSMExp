@@ -208,7 +208,7 @@ class ProcessData(nn.Module):
         
         return env_dir
     
-    def fetch_views(self, data_batch, has_target_image=False, target_has_input=True):
+    def fetch_views(self, data_batch, has_target_image=False, target_has_input=True, force_full_target=False):
         """
         Splits the input data batch into input and target sets.
         
@@ -218,6 +218,9 @@ class ProcessData(nn.Module):
                 - 'fxfycxcy' (torch.Tensor): Shape [b, v, 4]
                 - 'c2w' (torch.Tensor): Shape [b, v, 4, 4]
             target_has_input (bool): If True, target includes input views.
+            force_full_target (bool): If True and load_all_frames is enabled, bypass the
+                training target cap and return ALL frames in json order. Used for
+                visualization/video saving so the saved sequence is complete and ordered.
 
         Returns:
             tuple: (input_dict, target_dict), both as EasyDict objects.
@@ -245,7 +248,7 @@ class ProcessData(nn.Module):
             bs = data_batch["c2w"].size(0)
             target_positions = None
 
-            if (not is_inference) and max_target_views > 0 and num_views > max_target_views:
+            if (not is_inference) and (not force_full_target) and max_target_views > 0 and num_views > max_target_views:
                 device = data_batch["c2w"].device
                 sampled_idx = []
                 for _ in range(bs):
@@ -402,7 +405,7 @@ class ProcessData(nn.Module):
 
     
     @torch.no_grad()
-    def forward(self, data_batch, has_target_image=True, target_has_input=True, compute_rays=True):
+    def forward(self, data_batch, has_target_image=True, target_has_input=True, compute_rays=True, force_full_target=False):
         """
         Preprocesses the input data batch and (optionally) computes ray_o and ray_d.
 
@@ -424,7 +427,7 @@ class ProcessData(nn.Module):
                 - 'ray_d' (torch.Tensor): Shape [b, v, 3, h, w]
                 - 'image_h_w' (tuple): (height, width)
         """
-        input_dict, target_dict = self.fetch_views(data_batch, has_target_image=has_target_image, target_has_input=target_has_input)
+        input_dict, target_dict = self.fetch_views(data_batch, has_target_image=has_target_image, target_has_input=target_has_input, force_full_target=force_full_target)
 
         if compute_rays:
             for dict in [input_dict, target_dict]:

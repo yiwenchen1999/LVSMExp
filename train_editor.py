@@ -740,7 +740,25 @@ while cur_train_step <= total_train_steps:
         if export_inter_results:
             vis_path = os.path.join(config.training.checkpoint_dir, f"iter_{cur_train_step:08d}")
             os.makedirs(vis_path, exist_ok=True)
-            visualize_intermediate_results(vis_path, ret_dict)
+            if load_all_frames:
+                # Decoupled visualization: render ALL target frames in json order
+                # (chunked, no-grad) so saved images are complete and ordered, even
+                # though the training loss used a capped target subset.
+                vis_model = model.module if isinstance(model, DDP) else model
+                was_training = vis_model.training
+                vis_model.eval()
+                vis_chunk = int(config.training.get("load_all_vis_chunk_size", 4))
+                with torch.no_grad(), torch.autocast(
+                    enabled=config.training.use_amp,
+                    device_type="cuda",
+                    dtype=amp_dtype_mapping[config.training.amp_dtype],
+                ):
+                    vis_dict = vis_model.render_full_target_for_vis(batch, view_chunk_size=vis_chunk)
+                visualize_intermediate_results(vis_path, vis_dict)
+                if was_training:
+                    vis_model.train()
+            else:
+                visualize_intermediate_results(vis_path, ret_dict)
             torch.cuda.empty_cache()
             model.train()
 
