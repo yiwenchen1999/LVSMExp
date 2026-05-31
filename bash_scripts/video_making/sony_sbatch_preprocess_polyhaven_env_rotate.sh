@@ -34,6 +34,10 @@ export OUTPUT_DIR="${OUTPUT_DIR:-/music-shared-disk/group/ct/yiwen/data/objavers
 export SCENE_LIST="${SCENE_LIST:-$PROJ/metadata/polyhaven_env_rotate.json}"
 export SPLIT="${SPLIT:-test}"
 export N_VARIATIONS="${N_VARIATIONS:-8}"
+# For limited inference/debugging: sample a shared consecutive frame chunk per object.
+# This chunk is reused across scenes with same object id (e.g., Camera_01_env_0/env_1).
+export CONSECUTIVE_FRAMES="${CONSECUTIVE_FRAMES:-20}"
+export FRAME_CHUNK_SEED="${FRAME_CHUNK_SEED:-777}"
 
 ############################
 # Logging
@@ -50,6 +54,8 @@ echo "HDRI_DIR: $HDRI_DIR"
 echo "SCENE_LIST: $SCENE_LIST"
 echo "SPLIT: $SPLIT"
 echo "N_VARIATIONS: $N_VARIATIONS"
+echo "CONSECUTIVE_FRAMES: $CONSECUTIVE_FRAMES"
+echo "FRAME_CHUNK_SEED: $FRAME_CHUNK_SEED"
 echo "----------------------------------------------"
 echo ""
 
@@ -92,7 +98,9 @@ singularity exec --nv $BIND $SIF bash -lc "
     --split \"$SPLIT\" \
     --hdri-dir \"$HDRI_DIR\" \
     --scene-list \"$SCENE_LIST\" \
-    --n-variations \"$N_VARIATIONS\"
+    --n-variations \"$N_VARIATIONS\" \
+    --consecutive-frames \"$CONSECUTIVE_FRAMES\" \
+    --frame-chunk-seed \"$FRAME_CHUNK_SEED\"
 "
 
 echo ""

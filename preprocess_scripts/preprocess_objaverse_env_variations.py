@@ -29,6 +29,7 @@ import shutil
 import io
 import tarfile
 import re
+import random
 import torch
 import torch.nn.functional as F
 import cv2
@@ -201,6 +202,41 @@ def _extract_object_id_from_scene(scene_name):
     if m:
         return m.group(1)
     return scene_name.rsplit("_", 1)[0]
+
+
+def _sample_shared_consecutive_indices(frame_index_sets, chunk_len, rng):
+    """
+    Sample one consecutive frame chunk shared by all scenes of the same object.
+    Returns (selected_indices_set, start_idx) or (None, None) if unavailable.
+    """
+    if chunk_len is None or chunk_len <= 0:
+        return None, None
+    if not frame_index_sets:
+        return None, None
+
+    common_idx = set(frame_index_sets[0])
+    for s in frame_index_sets[1:]:
+        common_idx &= set(s)
+    if len(common_idx) < chunk_len:
+        return None, None
+
+    common_sorted = sorted(common_idx)
+    common_set = set(common_sorted)
+    valid_starts = []
+    for st in common_sorted:
+        ok = True
+        for off in range(chunk_len):
+            if (st + off) not in common_set:
+                ok = False
+                break
+        if ok:
+            valid_starts.append(st)
+    if not valid_starts:
+        return None, None
+
+    start_idx = rng.choice(valid_starts)
+    selected = set(range(start_idx, start_idx + chunk_len))
+    return selected, start_idx
 
 
 def blender_to_opencv_c2w(c2w_blender):
@@ -539,8 +575,9 @@ def load_scene_list(scene_list_path):
         return None, None
 
 
-def process_objaverse_scene(objaverse_root, object_id, output_root, split='test', hdri_dir=None, n_variations=1, 
-                            scenes_with_variations=None, scenes_without_variations=None):
+def process_objaverse_scene(objaverse_root, object_id, output_root, split='test', hdri_dir=None, n_variations=1,
+                            scenes_with_variations=None, scenes_without_variations=None,
+                            consecutive_frames=0, frame_chunk_rng=None):
     """
     Process a single Objaverse object and convert all env scenes to re10k format with variations.
     
@@ -553,6 +590,9 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         n_variations: Number of variations to create for each scene (default: 1)
         scenes_with_variations: Set of scene names to process with variations (if None, process all with variations)
         scenes_without_variations: Set of scene names to process without variations (if None, process all without variations)
+        consecutive_frames: If > 0, sample this many consecutive frames per object and
+            apply the same frame chunk to all scenes of the object.
+        frame_chunk_rng: Random generator used for chunk start sampling.
         
     Returns:
         tuple: (processed_scenes_with_variations, processed_scenes_without_variations) as lists
@@ -588,49 +628,85 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         print(f"Warning: No env folders found in {split_path}, skipping {object_id}")
         return
     
-    # Process each env folder as a separate scene, creating n_variations for each
-    processed_scenes_with_variations = []  # Track scenes processed with variations
-    processed_scenes_without_variations = []  # Track scenes processed without variations
-    
+    if frame_chunk_rng is None:
+        frame_chunk_rng = random
+
+    # Build scene plans first so we can sample one shared frame chunk per object.
+    scene_plans = []
     for env_folder in sorted(env_folders):
-        # Find all gt_*.png images and filter to only numeric indices.
         image_files_with_idx = _list_numeric_gt_images(split_path, env_folder)
-        
         if not image_files_with_idx:
             print(f"Warning: No valid gt_*.png images with numeric indices found for {object_id}/{env_folder}, skipping")
             continue
-        
-        # Sort by frame index
         image_files_with_idx.sort(key=lambda x: x[0])
-        
+
+        base_scene_name = f"{object_id}_{env_folder}"
+        should_process_with_variations = False
+        should_process_without_variations = False
+        if scenes_with_variations is not None or scenes_without_variations is not None:
+            if scenes_with_variations is not None and base_scene_name in scenes_with_variations:
+                should_process_with_variations = True
+            elif scenes_without_variations is not None and base_scene_name in scenes_without_variations:
+                should_process_without_variations = True
+            else:
+                print(f"Skipping {base_scene_name}: not in scene list")
+                continue
+        else:
+            should_process_with_variations = True
+
+        scene_plans.append({
+            "env_folder": env_folder,
+            "base_scene_name": base_scene_name,
+            "image_files_with_idx": image_files_with_idx,
+            "should_process_with_variations": should_process_with_variations,
+            "should_process_without_variations": should_process_without_variations,
+        })
+
+    if len(scene_plans) == 0:
+        return None
+
+    selected_frame_idx_set = None
+    if consecutive_frames and int(consecutive_frames) > 0:
+        chunk_len = int(consecutive_frames)
+        frame_sets = [[idx for idx, _ in p["image_files_with_idx"]] for p in scene_plans]
+        selected_frame_idx_set, chunk_start = _sample_shared_consecutive_indices(frame_sets, chunk_len, frame_chunk_rng)
+        if selected_frame_idx_set is None:
+            print(
+                f"Warning: Cannot find shared consecutive chunk of {chunk_len} frames for object {object_id}; skipping object"
+            )
+            return None
+        print(
+            f"Object {object_id}: using shared frame chunk [{chunk_start}, {chunk_start + chunk_len - 1}] "
+            f"({chunk_len} consecutive frames)"
+        )
+
+    # Process each planned scene, creating n_variations for each.
+    processed_scenes_with_variations = []  # Track scenes processed with variations
+    processed_scenes_without_variations = []  # Track scenes processed without variations
+
+    for plan in scene_plans:
+        env_folder = plan["env_folder"]
+        base_scene_name = plan["base_scene_name"]
+        should_process_with_variations = plan["should_process_with_variations"]
+        should_process_without_variations = plan["should_process_without_variations"]
+        image_files_with_idx = plan["image_files_with_idx"]
+
+        if selected_frame_idx_set is not None:
+            image_files_with_idx = [(idx, img) for idx, img in image_files_with_idx if idx in selected_frame_idx_set]
+            image_files_with_idx.sort(key=lambda x: x[0])
+            if len(image_files_with_idx) != int(consecutive_frames):
+                print(
+                    f"Warning: {base_scene_name} does not contain the sampled shared frame chunk, skipping this scene"
+                )
+                continue
+
         # Get image dimensions from first image
         try:
             image_width, image_height = _read_image_size_from_source(split_path, env_folder, image_files_with_idx[0][1])
         except Exception as e:
             print(f"Error reading first image for {object_id}/{env_folder}: {e}, skipping")
             continue
-        
-        # Base scene name: object_id_env_folder
-        base_scene_name = f"{object_id}_{env_folder}"
-        
-        # Determine if this scene should be processed and with or without variations
-        should_process_with_variations = False
-        should_process_without_variations = False
-        
-        if scenes_with_variations is not None or scenes_without_variations is not None:
-            # Scene list is provided - check if scene is in either list
-            if scenes_with_variations is not None and base_scene_name in scenes_with_variations:
-                should_process_with_variations = True
-            elif scenes_without_variations is not None and base_scene_name in scenes_without_variations:
-                should_process_without_variations = True
-            else:
-                # Scene not in either list, skip it
-                print(f"Skipping {base_scene_name}: not in scene list")
-                continue
-        else:
-            # No scene list provided - process all scenes with variations
-            should_process_with_variations = True
-        
+
         # Determine number of variations to create
         if should_process_with_variations:
             actual_n_variations = n_variations
@@ -982,6 +1058,10 @@ def main():
                        help='Maximum number of objects to process (overrides --test-run if specified)')
     parser.add_argument('--scene-list', type=str, default=None,
                        help='Path to JSON file containing list of scenes to process. If provided, only scenes in this list will be processed. Supports list format ["scene1", "scene2"] or dict format {"scene1": {...}, "scene2": {...}}')
+    parser.add_argument('--consecutive-frames', type=int, default=0,
+                       help='If > 0, sample this many consecutive frames per object and use the same chunk for all scenes of that object.')
+    parser.add_argument('--frame-chunk-seed', type=int, default=777,
+                       help='Random seed used when sampling object-level consecutive frame chunks.')
     
     args = parser.parse_args()
     
@@ -994,6 +1074,9 @@ def main():
     
     if args.n_variations < 1:
         print(f"Error: --n-variations must be >= 1, got {args.n_variations}")
+        return
+    if args.consecutive_frames < 0:
+        print(f"Error: --consecutive-frames must be >= 0, got {args.consecutive_frames}")
         return
     
     # Load scene list if provided
@@ -1032,12 +1115,19 @@ def main():
         print(f"TEST RUN: Processing first {test_count} objects only (from {original_count} total)")
     
     print(f"Processing {len(object_ids)} objects with {args.n_variations} variations per scene...")
+    if args.consecutive_frames > 0:
+        print(
+            f"Object-level frame chunk mode enabled: {args.consecutive_frames} consecutive frames "
+            f"(seed={args.frame_chunk_seed})"
+        )
     
     broken_scenes = []
     processed_scenes_with_variations = []
     processed_scenes_without_variations = []
     skipped_scenes = []  # Scenes that were skipped because files already exist
     
+    frame_chunk_rng = random.Random(args.frame_chunk_seed)
+
     for object_id in sorted(object_ids):
         print(f"\nProcessing object: {object_id}")
         try:
@@ -1045,7 +1135,9 @@ def main():
                                             split=args.split, hdri_dir=args.hdri_dir,
                                             n_variations=args.n_variations, 
                                             scenes_with_variations=scenes_with_variations,
-                                            scenes_without_variations=scenes_without_variations)
+                                            scenes_without_variations=scenes_without_variations,
+                                            consecutive_frames=args.consecutive_frames,
+                                            frame_chunk_rng=frame_chunk_rng)
             if result == "broken":
                 # Find all scenes for this object and mark them as broken
                 split_path = os.path.join(objaverse_root, object_id, args.split)
