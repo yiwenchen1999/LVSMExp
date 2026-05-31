@@ -47,6 +47,20 @@ class Dataset(Dataset):
         self.use_relight_envmap = "envmap" in self.relight_signals
         self.use_relight_point_light = "point_light" in self.relight_signals
 
+        def _is_allowed_input_scene(scene_name: str) -> bool:
+            scene_type = self._scene_lighting_type(scene_name)
+            # envmap-only: strictly keep *_env_* and *_white_env_* scenes.
+            if self.use_relight_envmap and (not self.use_relight_point_light):
+                return scene_type == "envmap"
+            # point-light-only: allow pure point-light and combined scenes.
+            if self.use_relight_point_light and (not self.use_relight_envmap):
+                return scene_type in ("point_light", "combined")
+            # both signals enabled: allow all relightable lighting scene types.
+            if self.use_relight_envmap and self.use_relight_point_light:
+                return scene_type in ("envmap", "point_light", "combined")
+            # Fallback default (no valid signal configured): behave like envmap-only.
+            return scene_type == "envmap"
+
         # Filter scenes if whiteEnvInput is enabled
         # Only keep scenes ending with "white_env_0" as input images
         self.whiteEnvInput = self.config.training.get("whiteEnvInput", False)
@@ -83,6 +97,8 @@ class Dataset(Dataset):
             for scene_path in self.all_scene_paths:
                 metadata_dir = os.path.dirname(scene_path)
                 scene_name = os.path.basename(scene_path).replace('.json', '')
+                if not _is_allowed_input_scene(scene_name):
+                    continue
                 object_id = self._extract_object_id(scene_name)
                 envmap_candidates = _envmap_by_dir[metadata_dir].get(object_id, set()) - {scene_name}
                 # combined_candidates = _combined_by_dir[metadata_dir].get(object_id, set()) - {scene_name}
@@ -93,17 +109,11 @@ class Dataset(Dataset):
             print(f"condition_reverse enabled: Filtered to {len(self.all_scene_paths)} scenes with envmap relit candidates (from {total_scenes_before} total)")
         else:
             total_scenes_before = len(self.all_scene_paths)
-            _valid_tags = ["_env_", "_white_env_", "_area_", "_multi_pl_", "_combined_"]
-            # "combined_*" scenes carry a point-light component; drop them as primary
-            # scenes when point_light is not an enabled relight signal.
-            if not self.use_relight_point_light:
-                _valid_tags = [tag for tag in _valid_tags if tag != "_combined_"]
-            _valid_tags = tuple(_valid_tags)
             filtered_scene_paths = []
             for scene_path in self.all_scene_paths:
                 file_name = os.path.basename(scene_path)
                 scene_name = file_name.replace('.json', '')
-                if any(tag in scene_name for tag in _valid_tags):
+                if _is_allowed_input_scene(scene_name):
                     filtered_scene_paths.append(scene_path)
             self.all_scene_paths = filtered_scene_paths
             print(f"whiteEnvInput disabled: Filtered to {len(self.all_scene_paths)} scenes with valid lighting tags (from {total_scenes_before} total)")
@@ -720,10 +730,12 @@ class Dataset(Dataset):
 
                 candidate_scenes = []
                 if self.condition_reverse:
-                    candidate_scenes = list(candidate_scenes_by_type["envmap"])
-                    if len(candidate_scenes) == 0:
+                    # Respect enabled signal types even in reverse-conditioning mode.
+                    if self.use_relight_envmap:
+                        candidate_scenes = list(candidate_scenes_by_type["envmap"])
+                    if len(candidate_scenes) == 0 and self.use_relight_point_light:
                         candidate_scenes = list(candidate_scenes_by_type["combined"])
-                    if len(candidate_scenes) == 0:
+                    if len(candidate_scenes) == 0 and self.use_relight_point_light:
                         candidate_scenes = list(candidate_scenes_by_type["point_light"])
                 else:
                     for sig in enabled_signal_types:
