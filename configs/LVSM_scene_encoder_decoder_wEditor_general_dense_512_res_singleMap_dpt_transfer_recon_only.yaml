@@ -1,0 +1,147 @@
+# Recon-only variant of the 512x512 DPT-transfer scene finetune.
+# recon_only=true skips the editor pass entirely (encoder -> decoder only),
+# supervises against the same-scene target.image, and disables relit/envmap IO.
+# The dataset trains on ALL scenes in full_list.txt (no lighting-type filtering).
+
+model:
+  class_name: model.LVSM_scene_encoder_decoder_wEditor.LatentSceneEditor
+
+  image_tokenizer:
+    image_size: 512
+    patch_size: 8
+    in_channels: 9  # 3 RGB + 3 direction + 3 Reference
+
+  target_pose_tokenizer:
+    image_size: 512
+    patch_size: 8
+    in_channels: 6  # 3 direction + 3 Reference
+
+  env_tokenizer:
+    image_size: 256
+    patch_size: 8
+    in_channels: 9  # 3 RGB + 3 ray_d
+
+  decoder_head:
+    type: dpt
+    dpt:
+      layer_indices: [3, 6, 9, 12]
+      feature_dim: 256
+      fusion_mode: add
+      upsample_mode: bilinear
+      out_activation: sigmoid
+      gate_init:
+        l3: 0.0
+        l6: 0.0
+        l9: 0.0
+        l12: 1.0
+
+  transformer:
+    d: 768
+    d_head: 64
+    encoder_n_layer: 12
+    decoder_n_layer: 12
+    special_init: true
+    depth_init: true
+    use_qk_norm: true
+    n_latent_vectors: 3072 # 3x32x32
+    editor:
+      n_layer: 12
+      init_scale: 0.1
+      init_from_decoder: false
+    freeze_reconstructor_renderer: false
+
+training:
+  amp_dtype: bf16
+  api_key_path: ./configs/api_keys.yaml
+  batch_size_per_gpu: 8
+  beta1: 0.9
+  beta2: 0.95
+  allowed_gradnorm_factor: 5
+  center_crop: true
+  scene_scale_factor: 1.35
+  LVSM_checkpoint_dir: ckpt/LVSM_object_encoder_decoder_512
+  checkpoint_dir: ckpt/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer_recon_only
+  checkpoint_every: 2000
+  dataset_name: data.dataset_scene.Dataset
+  dataset_path: /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps/test/full_list.txt
+  # recon_only: encoder-decoder reconstruction only (no editor pass).
+  recon_only: true
+  # Force-disable relit/envmap loading; recon_only supervises on target.image.
+  use_relit_images: false
+  whiteEnvInput: false
+  single_env_map: true
+  relight_signals: ["envmap"]
+  multi_edit:
+    enable: false
+    mode: latent_chain
+    max_steps: 3
+    sample_mode: uniform
+    force_all_steps: false
+    final_only: true
+    insufficient_chain_policy: resample
+  grad_accum_steps: 1
+  grad_checkpoint_every: 1
+  grad_clip_norm: 1.0
+  l2_loss_weight: 1.0
+  lpips_loss_weight: 0.0
+  perceptual_loss_weight: 0.5
+  reset_training_state: true
+
+  lr: 0.0001
+  train_steps: 100000
+  num_input_views: 8
+  num_target_views: 8
+  num_threads: 4
+  num_views: 12
+  num_workers: 2
+  prefetch_factor: 32
+  print_every: 20
+
+  square_crop: true
+  target_has_input: true
+  use_amp: true
+  use_rel_pose: false
+  use_tf32: true
+  view_selector:
+    max_frame_dist: 50
+    min_frame_dist: 17
+  vis_every: 1000
+  wandb_exp_name: LVSM_edit_dense_general_512_dptTransfer_singleMap_recon_only
+  wandb_log_every: 50
+  wandb_project: LVSM
+  warmup: 3000
+
+  weight_decay: 0.05
+
+  dpt_transfer:
+    enabled: true
+    train_stage: auto   # stage1 | stage2 | auto
+    stage1_steps: 5000
+    freeze_backbone_in_stage1: true
+    use_teacher_distill: false
+    distill_weight: 0.0
+    stage2_unfreeze: all  # all | decoder_only
+    backbone_lr_scale: 0.1
+    gate_init:
+      l3: 0.0
+      l6: 0.0
+      l9: 0.0
+      l12: 1.0
+    gate_ramp_steps:
+      l9_start: 0
+      l6_start: 2000
+      l3_start: 4000
+      ramp_len: 2000
+
+inference:
+  if_inference: false
+  compute_metrics: false
+  # null => random view_selector in dataset_scene (same as train_editor / sony_infer_512.sh).
+  # For fixed views, override CLI: inference.view_idx_file_path=/path/to/evaluation_index.json
+  view_idx_file_path: null
+  render_video: false
+  render_video_config:
+    traj_type: interpolate
+    num_frames: 60
+    loop_video: true
+    order_poses: false

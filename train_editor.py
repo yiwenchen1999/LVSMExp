@@ -261,6 +261,9 @@ if isinstance(relight_signals, str):
 config.training.relight_signals = list(relight_signals)
 print(f"------0.0.1 relight_signals: {config.training.relight_signals}------")
 
+recon_only = bool(config.training.get("recon_only", False))
+print(f"------0.0.2 recon_only: {recon_only}------")
+
 os.environ["OMP_NUM_THREADS"] = str(config.training.get("num_threads", 1))
 
 # Set up DDP for training/inference and fix random seed.

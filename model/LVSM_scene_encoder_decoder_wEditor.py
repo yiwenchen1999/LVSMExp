@@ -1048,8 +1048,12 @@ class LatentSceneEditor(nn.Module):
         pass_renders_context = None
         pass_targets_context = None
 
+        # recon_only: skip the editor pass entirely (encoder -> decoder only) and
+        # supervise against the same-scene target.image. Multi-edit is force-disabled.
+        recon_only = bool(self.config.training.get("recon_only", False))
+
         multi_edit_cfg = self.config.training.get("multi_edit", {})
-        multi_edit_enable = bool(multi_edit_cfg.get("enable", False))
+        multi_edit_enable = bool(multi_edit_cfg.get("enable", False)) and (not recon_only)
         multi_edit_mode = multi_edit_cfg.get("mode", "latent_chain")
 
         if multi_edit_enable and multi_edit_mode == "forward_chain":
@@ -1089,7 +1093,8 @@ class LatentSceneEditor(nn.Module):
             latent_tokens, n_patches, d = self.reconstructor(input)
             if multi_edit_enable:
                 latent_tokens, chain_info = self._run_multi_edit_chain(latent_tokens, input, d)
-            if (not multi_edit_enable) or (chain_info is None):
+            # recon_only: do NOT run the editor; render straight from reconstructor tokens.
+            if (not recon_only) and ((not multi_edit_enable) or (chain_info is None)):
                 condition_tokens = self._build_editor_condition_tokens(input, d)
                 latent_tokens = self._apply_editor_once(latent_tokens, condition_tokens)
 
@@ -1127,8 +1132,11 @@ class LatentSceneEditor(nn.Module):
                     max_steps=chain_info["max_steps"],
                 )
 
-            # Check if relit_images are available in target (from relit scene)
-            if chain_target_images is not None:
+            # Check if relit_images are available in target (from relit scene).
+            # recon_only always supervises against the same-scene target.image.
+            if recon_only:
+                target_images = target.image
+            elif chain_target_images is not None:
                 target_images = chain_target_images
             elif hasattr(target, 'relit_images') and target.relit_images is not None:
                 target_images = target.relit_images
@@ -1244,14 +1252,16 @@ class LatentSceneEditor(nn.Module):
 
         latent_tokens, n_patches, d = self.reconstructor(input)
 
+        recon_only = bool(self.config.training.get("recon_only", False))
         multi_edit_cfg = self.config.training.get("multi_edit", {})
-        multi_edit_enable = bool(multi_edit_cfg.get("enable", False))
+        multi_edit_enable = bool(multi_edit_cfg.get("enable", False)) and (not recon_only)
         multi_edit_mode = multi_edit_cfg.get("mode", "latent_chain")
 
         chain_info = None
         if multi_edit_enable and multi_edit_mode == "latent_chain":
             latent_tokens, chain_info = self._run_multi_edit_chain(latent_tokens, input, d)
-        if (not multi_edit_enable) or (chain_info is None):
+        # recon_only: render directly from reconstructor tokens (no editor pass).
+        if (not recon_only) and ((not multi_edit_enable) or (chain_info is None)):
             condition_tokens = self._build_editor_condition_tokens(input, d)
             latent_tokens = self._apply_editor_once(latent_tokens, condition_tokens)
 

@@ -47,7 +47,17 @@ class Dataset(Dataset):
         self.use_relight_envmap = "envmap" in self.relight_signals
         self.use_relight_point_light = "point_light" in self.relight_signals
 
+        # recon_only: encoder-decoder reconstruction only (no editor). In this mode we
+        # never load relit/envmap/point-light fields and we do NOT filter the scene
+        # list by lighting type (every scene in full_list is a valid input scene).
+        self.recon_only = bool(self.config.training.get("recon_only", False))
+        if self.recon_only:
+            self.use_relit_images = False
+
         def _is_allowed_input_scene(scene_name: str) -> bool:
+            # recon_only trains on all scenes regardless of lighting tag.
+            if self.recon_only:
+                return True
             scene_type = self._scene_lighting_type(scene_name)
             # envmap-only: strictly keep *_env_* and *_white_env_* scenes.
             if self.use_relight_envmap and (not self.use_relight_point_light):
