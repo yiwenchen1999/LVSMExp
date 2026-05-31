@@ -96,8 +96,12 @@ class Dataset(Dataset):
         self.inference = self.config.inference.get("if_inference", False)
         self.render_all_views = self.config.inference.get("render_all_views", False)
         self.load_all_frames = bool(self.config.training.get("load_all_frames", False))
+        # Inference-time random contiguous-chunk sampling (bypasses view_idx json).
+        self.random_chunk_sampling = bool(self.config.inference.get("random_chunk_sampling", False))
+        random_chunk_seed = self.config.inference.get("random_chunk_seed", None)
+        self._chunk_rng = random.Random(random_chunk_seed) if random_chunk_seed is not None else random
         # Load file that specifies the input and target view indices to use for inference
-        if self.inference and (not self.load_all_frames):
+        if self.inference and (not self.load_all_frames) and (not self.random_chunk_sampling):
             self.view_idx_list = dict()
             if self.config.inference.get("view_idx_file_path", None) is not None:
                 if os.path.exists(self.config.inference.view_idx_file_path):
@@ -512,6 +516,49 @@ class Dataset(Dataset):
         remaining_indices = [i for i in all_indices if i not in seen]
         return context_indices + remaining_indices
 
+    def random_chunk_view_selector(self, num_frames):
+        """Pick a random contiguous chunk of (n_context + n_target) frames, then place
+        n_context context frames evenly within the chunk. Returns indices ordered as
+        [context_frames..., target_frames...] (both ascending by frame id) so the
+        downstream input/target split stays stable.
+        """
+        n_context = int(self.config.training.num_input_views)
+        n_target = int(self.config.training.num_target_views)
+        chunk_len = n_context + n_target
+        if n_context <= 0 or chunk_len <= 0:
+            return None
+        if num_frames < chunk_len:
+            return None
+
+        start = self._chunk_rng.randint(0, num_frames - chunk_len)
+        window = list(range(start, start + chunk_len))  # contiguous, json order
+
+        # Evenly place context positions within the chunk.
+        raw_positions = np.linspace(0, chunk_len - 1, num=n_context)
+        ctx_pos = []
+        seen_pos = set()
+        for p in raw_positions:
+            pi = int(round(float(p)))
+            pi = max(0, min(chunk_len - 1, pi))
+            if pi not in seen_pos:
+                seen_pos.add(pi)
+                ctx_pos.append(pi)
+
+        # Fill any dedup gaps so we always get exactly n_context context frames.
+        if len(ctx_pos) < n_context:
+            for pi in range(chunk_len):
+                if pi not in seen_pos:
+                    seen_pos.add(pi)
+                    ctx_pos.append(pi)
+                if len(ctx_pos) >= n_context:
+                    break
+
+        ctx_pos = sorted(ctx_pos[:n_context])
+        ctx_pos_set = set(ctx_pos)
+        context_ids = [window[p] for p in ctx_pos]
+        target_ids = [window[p] for p in range(chunk_len) if p not in ctx_pos_set]
+        return context_ids + target_ids
+
     def __getitem__(self, idx, max_retries=10, _retry_count=0):
         """
         Get item from dataset with error handling and retry logic.
@@ -553,6 +600,12 @@ class Dataset(Dataset):
                 image_indices = self.load_all_view_selector(len(frames))
                 if image_indices is None:
                     print(f"load_all_view_selector returned None for scene {scene_name} at index {idx}, trying another random index")
+                    return self.__getitem__(random.randint(0, len(self) - 1), max_retries=max_retries, _retry_count=_retry_count + 1)
+            elif self.inference and self.random_chunk_sampling:
+                # Random contiguous chunk with evenly-placed context frames (bypass view_idx json).
+                image_indices = self.random_chunk_view_selector(len(frames))
+                if image_indices is None:
+                    print(f"random_chunk_view_selector returned None for scene {scene_name} at index {idx}, trying another random index")
                     return self.__getitem__(random.randint(0, len(self) - 1), max_retries=max_retries, _retry_count=_retry_count + 1)
             elif self.inference and self.render_all_views:
                 # Load ALL frames: context from view_idx (or first N), rest as targets

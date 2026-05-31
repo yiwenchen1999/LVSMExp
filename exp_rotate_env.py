@@ -398,9 +398,18 @@ with torch.no_grad(), torch.autocast(
         # Get this from the dataset's view_idx_list or infer from input shape
         v_input = input.image.shape[1]
         
-        # Try to get actual indices from view_idx_list
+        # Prefer the actual sampled context frame ids from this batch.
+        # This is required for random_chunk_sampling (and is correct for any sampler),
+        # since the context frames are not necessarily 0..v_input-1.
         input_indices = None
-        if hasattr(dataset, 'view_idx_list') and scene_name in dataset.view_idx_list:
+        if hasattr(input, "index") and input.index is not None:
+            try:
+                input_indices = input.index[0, :, 0].detach().cpu().long().tolist()
+            except Exception:
+                input_indices = None
+        
+        # Fallback: actual indices from view_idx_list json (legacy eval-index mode)
+        if input_indices is None and hasattr(dataset, 'view_idx_list') and scene_name in dataset.view_idx_list:
             view_idx_info = dataset.view_idx_list[scene_name]
             if 'context' in view_idx_info:
                 input_indices = view_idx_info['context'][:v_input]
