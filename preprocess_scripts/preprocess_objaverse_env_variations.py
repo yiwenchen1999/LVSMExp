@@ -26,6 +26,9 @@ import argparse
 from pathlib import Path
 from PIL import Image
 import shutil
+import io
+import tarfile
+import re
 import torch
 import torch.nn.functional as F
 import cv2
@@ -35,6 +38,169 @@ try:
 except ImportError:
     HAS_PYEXR = False
     print("Warning: pyexr not available, HDR EXR files cannot be read")
+
+
+def _resolve_env_source(split_path, env_folder):
+    """Return ('dir'|'tar'|None, source_path) for env folder data."""
+    dir_path = os.path.join(split_path, env_folder)
+    tar_path = os.path.join(split_path, f"{env_folder}.tar")
+    if os.path.isdir(dir_path):
+        return "dir", dir_path
+    if os.path.isfile(tar_path):
+        return "tar", tar_path
+    return None, None
+
+
+def _list_env_folders(split_path):
+    """List env folders from either extracted dirs or compressed .tar files."""
+    env_names = set()
+    if not os.path.isdir(split_path):
+        return []
+    for item in os.listdir(split_path):
+        item_path = os.path.join(split_path, item)
+        if os.path.isdir(item_path) and (item.startswith("env_") or item.startswith("white_env_")):
+            env_names.add(item)
+        elif os.path.isfile(item_path) and item.endswith(".tar"):
+            name = item[:-4]
+            if name.startswith("env_") or name.startswith("white_env_"):
+                env_names.add(name)
+    return sorted(env_names)
+
+
+def _list_numeric_gt_images(split_path, env_folder):
+    """
+    List (frame_idx, filename) for gt_*.png in a folder or tar.
+    """
+    source_type, source_path = _resolve_env_source(split_path, env_folder)
+    if source_type is None:
+        return []
+
+    all_image_files = []
+    if source_type == "dir":
+        all_image_files = [f for f in os.listdir(source_path) if f.startswith("gt_") and f.endswith(".png")]
+    else:
+        with tarfile.open(source_path, "r") as tar:
+            all_image_files = [
+                os.path.basename(m.name)
+                for m in tar.getmembers()
+                if m.isfile() and os.path.basename(m.name).startswith("gt_") and os.path.basename(m.name).endswith(".png")
+            ]
+
+    image_files_with_idx = []
+    for image_file in all_image_files:
+        idx_str = image_file.replace("gt_", "").replace(".png", "")
+        try:
+            frame_idx = int(idx_str)
+            image_files_with_idx.append((frame_idx, image_file))
+        except ValueError:
+            continue
+    image_files_with_idx.sort(key=lambda x: x[0])
+    return image_files_with_idx
+
+
+def _read_image_size_from_source(split_path, env_folder, image_name):
+    source_type, source_path = _resolve_env_source(split_path, env_folder)
+    if source_type is None:
+        raise FileNotFoundError(f"Missing source for {env_folder} under {split_path}")
+
+    if source_type == "dir":
+        image_path = os.path.join(source_path, image_name)
+        with Image.open(image_path) as img:
+            return img.size
+
+    with tarfile.open(source_path, "r") as tar:
+        members = [m for m in tar.getmembers() if m.isfile() and os.path.basename(m.name) == image_name]
+        if not members:
+            raise FileNotFoundError(f"{image_name} not found in tar {source_path}")
+        member = members[0]
+        fobj = tar.extractfile(member)
+        if fobj is None:
+            raise FileNotFoundError(f"Could not extract {image_name} from {source_path}")
+        with Image.open(io.BytesIO(fobj.read())) as img:
+            return img.size
+
+
+def _read_rgb_image_from_source(split_path, env_folder, image_name):
+    source_type, source_path = _resolve_env_source(split_path, env_folder)
+    if source_type is None:
+        return None
+
+    if source_type == "dir":
+        image_path = os.path.join(source_path, image_name)
+        if not os.path.exists(image_path):
+            return None
+        return Image.open(image_path).convert("RGB")
+
+    with tarfile.open(source_path, "r") as tar:
+        members = [m for m in tar.getmembers() if m.isfile() and os.path.basename(m.name) == image_name]
+        if not members:
+            return None
+        fobj = tar.extractfile(members[0])
+        if fobj is None:
+            return None
+        return Image.open(io.BytesIO(fobj.read())).convert("RGB")
+
+
+def _copy_image_from_source(split_path, env_folder, image_name, output_image_path):
+    source_type, source_path = _resolve_env_source(split_path, env_folder)
+    if source_type is None:
+        raise FileNotFoundError(f"Missing source for {env_folder} under {split_path}")
+
+    if source_type == "dir":
+        shutil.copy2(os.path.join(source_path, image_name), output_image_path)
+        return
+
+    with tarfile.open(source_path, "r") as tar:
+        members = [m for m in tar.getmembers() if m.isfile() and os.path.basename(m.name) == image_name]
+        if not members:
+            raise FileNotFoundError(f"{image_name} not found in tar {source_path}")
+        fobj = tar.extractfile(members[0])
+        if fobj is None:
+            raise FileNotFoundError(f"Could not extract {image_name} from {source_path}")
+        os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+        with open(output_image_path, "wb") as out_f:
+            out_f.write(fobj.read())
+
+
+def _load_json_from_source(split_path, env_folder, json_names):
+    """
+    Load first existing json from source folder/tar.
+    Returns dict or None.
+    """
+    source_type, source_path = _resolve_env_source(split_path, env_folder)
+    if source_type is None:
+        return None
+
+    if source_type == "dir":
+        for name in json_names:
+            path = os.path.join(source_path, name)
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    return json.load(f)
+        return None
+
+    with tarfile.open(source_path, "r") as tar:
+        file_members = [m for m in tar.getmembers() if m.isfile()]
+        member_by_name = {m.name: m for m in file_members}
+        member_by_base = {os.path.basename(m.name): m for m in file_members}
+        for name in json_names:
+            member = member_by_name.get(name) or member_by_base.get(name)
+            if member is not None:
+                fobj = tar.extractfile(member)
+                if fobj is not None:
+                    return json.load(fobj)
+        return None
+
+
+def _extract_object_id_from_scene(scene_name):
+    """
+    Extract object id from base scene name:
+      <object_id>_env_k or <object_id>_white_env_k.
+    """
+    m = re.match(r"^(.*?)_(?:white_env|env)_\d+$", scene_name)
+    if m:
+        return m.group(1)
+    return scene_name.rsplit("_", 1)[0]
 
 
 def blender_to_opencv_c2w(c2w_blender):
@@ -131,18 +297,14 @@ def check_scene_broken(split_path, object_id):
                 cam_idx = albedo_files[0].replace('albedo_cam_', '').replace('.png', '')
                 try:
                     cam_idx_int = int(cam_idx)
-                    # Look for gt_{cam_idx}.png in any env folder
-                    env_folders = [d for d in os.listdir(split_path) 
-                                 if os.path.isdir(os.path.join(split_path, d)) 
-                                 and (d.startswith('env_') or d.startswith('white_env_'))]
+                    # Look for gt_{cam_idx}.png in any env source (folder or tar)
+                    env_folders = _list_env_folders(split_path)
                     
                     for env_folder in env_folders:
-                        env_path = os.path.join(split_path, env_folder)
-                        rgb_path = os.path.join(env_path, f'gt_{cam_idx_int}.png')
-                        if os.path.exists(rgb_path):
-                            rgb_img = Image.open(rgb_path).convert('RGB')
+                        rgb_img = _read_rgb_image_from_source(split_path, env_folder, f'gt_{cam_idx_int}.png')
+                        if rgb_img is not None:
                             rgb_array = np.array(rgb_img)
-                            
+
                             # Get RGB values inside the mask
                             masked_rgb = rgb_array[mask]
                             if len(masked_rgb) > 0:
@@ -419,10 +581,8 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
     with open(cameras_json_path, 'r') as f:
         cameras_data = json.load(f)
     
-    # Find all env folders (env_0, env_1, ..., env_4, white_env_0, etc.)
-    env_folders = [d for d in os.listdir(split_path) 
-                   if os.path.isdir(os.path.join(split_path, d)) 
-                   and (d.startswith('env_') or d.startswith('white_env_'))]
+    # Find all env sources (env_0, env_1, ..., white_env_0) from dirs or .tar files.
+    env_folders = _list_env_folders(split_path)
     
     if not env_folders:
         print(f"Warning: No env folders found in {split_path}, skipping {object_id}")
@@ -433,39 +593,21 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
     processed_scenes_without_variations = []  # Track scenes processed without variations
     
     for env_folder in sorted(env_folders):
-        env_path = os.path.join(split_path, env_folder)
-        
-        # Find all gt_*.png images and filter to only numeric indices
-        all_image_files = [f for f in os.listdir(env_path) 
-                          if f.startswith('gt_') and f.endswith('.png')]
-        
-        # Filter to only include files where the index is a number
-        # Extract index from filename (gt_0.png -> 0) and check if it's numeric
-        image_files_with_idx = []
-        for image_file in all_image_files:
-            # Extract the index part (between 'gt_' and '.png')
-            idx_str = image_file.replace('gt_', '').replace('.png', '')
-            try:
-                frame_idx = int(idx_str)
-                image_files_with_idx.append((frame_idx, image_file))
-            except ValueError:
-                # Skip files where index is not a number (e.g., gt_{idx}.png)
-                continue
+        # Find all gt_*.png images and filter to only numeric indices.
+        image_files_with_idx = _list_numeric_gt_images(split_path, env_folder)
         
         if not image_files_with_idx:
-            print(f"Warning: No valid gt_*.png images with numeric indices found in {env_path}, skipping")
+            print(f"Warning: No valid gt_*.png images with numeric indices found for {object_id}/{env_folder}, skipping")
             continue
         
         # Sort by frame index
         image_files_with_idx.sort(key=lambda x: x[0])
         
         # Get image dimensions from first image
-        first_image_path = os.path.join(env_path, image_files_with_idx[0][1])
         try:
-            img = Image.open(first_image_path)
-            image_width, image_height = img.size
+            image_width, image_height = _read_image_size_from_source(split_path, env_folder, image_files_with_idx[0][1])
         except Exception as e:
-            print(f"Error reading image {first_image_path}: {e}, skipping")
+            print(f"Error reading first image for {object_id}/{env_folder}: {e}, skipping")
             continue
         
         # Base scene name: object_id_env_folder
@@ -499,30 +641,15 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
         output_metadata_dir = os.path.join(output_root, split, 'metadata')
         os.makedirs(output_metadata_dir, exist_ok=True)
         
-        # Load environment map info if available (needed to check if envmaps should exist)
-        # For train split, look for env info in the corresponding test folder
+        # Load environment map info if available (needed to check if envmaps should exist).
+        # For train split, prefer corresponding test source; otherwise fallback to current split.
+        env_info = None
         if split == 'train':
             test_split_path = os.path.join(object_path, 'test')
-            test_env_path = os.path.join(test_split_path, env_folder) if os.path.exists(test_split_path) else None
-            if test_env_path and os.path.exists(test_env_path):
-                env_json_path = os.path.join(test_env_path, 'env.json')
-                white_env_json_path = os.path.join(test_env_path, 'white_env.json')
-            else:
-                # Fallback to current split if test folder doesn't exist
-                env_json_path = os.path.join(env_path, 'env.json')
-                white_env_json_path = os.path.join(env_path, 'white_env.json')
-        else:
-            # For test split, use current folder
-            env_json_path = os.path.join(env_path, 'env.json')
-            white_env_json_path = os.path.join(env_path, 'white_env.json')
-        
-        env_info = None
-        if os.path.exists(env_json_path):
-            with open(env_json_path, 'r') as f:
-                env_info = json.load(f)
-        elif os.path.exists(white_env_json_path):
-            with open(white_env_json_path, 'r') as f:
-                env_info = json.load(f)
+            if os.path.exists(test_split_path):
+                env_info = _load_json_from_source(test_split_path, env_folder, ['env.json', 'white_env.json'])
+        if env_info is None:
+            env_info = _load_json_from_source(split_path, env_folder, ['env.json', 'white_env.json'])
         
         # Load environment map if available (shared across all variations)
         env_map = None
@@ -662,8 +789,7 @@ def process_objaverse_scene(objaverse_root, object_id, output_root, split='test'
                 # Only copy image and process envmaps if not skipping
                 if not skip_file_processing:
                     # Copy image to output directory with zero-padded name
-                    input_image_path = os.path.join(env_path, image_file)
-                    shutil.copy2(input_image_path, output_image_path)
+                    _copy_image_from_source(split_path, env_folder, image_file, output_image_path)
                     
                     # Process environment map if available
                     if env_map is not None:
@@ -873,13 +999,26 @@ def main():
     # Load scene list if provided
     scenes_with_variations, scenes_without_variations = load_scene_list(args.scene_list)
     if args.scene_list and scenes_with_variations is None and scenes_without_variations is None:
-        print(f"Warning: Failed to load scene list from {args.scene_list}, processing all scenes with variations")
+        print(f"Error: Failed to load scene list from {args.scene_list}.")
+        return
     
     # Find all object folders
     if args.object_id:
         object_ids = [args.object_id]
+    elif args.scene_list and (scenes_with_variations is not None or scenes_without_variations is not None):
+        requested_scenes = set()
+        if scenes_with_variations:
+            requested_scenes.update(scenes_with_variations)
+        if scenes_without_variations:
+            requested_scenes.update(scenes_without_variations)
+        requested_object_ids = sorted({_extract_object_id_from_scene(scene_name) for scene_name in requested_scenes})
+        missing_objects = [oid for oid in requested_object_ids if not os.path.isdir(os.path.join(objaverse_root, oid))]
+        if missing_objects:
+            print(f"Warning: {len(missing_objects)} objects from scene-list not found under input root (examples: {missing_objects[:5]})")
+        object_ids = [oid for oid in requested_object_ids if os.path.isdir(os.path.join(objaverse_root, oid))]
+        print(f"Scene-list restricted mode: processing {len(object_ids)} objects mapped from scene list")
     else:
-        object_ids = [d for d in os.listdir(objaverse_root) 
+        object_ids = [d for d in os.listdir(objaverse_root)
                      if os.path.isdir(os.path.join(objaverse_root, d))]
     
     # Apply test run or max objects limit
@@ -911,9 +1050,7 @@ def main():
                 # Find all scenes for this object and mark them as broken
                 split_path = os.path.join(objaverse_root, object_id, args.split)
                 if os.path.exists(split_path):
-                    env_folders = [d for d in os.listdir(split_path) 
-                                 if os.path.isdir(os.path.join(split_path, d)) 
-                                 and (d.startswith('env_') or d.startswith('white_env_'))]
+                    env_folders = _list_env_folders(split_path)
                     for env_folder in env_folders:
                         base_scene_name = f"{object_id}_{env_folder}"
                         # Mark all variations as broken
