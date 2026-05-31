@@ -366,17 +366,30 @@ def visualize_intermediate_results(out_dir, result):
                 components.append(result.render_albedo.reshape(b * v, -1, h, w))
             m = len(components)
 
-        visualized_image = torch.cat(components, dim=3).detach().cpu()
-        visualized_image = rearrange(visualized_image, "(b v) c h (m w) -> (b h) (v m w) c", v=v, m=m)
-        visualized_image = (visualized_image.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-        
+        stacked = torch.cat(components, dim=3).detach().cpu()  # [b*v, c, h, m*w]
+        c_dim, mw = stacked.shape[1], stacked.shape[3]
+        stacked = stacked.reshape(b, v, c_dim, h, mw)
+
         # Use scene_name for filename
         scene_name = target.scene_name[0] if hasattr(target, 'scene_name') else "unknown"
         safe_scene_name = _safe_scene_name(scene_name)
 
-        Image.fromarray(visualized_image).save(
-            os.path.join(out_dir, f"supervision_{safe_scene_name}.jpg")
-        )
+        # JPEG has a hard ~65500 px per-side limit and very wide strips are hard to
+        # inspect, so split the per-view strip into chunks of at most
+        # max_frames_per_image frames and save one image per chunk. Frames keep their
+        # given (json) order; a single chunk preserves the original filename.
+        max_frames_per_image = 25
+        num_chunks = (v + max_frames_per_image - 1) // max_frames_per_image
+        for chunk_idx in range(num_chunks):
+            start = chunk_idx * max_frames_per_image
+            end = min(start + max_frames_per_image, v)
+            chunk_img = rearrange(stacked[:, start:end], "b v c h mw -> (b h) (v mw) c")
+            chunk_img = (chunk_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+            if num_chunks == 1:
+                fname = f"supervision_{safe_scene_name}.jpg"
+            else:
+                fname = f"supervision_{safe_scene_name}_part{chunk_idx:03d}_frames{start:04d}-{end - 1:04d}.jpg"
+            Image.fromarray(chunk_img).save(os.path.join(out_dir, fname))
         # Save context/target envmaps (LDR + HDR) when available.
         if hasattr(target, "env_ldr") and target.env_ldr is not None:
             _save_envmap_strip(out_dir, safe_scene_name, "target_envldr", target.env_ldr[0])
