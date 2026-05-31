@@ -33,7 +33,7 @@ export OUTPUT_DIR="${OUTPUT_DIR:-/music-shared-disk/group/ct/yiwen/data/objavers
 
 export SCENE_LIST="${SCENE_LIST:-$PROJ/metadata/polyhaven_env_rotate.json}"
 export SPLIT="${SPLIT:-test}"
-export N_VARIATIONS="${N_VARIATIONS:-8}"
+export N_VARIATIONS="${N_VARIATIONS:-36}"
 # For limited inference/debugging: sample a shared consecutive frame chunk per object.
 # This chunk is reused across scenes with same object id (e.g., Camera_01_env_0/env_1).
 export CONSECUTIVE_FRAMES="${CONSECUTIVE_FRAMES:-20}"
