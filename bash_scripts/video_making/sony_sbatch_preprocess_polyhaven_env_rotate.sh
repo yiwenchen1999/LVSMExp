@@ -70,7 +70,7 @@ export SINGULARITYENV_QT_QPA_PLATFORM=offscreen
 export SINGULARITYENV_PYOPENGL_PLATFORM=egl
 
 echo "Checking/installing required packages..."
-srun singularity exec --nv $BIND $SIF bash -lc "
+singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:\${PYTHONPATH:-}\"
   cd $PROJ
@@ -81,7 +81,7 @@ srun singularity exec --nv $BIND $SIF bash -lc "
 
 echo ""
 echo "Running env-variation preprocessing..."
-srun singularity exec --nv $BIND $SIF bash -lc "
+singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
   export PYTHONPATH=\"$PY_SITE:\${PYTHONPATH:-}\"
   cd $PROJ
