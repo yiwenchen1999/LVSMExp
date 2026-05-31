@@ -35,7 +35,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 # Inference controls
 ############################
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt}"
-export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt/video_making_train_load_all}"
+export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/dpt_decoder_512_1e5}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
 export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/video_making_load_all}"
 export LOAD_ALL_FRAMES="${LOAD_ALL_FRAMES:-true}"
