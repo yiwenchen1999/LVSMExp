@@ -37,6 +37,16 @@ class Dataset(Dataset):
         # and relit supervision + lighting comes from the current scene
         self.condition_reverse = self.config.training.get("condition_reverse", False)
 
+        # Parse relight signal config early: scene filtering below depends on
+        # whether point_light is an enabled lighting condition.
+        self.use_relit_images = self.config.training.get("use_relit_images", True)
+        self.relight_signals = self.config.training.get("relight_signals", ["envmap"])
+        if isinstance(self.relight_signals, str):
+            self.relight_signals = [self.relight_signals]
+        self.relight_signals = list(self.relight_signals)
+        self.use_relight_envmap = "envmap" in self.relight_signals
+        self.use_relight_point_light = "point_light" in self.relight_signals
+
         # Filter scenes if whiteEnvInput is enabled
         # Only keep scenes ending with "white_env_0" as input images
         self.whiteEnvInput = self.config.training.get("whiteEnvInput", False)
@@ -83,7 +93,12 @@ class Dataset(Dataset):
             print(f"condition_reverse enabled: Filtered to {len(self.all_scene_paths)} scenes with envmap relit candidates (from {total_scenes_before} total)")
         else:
             total_scenes_before = len(self.all_scene_paths)
-            _valid_tags = ("_env_", "_white_env_", "_area_", "_multi_pl_", "_combined_")
+            _valid_tags = ["_env_", "_white_env_", "_area_", "_multi_pl_", "_combined_"]
+            # "combined_*" scenes carry a point-light component; drop them as primary
+            # scenes when point_light is not an enabled relight signal.
+            if not self.use_relight_point_light:
+                _valid_tags = [tag for tag in _valid_tags if tag != "_combined_"]
+            _valid_tags = tuple(_valid_tags)
             filtered_scene_paths = []
             for scene_path in self.all_scene_paths:
                 file_name = os.path.basename(scene_path)
@@ -120,14 +135,7 @@ class Dataset(Dataset):
         else:
             self.view_idx_list = dict()
 
-        # Check if we should load relit images
-        self.use_relit_images = self.config.training.get("use_relit_images", True)
-        self.relight_signals = self.config.training.get("relight_signals", ["envmap"])
-        if isinstance(self.relight_signals, str):
-            self.relight_signals = [self.relight_signals]
-        self.relight_signals = list(self.relight_signals)
-        self.use_relight_envmap = "envmap" in self.relight_signals
-        self.use_relight_point_light = "point_light" in self.relight_signals
+        # relight signal flags are parsed earlier (used for scene filtering above).
         self.point_light_num_rays = int(self.config.training.get("point_light_num_rays", 1024))
         self.exclude_white_env0_from_relit_sampling = bool(
             self.config.training.get("exclude_white_env0_from_relit_sampling", False)
@@ -694,6 +702,11 @@ class Dataset(Dataset):
                     ):
                         continue
                     scene_type = self._scene_lighting_type(candidate_scene_name)
+                    # Skip "combined_*" scenes entirely when point_light is not an enabled
+                    # signal (they carry a point-light component). Covers all candidate
+                    # branches below, including condition_reverse fallback.
+                    if scene_type == "combined" and not self.use_relight_point_light:
+                        continue
                     if scene_type in candidate_scenes_by_type:
                         candidate_scenes_by_type[scene_type].append(candidate_scene_name)
 
@@ -715,8 +728,9 @@ class Dataset(Dataset):
                 else:
                     for sig in enabled_signal_types:
                         candidate_scenes.extend(candidate_scenes_by_type[sig])
-                    # Combined scenes are valid targets whenever either signal type is enabled
-                    if self.use_relight_envmap or self.use_relight_point_light:
+                    # Combined scenes mix a point-light component with envmap, so only
+                    # use them as relit targets when point_light is an enabled signal.
+                    if self.use_relight_point_light:
                         candidate_scenes.extend(candidate_scenes_by_type["combined"])
 
                 if not candidate_scenes:
