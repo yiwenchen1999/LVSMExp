@@ -8,7 +8,7 @@
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
-# Train on scene-dense data with load_all_frames enabled.
+# Recon-only training on scene-dense data with load_all_frames enabled.
 # Sony cluster + Singularity.
 #
 # Usage:
@@ -42,10 +42,10 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 # Training controls
 ############################
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense/test/full_list.txt}"
-export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/scene_dense_512_dpt_head_scene_load_all}"
-export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/dpt_decoder_512_1e5}"
+export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/scene_dense_512_dpt_head_recon_only_load_all}"
+export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/scene_dense_512_dpt_head_recon_only}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
-export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_scene_dense_512_dpt_head_scene_load_all}"
+export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_scene_dense_512_dpt_head_recon_only_load_all}"
 
 export TRAIN_STAGE="${TRAIN_STAGE:-stage2}"                # stage1 | stage2 | auto
 export STAGE1_STEPS="${STAGE1_STEPS:-0}"
@@ -62,7 +62,7 @@ export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-10}"
 export LOAD_ALL_MAX_TARGET_VIEWS="${LOAD_ALL_MAX_TARGET_VIEWS:-32}"
 export EXCLUDE_WHITE_ENV0_FROM_RELIT="${EXCLUDE_WHITE_ENV0_FROM_RELIT:-true}"
 
-# For scene style shift, always co-tune reconstruction/editor backbones.
+# For scene style shift, always co-tune reconstruction/renderer backbones.
 if [ "${TRAIN_STAGE}" != "stage2" ]; then
   echo "INFO: forcing TRAIN_STAGE=stage2 to co-tune backbones."
   TRAIN_STAGE="stage2"
@@ -80,7 +80,7 @@ fi
 # Logging
 ############################
 echo "=============================================="
-echo "SBATCH: Scene dense 512 load-all training"
+echo "SBATCH: Scene dense 512 load-all training (RECON-ONLY)"
 echo "=============================================="
 echo "Host: $(hostname)"
 echo "JobID: ${SLURM_JOB_ID:-N/A}"
@@ -97,6 +97,7 @@ echo "EXCLUDE_WHITE_ENV0_FROM_RELIT: $EXCLUDE_WHITE_ENV0_FROM_RELIT"
 echo "TRAIN_STAGE: $TRAIN_STAGE"
 echo "STAGE2_UNFREEZE: $STAGE2_UNFREEZE"
 echo "BATCH_SIZE_PER_GPU: $BATCH_SIZE_PER_GPU"
+echo "recon_only: true (editor pass skipped, supervise on target.image)"
 echo "LR: $LEARNING_RATE"
 echo "----------------------------------------------"
 echo ""
@@ -127,13 +128,15 @@ singularity exec --nv $BIND $SIF bash -lc "
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:29531 \
-    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer_recon_only.yaml \
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CHECKPOINT_DIR\" \
     training.resume_ckpt = \"$RESUME_CKPT\" \
     training.batch_size_per_gpu = ${BATCH_SIZE_PER_GPU} \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
     training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
+    training.recon_only = true \
+    training.use_relit_images = false \
     training.lr = ${LEARNING_RATE} \
     training.warmup = ${WARMUP_STEPS} \
     training.seed = ${DATALOADER_SEED} \
