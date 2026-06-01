@@ -1,9 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=infer_polyhaven_env_rotate
-#SBATCH --partition=short
+#SBATCH --partition=jiang
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a6000:1
 #SBATCH --mem=64G
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm-%x-%j.out

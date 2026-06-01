@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=jiang
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a6000:4
+#SBATCH --gres=gpu:a6000:1
 #SBATCH --time=72:00:00
 #SBATCH --job-name=relight_stanford
 #SBATCH --mem=128
