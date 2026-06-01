@@ -118,5 +118,5 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.dpt_transfer.stage2_unfreeze = all \
     training.dpt_transfer.backbone_lr_scale = 1.0 \
     training.checkpoint_every = 1000 \
-    training.vis_every = 1000
+    training.vis_every = 1
 "
