@@ -17,12 +17,13 @@ if [ ! -d "$METADATA_DIR" ]; then
   exit 1
 fi
 
-python - <<'PY'
+python - "$OUTPUT_DIR" "$SPLIT" <<'PY'
 import glob
 import os
+import sys
 
-output_dir = os.environ["OUTPUT_DIR"]
-split = os.environ["SPLIT"]
+output_dir = sys.argv[1]
+split = sys.argv[2]
 metadata_dir = os.path.join(output_dir, split, "metadata")
 full_list_path = os.path.join(output_dir, split, "full_list.txt")
 
