@@ -92,12 +92,12 @@ python preprocess_scripts/create_rotation_traj.py \
     --max-scenes 100 
 # create evaluation scene of scenes with rotating env:
 python preprocess_scripts/preprocess_objaverse_env_variations.py \
-    --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense \
-    --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/lvsm_with_envmaps_rotating_env \
+    --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense_polyhaven \
+    --output /projects/vig/Datasets/objaverse/hf-objaverse-v1/polyhaven_env_rotate \
     --split test \
     --hdri-dir /projects/vig/Datasets/objaverse/envmaps_256/hdirs \
     --n-variations 36 \
-    --scene-list env_varation_scene_list.json
+    --scene-list metadata/polyhaven_env_rotate.json
 
 # 激活 venv
 source /Users/yiwenchen/Desktop/ResearchProjects/scripts/venv/bin/activate
