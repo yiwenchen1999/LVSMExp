@@ -4,6 +4,7 @@
 #SBATCH --account=ct
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --gres=gpu:1
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
 
