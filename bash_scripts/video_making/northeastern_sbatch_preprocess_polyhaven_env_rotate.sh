@@ -12,8 +12,6 @@ set -euo pipefail
 
 # Resolve project root from this script location:
 # bash_scripts/video_making -> project root
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT_DIR"
 
 python preprocess_scripts/preprocess_objaverse_env_variations.py \
     --input /projects/vig/Datasets/objaverse/hf-objaverse-v1/rendered_dense_polyhaven \
