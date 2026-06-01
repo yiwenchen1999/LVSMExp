@@ -34,7 +34,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 # Training controls
 ############################
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt}"
-export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt/video_making_train_load_all_recon_only}"
+export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/video_making_train_load_all_recon_only}"
 export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/dpt_decoder_512_1e5}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_video_making_train_load_all_recon_only}"
