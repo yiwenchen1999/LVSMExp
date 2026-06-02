@@ -18,10 +18,43 @@ class Dataset(Dataset):
         self.config = config
 
         try:
-            with open(self.config.training.dataset_path, 'r') as f:
-                self.all_scene_paths = f.read().splitlines()
-            self.all_scene_paths = [path for path in self.all_scene_paths if path.strip()]
-        
+            # Support merged scene lists:
+            # - training.dataset_path: single path or comma-separated paths
+            # - training.extra_dataset_paths: optional list / comma-separated string
+            dataset_list_paths = []
+            dataset_path_raw = self.config.training.dataset_path
+            if isinstance(dataset_path_raw, str):
+                dataset_list_paths.extend([p.strip() for p in dataset_path_raw.split(",") if p.strip()])
+            else:
+                dataset_list_paths.append(str(dataset_path_raw).strip())
+
+            extra_dataset_paths = self.config.training.get("extra_dataset_paths", [])
+            if isinstance(extra_dataset_paths, str):
+                dataset_list_paths.extend([p.strip() for p in extra_dataset_paths.split(",") if p.strip()])
+            elif isinstance(extra_dataset_paths, (list, tuple)):
+                dataset_list_paths.extend([str(p).strip() for p in extra_dataset_paths if str(p).strip()])
+            elif extra_dataset_paths:
+                dataset_list_paths.append(str(extra_dataset_paths).strip())
+
+            # Keep order while deduplicating list files.
+            seen_list_files = set()
+            dataset_list_paths = [
+                p for p in dataset_list_paths
+                if not (p in seen_list_files or seen_list_files.add(p))
+            ]
+
+            all_scene_paths = []
+            seen_scene_paths = set()
+            for list_path in dataset_list_paths:
+                with open(list_path, 'r') as f:
+                    scene_paths = [path.strip() for path in f.read().splitlines() if path.strip()]
+                for scene_path in scene_paths:
+                    if scene_path not in seen_scene_paths:
+                        seen_scene_paths.add(scene_path)
+                        all_scene_paths.append(scene_path)
+
+            self.all_scene_paths = all_scene_paths
+
         except Exception as e:
             print(f"Error reading dataset paths from '{self.config.training.dataset_path}'")
             raise e
