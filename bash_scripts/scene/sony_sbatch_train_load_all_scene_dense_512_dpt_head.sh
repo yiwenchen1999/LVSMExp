@@ -41,8 +41,8 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 ############################
 # Training controls
 ############################
-export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense/test/full_list.txt}"
-export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/scene_dense_512_dpt_head_recon_only_load_all}"
+export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_scenes_dense/test/full_list_enhance.txt}"
+export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/video_12_scenes}"
 export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/scene_dense_512_dpt_head_recon_only}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_scene_dense_512_dpt_head_recon_only_load_all}"
@@ -55,7 +55,7 @@ export STAGE2_UNFREEZE="${STAGE2_UNFREEZE:-all}"           # all | decoder_only
 export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
 export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
-export BATCH_SIZE_PER_GPU="${BATCH_SIZE_PER_GPU:-2}"
+export BATCH_SIZE_PER_GPU="${BATCH_SIZE_PER_GPU:-1}"
 
 export LOAD_ALL_FRAMES="${LOAD_ALL_FRAMES:-true}"
 export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-10}"
