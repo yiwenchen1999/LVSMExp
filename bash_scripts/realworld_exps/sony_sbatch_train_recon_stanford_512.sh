@@ -37,7 +37,9 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 # Training controls
 ############################
 export DATASET_ROOT="${DATASET_ROOT:-/music-shared-disk/group/ct/yiwen/data/lvsm_stanford_orb}"
-export DATASET_PATH="${DATASET_PATH:-$DATASET_ROOT/test/full_list.txt}"
+export TRAIN_DATASET_PATH="${TRAIN_DATASET_PATH:-$DATASET_ROOT/train/full_list.txt}"
+export TEST_DATASET_PATH="${TEST_DATASET_PATH:-$DATASET_ROOT/test/full_list.txt}"
+export DATASET_PATH="${DATASET_PATH:-$TRAIN_DATASET_PATH,$TEST_DATASET_PATH}"
 export OG_DATASET_BASE="${OG_DATASET_BASE:-/projects/vig/Datasets/stanfordORB}"
 export LOCAL_DATASET_BASE="${LOCAL_DATASET_BASE:-/music-shared-disk/group/ct/yiwen/data}"
 
@@ -55,6 +57,12 @@ export VIS_EVERY="${VIS_EVERY:-1000}"
 export SAVE_EVERY="${SAVE_EVERY:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
 export MASTER_PORT="${MASTER_PORT:-29533}"
+export VIS_INTERPOLATE="${VIS_INTERPOLATE:-true}"
+export VIS_INTERPOLATE_FRAMES="${VIS_INTERPOLATE_FRAMES:-8}"
+export VIS_INTERPOLATE_SELECT="${VIS_INTERPOLATE_SELECT:-local_six_pose}"
+export VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES="${VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES:-6}"
+export VIS_INTERPOLATE_POSE_DIST_POS_W="${VIS_INTERPOLATE_POSE_DIST_POS_W:-1.0}"
+export VIS_INTERPOLATE_POSE_DIST_ROT_W="${VIS_INTERPOLATE_POSE_DIST_ROT_W:-0.5}"
 
 ############################
 # Logging
@@ -65,7 +73,9 @@ echo "=============================================="
 echo "Host: $(hostname)"
 echo "JobID: ${SLURM_JOB_ID:-N/A}"
 echo "PROJ: $PROJ"
-echo "DATASET_PATH: $DATASET_PATH"
+echo "TRAIN_DATASET_PATH: $TRAIN_DATASET_PATH"
+echo "TEST_DATASET_PATH: $TEST_DATASET_PATH"
+echo "DATASET_PATH(merged): $DATASET_PATH"
 echo "OG_DATASET_BASE: $OG_DATASET_BASE"
 echo "LOCAL_DATASET_BASE: $LOCAL_DATASET_BASE"
 echo "CHECKPOINT_DIR: $CHECKPOINT_DIR"
@@ -76,8 +86,13 @@ echo "recon_only: true (no relit supervision)"
 echo "----------------------------------------------"
 echo ""
 
-if [ ! -f "$DATASET_PATH" ]; then
-  echo "ERROR: Dataset list not found: $DATASET_PATH"
+if [ ! -f "$TRAIN_DATASET_PATH" ]; then
+  echo "ERROR: Train dataset list not found: $TRAIN_DATASET_PATH"
+  exit 1
+fi
+
+if [ ! -f "$TEST_DATASET_PATH" ]; then
+  echo "ERROR: Test dataset list not found: $TEST_DATASET_PATH"
   exit 1
 fi
 
@@ -126,7 +141,13 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.warmup = ${WARMUP_STEPS} \
     training.seed = ${DATALOADER_SEED} \
     training.vis_every = ${VIS_EVERY} \
-    training.save_every = ${SAVE_EVERY}
+    training.save_every = ${SAVE_EVERY} \
+    training.vis_interpolate = ${VIS_INTERPOLATE} \
+    training.vis_interpolate_frames = ${VIS_INTERPOLATE_FRAMES} \
+    training.vis_interpolate_select = ${VIS_INTERPOLATE_SELECT} \
+    training.vis_interpolate_num_input_keyframes = ${VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES} \
+    training.vis_interpolate_pose_dist_pos_w = ${VIS_INTERPOLATE_POSE_DIST_POS_W} \
+    training.vis_interpolate_pose_dist_rot_w = ${VIS_INTERPOLATE_POSE_DIST_ROT_W}
 "
 
 echo ""
