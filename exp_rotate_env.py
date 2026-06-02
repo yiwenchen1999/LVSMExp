@@ -524,9 +524,11 @@ with torch.no_grad(), torch.autocast(
                     frames = light_item["rendered_images"][0]  # [v_target, 3, h, w]
                     frames = rearrange(frames, "n c h w -> n h w c")
                     frames = (frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                    # Keep original frame set (e.g., all 36 views), and extend duration
+                    # by repeating each frame 3 times at the same fps.
+                    frames = np.repeat(frames, repeats=3, axis=0)
                     video_path = os.path.join(sample_dir, f"group_{light_key}.mp4")
-                    # Keep the same frame count but play 3x slower via lower FPS.
-                    create_video_from_frames(frames, video_path, framerate=5)
+                    create_video_from_frames(frames, video_path, framerate=24)
 
                 print(
                     f"Saved {len(all_lighting_results) * v_target} images, "
