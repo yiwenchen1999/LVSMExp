@@ -3,14 +3,16 @@
 import importlib
 import os
 import time
+import random
 import wandb
 import torch
 from rich import print
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 import torch.distributed as dist
+from easydict import EasyDict as edict
 from setup import init_config, init_distributed, init_wandb_and_backup
-from utils.metric_utils import visualize_intermediate_results
+from utils.metric_utils import visualize_intermediate_results, save_interpolated_vis_frames
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
 
@@ -67,6 +69,11 @@ total_param_update_steps = total_train_steps
 total_train_steps = total_train_steps * grad_accum_steps # real train steps when using gradient accumulation
 total_batch_size = batch_size_per_gpu * ddp_info.world_size * grad_accum_steps
 total_num_epochs = int(total_param_update_steps * total_batch_size / len(dataset))
+
+# Extra vis-only interpolation rendering between 2 input views.
+vis_interpolate_two_inputs = bool(config.training.get("vis_interpolate_two_inputs", False))
+vis_interpolate_num_frames = int(config.training.get("vis_interpolate_num_frames", 8))
+vis_interpolate_pair_mode = str(config.training.get("vis_interpolate_pair_mode", "random_two")).lower()
 
 
 module, class_name = config.model.class_name.rsplit(".", 1)
@@ -260,6 +267,58 @@ while cur_train_step <= total_train_steps:
             vis_path = os.path.join(config.training.checkpoint_dir, f"iter_{cur_train_step:08d}")
             os.makedirs(vis_path, exist_ok=True)
             visualize_intermediate_results(vis_path, ret_dict)
+
+            if vis_interpolate_two_inputs:
+                try:
+                    input_data = ret_dict.input
+                    target_data = ret_dict.target
+                    if input_data is not None and hasattr(input_data, "image") and input_data.image is not None:
+                        bs, v_input = input_data.image.shape[:2]
+                        if v_input >= 2:
+                            pair_positions_by_batch = []
+                            for _ in range(bs):
+                                if vis_interpolate_pair_mode == "random_two":
+                                    pair = sorted(random.sample(range(v_input), 2))
+                                else:
+                                    pair = [0, v_input - 1]
+                                pair_positions_by_batch.append((int(pair[0]), int(pair[1])))
+
+                            pair_idx = torch.tensor(
+                                pair_positions_by_batch, dtype=torch.long, device=input_data.image.device
+                            )  # [b, 2]
+                            batch_idx = torch.arange(bs, device=input_data.image.device).unsqueeze(1)  # [b, 1]
+
+                            input_vis = edict()
+                            for key, value in input_data.items():
+                                if (
+                                    isinstance(value, torch.Tensor)
+                                    and value.dim() >= 2
+                                    and value.shape[0] == bs
+                                    and value.shape[1] == v_input
+                                ):
+                                    input_vis[key] = value[batch_idx, pair_idx]
+                                else:
+                                    input_vis[key] = value
+
+                            target_vis = edict(image_h_w=target_data.image_h_w)
+                            vis_data_batch = edict(input=input_vis, target=target_vis)
+                            render_fn = model.module.render_video if isinstance(model, DDP) else model.render_video
+                            vis_result = render_fn(
+                                vis_data_batch,
+                                traj_type="interpolate",
+                                num_frames=vis_interpolate_num_frames,
+                                loop_video=False,
+                                order_poses=False,
+                            )
+                            save_interpolated_vis_frames(
+                                vis_path,
+                                vis_result,
+                                pair_positions_by_batch=pair_positions_by_batch,
+                                num_frames=vis_interpolate_num_frames,
+                            )
+                except Exception as e:
+                    print_rank0(f"[vis_interpolate_two_inputs] skipped due to error: {e}")
+
             torch.cuda.empty_cache()
             model.train()
 

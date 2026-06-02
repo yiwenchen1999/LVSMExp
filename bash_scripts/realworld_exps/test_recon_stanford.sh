@@ -28,6 +28,9 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.num_input_views = 16 \
     training.num_target_views = 8 \
     training.num_views = 24 \
+    training.vis_interpolate_two_inputs = true \
+    training.vis_interpolate_num_frames = 8 \
+    training.vis_interpolate_pair_mode = random_two \
     training.warmup = 3000 \
     training.vis_every = 1 \
     training.lr = 0.0001
