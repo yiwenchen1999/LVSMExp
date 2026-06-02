@@ -430,19 +430,18 @@ def visualize_intermediate_results(out_dir, result):
     )
 
 
-def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None, scene_name=None, prefix="interpolate_vis"):
-    """Save extra visualization frames produced by model.render_video.
+def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None, scene_name=None):
+    """Save interpolated visualization frames produced by model.render_video.
 
-    Works for any trajectory type (e.g. interpolation between views or an orbit
-    around the object); the `prefix` controls the output file naming.
+    Image-only export (no video). The frames may be a concatenation of multiple
+    interpolation segments (e.g. 6 keyframes -> 5 segments x N frames).
 
     Args:
         out_dir (str): directory to write the visualization into.
-        video_rendering (torch.Tensor): [b, num_frames, 3, h, w] rendered frames (any device).
-        input_endpoints (torch.Tensor | None): [n_views, 3, h, w] the input views used
-            to build the trajectory, prepended to the strip for reference.
+        video_rendering (torch.Tensor): [b, total_frames, 3, h, w] rendered frames (any device).
+        input_endpoints (torch.Tensor | None): [n_keyframes, 3, h, w] the ordered input
+            keyframes the path was built from, saved as a separate reference strip.
         scene_name (str | None): used to build the output filename.
-        prefix (str): filename prefix, e.g. "orbit_vis" or "interpolate_vis".
     """
     if video_rendering is None or (not isinstance(video_rendering, torch.Tensor)) or video_rendering.ndim != 5:
         return None
@@ -452,32 +451,24 @@ def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None,
     safe_scene_name = _safe_scene_name(scene_name) if scene_name is not None else "unknown"
 
     # Only visualize the first batch element.
-    frames = video_rendering[0].detach().cpu().float()  # [num_frames, 3, h, w]
+    frames = video_rendering[0].detach().cpu().float()  # [total_frames, 3, h, w]
     h, w = frames.shape[-2], frames.shape[-1]
 
-    strip_parts = []
-    if input_endpoints is not None and isinstance(input_endpoints, torch.Tensor) and input_endpoints.ndim == 4:
-        endpoints = input_endpoints.detach().cpu().float()
-        if endpoints.shape[-2:] == (h, w):
-            strip_parts.append(endpoints)
-    strip_parts.append(frames)
-
-    strip = torch.cat(strip_parts, dim=0)  # [n, 3, h, w]
-    strip_img = rearrange(strip, "v c h w -> h (v w) c")
+    # Save the interpolated trajectory frames as a single horizontal strip.
+    strip_img = rearrange(frames, "v c h w -> h (v w) c")
     strip_img = (strip_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-    out_path = os.path.join(out_dir, f"{prefix}_{safe_scene_name}.jpg")
+    out_path = os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}.jpg")
     Image.fromarray(strip_img).save(out_path)
 
-    # Also export an mp4 so the trajectory can be inspected as motion.
-    try:
-        video_np = (frames.permute(0, 2, 3, 1).numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-        data_utils.create_video_from_frames(
-            video_np,
-            os.path.join(out_dir, f"{prefix}_{safe_scene_name}.mp4"),
-            framerate=10,
-        )
-    except Exception as e:
-        print(f"[{prefix}] failed to write mp4: {e}")
+    # Save the ordered input keyframes used to build the path as a reference strip.
+    if input_endpoints is not None and isinstance(input_endpoints, torch.Tensor) and input_endpoints.ndim == 4:
+        endpoints = input_endpoints.detach().cpu().float()
+        if endpoints.shape[-2:] == (h, w) and endpoints.shape[0] > 0:
+            kf_img = rearrange(endpoints, "v c h w -> h (v w) c")
+            kf_img = (kf_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+            Image.fromarray(kf_img).save(
+                os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}_keyframes.jpg")
+            )
 
     return out_path
 

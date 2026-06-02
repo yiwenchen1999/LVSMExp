@@ -31,7 +31,9 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     training.warmup = 3000 \
     training.vis_every = 1 \
     training.vis_interpolate = true \
-    training.vis_interpolate_traj_type = orbit_centered \
-    training.vis_interpolate_frames = 16 \
-    training.vis_interpolate_select = all \
+    training.vis_interpolate_frames = 8 \
+    training.vis_interpolate_select = local_six_pose \
+    training.vis_interpolate_num_input_keyframes = 6 \
+    training.vis_interpolate_pose_dist_pos_w = 1.0 \
+    training.vis_interpolate_pose_dist_rot_w = 0.5 \
     training.lr = 0.0001

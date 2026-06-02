@@ -16,6 +16,61 @@ from utils.metric_utils import visualize_intermediate_results, save_interpolated
 from utils.training_utils import create_optimizer, create_lr_scheduler, auto_resume_job, print_rank0
 
 
+def select_local_pose_path(c2w, num_keyframes=6, pos_w=1.0, rot_w=0.5, anchor_idx=None):
+    """Select a set of spatially-close camera views and order them into a smooth path.
+
+    Selection is based on camera-pose proximity (NOT frame index), since views with
+    adjacent indices are not necessarily spatially close.
+
+    Args:
+        c2w (torch.Tensor): [v, 4, 4] camera-to-world matrices for the available views.
+        num_keyframes (int): number of views to pick for the path.
+        pos_w (float): weight on translation distance.
+        rot_w (float): weight on rotation-angle distance (radians).
+        anchor_idx (int | None): optional fixed anchor; if None a random view is used.
+
+    Returns:
+        list[int]: ordered view indices forming a spatially smooth path.
+    """
+    v = c2w.shape[0]
+    if v <= 1:
+        return list(range(v))
+
+    c2w = c2w.detach().float()
+    t = c2w[:, :3, 3]                    # [v, 3]
+    R = c2w[:, :3, :3].reshape(v, 9)     # [v, 9]
+
+    # Translation distance (euclidean).
+    pos_d = torch.cdist(t, t)            # [v, v]
+    # Rotation angle distance: trace(R_i^T R_j) == <R_i, R_j>_F for rotation matrices.
+    trace = R @ R.t()                    # [v, v]
+    cos_theta = ((trace - 1.0) / 2.0).clamp(-1.0, 1.0)
+    rot_d = torch.arccos(cos_theta)      # [v, v], radians
+
+    dist = pos_w * pos_d + rot_w * rot_d  # [v, v]
+
+    k = min(num_keyframes, v)
+    if anchor_idx is None:
+        anchor_idx = int(torch.randint(0, v, (1,)).item())
+
+    # Pick the (k-1) views closest to the anchor (plus the anchor itself).
+    anchor_dists = dist[anchor_idx].clone()
+    anchor_dists[anchor_idx] = float("inf")
+    nearest = torch.topk(anchor_dists, k - 1, largest=False).indices.tolist()
+    selected = [anchor_idx] + nearest
+
+    # Greedy nearest-neighbour ordering over the selected set to form a smooth path.
+    remaining = set(selected)
+    ordered = [anchor_idx]
+    remaining.discard(anchor_idx)
+    while remaining:
+        last = ordered[-1]
+        nxt = min(remaining, key=lambda j: float(dist[last, j]))
+        ordered.append(nxt)
+        remaining.discard(nxt)
+    return ordered
+
+
 # Load config and read(override) arguments from CLI
 config = init_config()
 
@@ -263,9 +318,10 @@ while cur_train_step <= total_train_steps:
             os.makedirs(vis_path, exist_ok=True)
             visualize_intermediate_results(vis_path, ret_dict)
 
-            # Extra visualization-only pass: render an orbit trajectory that circles
-            # around the input-camera-distribution center, staying in-distribution.
-            # This does NOT affect loss, optimizer steps or checkpoints
+            # Extra visualization-only pass: pick a set of spatially-close input views
+            # (by camera-pose proximity, not frame index), order them into a smooth
+            # short trajectory, and interpolate `num_frames` views between every
+            # adjacent pair. This does NOT affect loss, optimizer steps or checkpoints
             # (pure no_grad inference + save).
             if config.training.get("vis_interpolate", True):
                 try:
@@ -274,52 +330,73 @@ while cur_train_step <= total_train_steps:
                     vis_input = ret_dict.input
                     v_input = vis_input.image.size(1)
                     if v_input >= 2:
-                        num_frames = int(config.training.get("vis_interpolate_frames", 16))
-                        traj_type = config.training.get("vis_interpolate_traj_type", "orbit_centered")
-                        select_mode = config.training.get("vis_interpolate_select", "all")
+                        num_frames = int(config.training.get("vis_interpolate_frames", 8))
+                        num_keyframes = int(config.training.get("vis_interpolate_num_input_keyframes", 6))
+                        pos_w = float(config.training.get("vis_interpolate_pose_dist_pos_w", 1.0))
+                        rot_w = float(config.training.get("vis_interpolate_pose_dist_rot_w", 0.5))
+                        select_mode = config.training.get("vis_interpolate_select", "local_six_pose")
+
+                        c2w_b0 = vis_input.c2w[0]  # [v, 4, 4]
                         if select_mode == "random_two":
-                            sel = sorted(random.sample(range(v_input), 2))
-                        else:  # "all": use every input view for reconstruction + orbit stats
-                            sel = list(range(v_input))
+                            ordered = random.sample(range(v_input), 2)
+                        elif (not torch.isfinite(c2w_b0).all()):
+                            print("[interpolate vis] non-finite c2w, falling back to random sampling")
+                            k = min(num_keyframes, v_input)
+                            ordered = random.sample(range(v_input), k)
+                        else:
+                            ordered = select_local_pose_path(
+                                c2w_b0,
+                                num_keyframes=num_keyframes,
+                                pos_w=pos_w,
+                                rot_w=rot_w,
+                            )
 
-                        vis_data_batch = edict(
-                            input=edict(
-                                image=vis_input.image[:, sel],
-                                ray_o=vis_input.ray_o[:, sel],
-                                ray_d=vis_input.ray_d[:, sel],
-                                c2w=vis_input.c2w[:, sel],
-                                fxfycxcy=vis_input.fxfycxcy[:, sel],
-                            ),
-                            target=edict(image_h_w=ret_dict.target.image_h_w),
-                        )
+                        # Render each adjacent segment and concatenate frames in order.
+                        segment_frames = []
+                        for a, b in zip(ordered[:-1], ordered[1:]):
+                            sel = [a, b]
+                            vis_data_batch = edict(
+                                input=edict(
+                                    image=vis_input.image[:, sel],
+                                    ray_o=vis_input.ray_o[:, sel],
+                                    ray_d=vis_input.ray_d[:, sel],
+                                    c2w=vis_input.c2w[:, sel],
+                                    fxfycxcy=vis_input.fxfycxcy[:, sel],
+                                ),
+                                target=edict(image_h_w=ret_dict.target.image_h_w),
+                            )
+                            try:
+                                with torch.no_grad():
+                                    with torch.autocast(
+                                        device_type="cuda",
+                                        dtype=amp_dtype_mapping[config.training.amp_dtype],
+                                    ):
+                                        vis_out = base_model.render_video(
+                                            vis_data_batch,
+                                            traj_type="interpolate",
+                                            num_frames=num_frames,
+                                            loop_video=False,
+                                            order_poses=False,
+                                        )
+                                segment_frames.append(vis_out.video_rendering)  # [b, num_frames, 3, h, w]
+                            except Exception as seg_e:
+                                print(f"[interpolate vis] segment ({a},{b}) skipped: {seg_e}")
 
-                        with torch.no_grad():
-                            with torch.autocast(
-                                device_type="cuda",
-                                dtype=amp_dtype_mapping[config.training.amp_dtype],
-                            ):
-                                vis_out = base_model.render_video(
-                                    vis_data_batch,
-                                    traj_type=traj_type,
-                                    num_frames=num_frames,
-                                    loop_video=False,
-                                    order_poses=False,
-                                )
-
-                        scene_name = (
-                            ret_dict.input.scene_name[0]
-                            if hasattr(ret_dict.input, "scene_name") and ret_dict.input.scene_name is not None
-                            else "unknown"
-                        )
-                        save_interpolated_vis_frames(
-                            vis_path,
-                            vis_out.video_rendering,
-                            input_endpoints=vis_input.image[0, sel],
-                            scene_name=scene_name,
-                            prefix="orbit_vis" if traj_type == "orbit_centered" else "interpolate_vis",
-                        )
+                        if len(segment_frames) > 0:
+                            all_frames = torch.cat(segment_frames, dim=1)  # [b, total_frames, 3, h, w]
+                            scene_name = (
+                                ret_dict.input.scene_name[0]
+                                if hasattr(ret_dict.input, "scene_name") and ret_dict.input.scene_name is not None
+                                else "unknown"
+                            )
+                            save_interpolated_vis_frames(
+                                vis_path,
+                                all_frames,
+                                input_endpoints=vis_input.image[0, ordered],
+                                scene_name=scene_name,
+                            )
                 except Exception as e:
-                    print(f"[orbit vis] skipped due to error: {e}")
+                    print(f"[interpolate vis] skipped due to error: {e}")
 
             torch.cuda.empty_cache()
             model.train()
