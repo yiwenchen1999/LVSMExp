@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Haian Jin. Created for the LVSM project (ICLR 2025).
 
 import random
+import re
 import traceback
 import os
 import numpy as np
@@ -223,6 +224,29 @@ class Dataset(Dataset):
 
     def _is_white_env0_scene(self, scene_name: str) -> bool:
         return scene_name.endswith("_white_env_0")
+
+    def _extract_env_base_id(self, scene_name: str):
+        """
+        Return a signature for the base lighting environment, ignoring any
+        rotation/variation suffix. Used to ensure the source scene and the
+        sampled relit scene do NOT come from the same ``*_env_{k}_*`` base env.
+
+        Examples:
+            obj_env_0_5      -> obj_env_0
+            obj_env_2        -> obj_env_2
+            obj_white_env_0  -> obj_white_env_0
+        Returns None when the name does not match an env pattern.
+        """
+        m = re.match(r"^(.+)_white_env_(\d+)$", scene_name)
+        if m:
+            return f"{m.group(1)}_white_env_{m.group(2)}"
+        m = re.match(r"^(.+)_env_(\d+)_(\d+)$", scene_name)
+        if m:
+            return f"{m.group(1)}_env_{m.group(2)}"
+        m = re.match(r"^(.+)_env_(\d+)$", scene_name)
+        if m:
+            return f"{m.group(1)}_env_{m.group(2)}"
+        return None
 
     def _load_point_light_rays(self, base_dir: str, scene_name: str, num_views: int) -> torch.Tensor:
         base_dir = self._remap_path(base_dir)
@@ -754,6 +778,19 @@ class Dataset(Dataset):
                     # use them as relit targets when point_light is an enabled signal.
                     if self.use_relight_point_light:
                         candidate_scenes.extend(candidate_scenes_by_type["combined"])
+
+                # Ensure the relit scene comes from a DIFFERENT base env than the
+                # source scene: exclude candidates that share the same *_env_{k}_*
+                # base env (rotations of the same env should not be a relit target).
+                source_env_base = self._extract_env_base_id(scene_name)
+                if source_env_base is not None:
+                    different_env_candidates = [
+                        c for c in candidate_scenes
+                        if self._extract_env_base_id(c) != source_env_base
+                    ]
+                    # Fall back to the unfiltered list only if filtering removed everything.
+                    if different_env_candidates:
+                        candidate_scenes = different_env_candidates
 
                 if not candidate_scenes:
                     error_msg = (
