@@ -35,120 +35,102 @@ amp_dtype_mapping = {
 }
 
 
-def find_all_env_variations(scene_name, full_list_path):
+def parse_scene_name(scene_name):
     """
-    Find all environment variation scenes for a given base scene from full_list.txt.
-    
-    For example:
-    - If scene_name is "01c9013483b6427fbc2f478e5e328810_env_0_1",
-      find all "01c9013483b6427fbc2f478e5e328810_env_*" scenes
-    - If scene_name is "e561fa2f48d64a9fb62ca03daeea41be_white_env_0",
-      find all "e561fa2f48d64a9fb62ca03daeea41be*" scenes (env_* and white_env_*)
-    
-    Args:
-        scene_name: Current scene name (e.g., "object_id_env_0_1" or "object_id_white_env_0")
-        full_list_path: Path to full_list.txt file containing scene JSON paths
-        
+    Parse scene naming patterns used by env-variation datasets.
+
     Returns:
-        list: Sorted list of variation scene names (sorted by env_num and variation number)
+        dict or None:
+          - object_id
+          - input_prefix: dedup key for "same input" scenes
+          - lighting_prefix: key for grouping different lighting envs
+          - sort_key: stable sorting tuple
     """
-    # Parse scene name to extract object_id
-    # Examples:
-    #   "01c9013483b6427fbc2f478e5e328810_env_0_1" -> object_id: "01c9013483b6427fbc2f478e5e328810"
-    #   "e561fa2f48d64a9fb62ca03daeea41be_white_env_0" -> object_id: "e561fa2f48d64a9fb62ca03daeea41be"
-    
-    object_id = None
-    
-    # Try to match pattern: {object_id}_white_env_{env_num} first (more specific)
-    # This must come before the generic _env_ pattern to avoid greedy matching
-    match = re.match(r'^(.+)_white_env_(\d+)$', scene_name)
+    match = re.match(r"^(.+)_env_(\d+)_(\d+)$", scene_name)
     if match:
         object_id = match.group(1)
-    else:
-        # Try pattern: {object_id}_env_{env_num}_{variation}
-        match = re.match(r'^(.+)_env_(\d+)_(\d+)$', scene_name)
-        if match:
-            object_id = match.group(1)
-        else:
-            # Try pattern: {object_id}_env_{env_num} (without variation)
-            match = re.match(r'^(.+)_env_(\d+)$', scene_name)
-            if match:
-                object_id = match.group(1)
-            else:
-                print(f"Warning: Could not parse scene name '{scene_name}', skipping env variations")
-                return []
-    
-    if object_id is None:
-        print(f"Warning: Could not extract object_id from scene name '{scene_name}', skipping env variations")
-        return []
-    
-    # Read scene list from full_list.txt
+        env_num = int(match.group(2))
+        variation_num = int(match.group(3))
+        return {
+            "object_id": object_id,
+            "input_prefix": f"{object_id}_env_{env_num}",
+            "lighting_prefix": f"env_{env_num}",
+            "sort_key": (0, env_num, variation_num),
+        }
+
+    match = re.match(r"^(.+)_env_(\d+)$", scene_name)
+    if match:
+        object_id = match.group(1)
+        env_num = int(match.group(2))
+        return {
+            "object_id": object_id,
+            "input_prefix": f"{object_id}_env_{env_num}",
+            "lighting_prefix": f"env_{env_num}",
+            "sort_key": (0, env_num, 0),
+        }
+
+    match = re.match(r"^(.+)_white_env_(\d+)$", scene_name)
+    if match:
+        object_id = match.group(1)
+        white_idx = int(match.group(2))
+        return {
+            "object_id": object_id,
+            "input_prefix": f"{object_id}_white_env_{white_idx}",
+            "lighting_prefix": f"white_env_{white_idx}",
+            "sort_key": (1, white_idx, 0),
+        }
+
+    return None
+
+
+def collect_unique_lighting_scenes(scene_name, full_list_path):
+    """
+    Collect one representative scene per lighting prefix for the same object.
+    Also returns the dedup input prefix.
+    """
+    parsed_scene = parse_scene_name(scene_name)
+    if parsed_scene is None:
+        return None, []
+
     if not os.path.exists(full_list_path):
-        print(f"Warning: full_list.txt not found at {full_list_path}, skipping env variations")
-        return []
-    
-    variation_scenes = []
-    
-    # Pattern to match: {object_id}_env_{any_env_num}_{variation}
-    # This will match all env variations (env_0_*, env_1_*, env_2_*, etc.)
-    pattern_env = f"^{re.escape(object_id)}_env_(\\d+)_(\\d+)$"
-    
-    # Pattern to match: {object_id}_white_env_{env_num} (white_env usually doesn't have variations)
-    pattern_white_env = f"^{re.escape(object_id)}_white_env_(\\d+)$"
-    
-    # Debug: print patterns
-    if ddp_info.is_main_process:
-        print(f"Looking for variations of scene: {scene_name}")
-        print(f"Extracted object_id: {object_id}")
-        print(f"Pattern env: {pattern_env}")
-        print(f"Pattern white_env: {pattern_white_env}")
-    
-    with open(full_list_path, 'r') as f:
+        if ddp_info.is_main_process:
+            print(f"Warning: full_list.txt not found at {full_list_path}")
+        return parsed_scene["input_prefix"], []
+
+    object_id = parsed_scene["object_id"]
+    by_lighting = {}
+
+    with open(full_list_path, "r") as f:
         for line in f:
-            line = line.strip()
-            if not line:
+            json_path = line.strip()
+            if not json_path:
                 continue
-            
-            # Extract scene name from JSON path
-            # Path format: /path/to/metadata/scene_name.json
-            json_path = line
             json_file = os.path.basename(json_path)
-            candidate_scene_name = json_file[:-5] if json_file.endswith('.json') else json_file
-            
-            # Skip the current scene itself
-            if candidate_scene_name == scene_name:
+            candidate_scene_name = json_file[:-5] if json_file.endswith(".json") else json_file
+
+            parsed_candidate = parse_scene_name(candidate_scene_name)
+            if parsed_candidate is None:
                 continue
-            
-            # Check if candidate starts with object_id (quick check before regex)
-            if not candidate_scene_name.startswith(object_id + '_'):
+            if parsed_candidate["object_id"] != object_id:
                 continue
-            
-            # Check if it matches env pattern: {object_id}_env_{env_num}_{variation}
-            match_env = re.match(pattern_env, candidate_scene_name)
-            if match_env:
-                env_num = int(match_env.group(1))
-                variation_num = int(match_env.group(2))
-                # Store as (0, env_num, variation_num, scene_name) for sorting
-                # Use 0 prefix to distinguish from white_env
-                variation_scenes.append((0, env_num, variation_num, candidate_scene_name))
-                if ddp_info.is_main_process:
-                    print(f"  Matched env scene: {candidate_scene_name} (env_{env_num}, var_{variation_num})")
-            else:
-                # Check if it matches white_env pattern: {object_id}_white_env_{env_num}
-                match_white = re.match(pattern_white_env, candidate_scene_name)
-                if match_white:
-                    env_num = int(match_white.group(1))
-                    # Store as (1, env_num, 0, scene_name) for sorting
-                    # Use 1 prefix to put white_env after regular env
-                    variation_scenes.append((1, env_num, 0, candidate_scene_name))
-                    if ddp_info.is_main_process:
-                        print(f"  Matched white_env scene: {candidate_scene_name} (env_{env_num})")
-    
-    # Sort by: type (0=env, 1=white_env), env_num, variation_num
-    # This ensures order: env_0_1, env_0_2, ..., env_1_1, env_1_2, ..., white_env_0, white_env_1, ...
-    variation_scenes.sort(key=lambda x: (x[0], x[1], x[2]))
-    
-    return [scene_name for _, _, _, scene_name in variation_scenes]
+
+            lighting_prefix = parsed_candidate["lighting_prefix"]
+            prev = by_lighting.get(lighting_prefix)
+            # Keep a stable canonical representative (smallest sort_key then name).
+            if prev is None or (parsed_candidate["sort_key"], candidate_scene_name) < (prev["sort_key"], prev["scene_name"]):
+                by_lighting[lighting_prefix] = {
+                    "scene_name": candidate_scene_name,
+                    "sort_key": parsed_candidate["sort_key"],
+                }
+
+    unique_lighting_scenes = sorted(
+        [
+            {"lighting_prefix": k, "scene_name": v["scene_name"], "sort_key": v["sort_key"]}
+            for k, v in by_lighting.items()
+        ],
+        key=lambda x: (x["sort_key"], x["scene_name"]),
+    )
+    return parsed_scene["input_prefix"], unique_lighting_scenes
 
 
 def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
@@ -326,6 +308,7 @@ dist.barrier()
 
 datasampler.set_epoch(0)
 model.eval()
+processed_input_prefixes = set()
 
 with torch.no_grad(), torch.autocast(
     enabled=config.training.use_amp,
@@ -361,18 +344,34 @@ with torch.no_grad(), torch.autocast(
         # Find full_list.txt path
         full_list_path = os.path.join(base_dir, 'full_list.txt')
         
-        # Find all environment variation scenes from full_list.txt
-        variation_scenes = find_all_env_variations(scene_name, full_list_path)
-        
-        if not variation_scenes:
-            print(f"No environment variations found for {scene_name}, processing normally")
+        # Group scenes by input-prefix and keep one representative per lighting prefix.
+        # This avoids repeatedly using duplicated scenes like *_env_0_25, *_env_0_26, ...
+        input_prefix, lighting_scene_entries = collect_unique_lighting_scenes(scene_name, full_list_path)
+
+        if input_prefix is None:
+            print(f"Warning: Could not parse scene name {scene_name}, processing normally")
             result = model(batch)
             if config.inference.get("render_video", False):
                 result = model.module.render_video(result, **config.inference.render_video_config)
             export_results(result, config.inference_out_dir, compute_metrics=config.inference.get("compute_metrics"))
             continue
-        
-        print(f"Found {len(variation_scenes)} environment variations for {scene_name}")
+
+        if input_prefix in processed_input_prefixes:
+            if ddp_info.is_main_process:
+                print(f"Skipping duplicate input prefix '{input_prefix}' from scene '{scene_name}'")
+            continue
+        processed_input_prefixes.add(input_prefix)
+
+        if not lighting_scene_entries:
+            print(f"No lighting scenes found for {scene_name}, processing normally")
+            result = model(batch)
+            if config.inference.get("render_video", False):
+                result = model.module.render_video(result, **config.inference.render_video_config)
+            export_results(result, config.inference_out_dir, compute_metrics=config.inference.get("compute_metrics"))
+            continue
+
+        if ddp_info.is_main_process:
+            print(f"Using input prefix '{input_prefix}' with {len(lighting_scene_entries)} unique lighting conditions")
         
         # Process original scene first to get input data and reconstruct scene
         input, target = model.module.process_data(
@@ -418,13 +417,18 @@ with torch.no_grad(), torch.autocast(
         if input_indices is None:
             input_indices = list(range(v_input))
         
-        # Store results for all variations
-        all_variation_results = []
+        # Store results grouped by lighting prefix
+        all_lighting_results = []
         
-        # Process each variation in order
-        for var_idx, var_scene_name in enumerate(variation_scenes):
+        # Process one representative scene per lighting prefix.
+        for light_idx, light_entry in enumerate(lighting_scene_entries):
+            var_scene_name = light_entry["scene_name"]
+            lighting_prefix = light_entry["lighting_prefix"]
             if ddp_info.is_main_process:
-                print(f"Processing variation {var_idx + 1}/{len(variation_scenes)}: {var_scene_name}")
+                print(
+                    f"Processing lighting {light_idx + 1}/{len(lighting_scene_entries)}: "
+                    f"{lighting_prefix} ({var_scene_name})"
+                )
             
             # Load environment variation data
             var_data = load_env_variation_data(var_scene_name, base_dir, input_indices, dataset)
@@ -462,51 +466,72 @@ with torch.no_grad(), torch.autocast(
             rendered_images = model.module.renderer(edited_latent_tokens, target_template, n_patches, d)
             
             # Store result
-            all_variation_results.append(rendered_images)  # [1, v_target, 3, h, w]
+            all_lighting_results.append({
+                "lighting_prefix": lighting_prefix,
+                "scene_name": var_scene_name,
+                "rendered_images": rendered_images,   # [1, v_target, 3, h, w]
+                "env_ldr": var_env_ldr,               # [1, v_input, 3, h, w]
+                "env_hdr": var_env_hdr,               # [1, v_input, 3, h, w]
+            })
         
         # Save individual images and videos
-        if all_variation_results:
+        if all_lighting_results:
             if ddp_info.is_main_process:
-                safe_scene_name = "".join(c for c in scene_name if c.isalnum() or c in ('_', '-'))[:100]
-                sample_dir = os.path.join(config.inference_out_dir, safe_scene_name)
+                safe_group_name = "".join(c for c in input_prefix if c.isalnum() or c in ('_', '-'))[:100]
+                sample_dir = os.path.join(config.inference_out_dir, safe_group_name)
+                image_dir = os.path.join(sample_dir, "images")
+                envmap_dir = os.path.join(sample_dir, "envmaps")
                 os.makedirs(sample_dir, exist_ok=True)
+                os.makedirs(image_dir, exist_ok=True)
+                os.makedirs(envmap_dir, exist_ok=True)
                 
-                v_target = all_variation_results[0].shape[1]
-                num_variations = len(all_variation_results)
+                v_target = all_lighting_results[0]["rendered_images"].shape[1]
                 
-                # Save each image individually: view_{view_idx}_var_{var_idx}.png
-                for var_idx, var_result in enumerate(all_variation_results):
+                # Save each rendered image individually with lighting prefix in file name.
+                for light_item in all_lighting_results:
+                    light_key = "".join(c for c in light_item["lighting_prefix"] if c.isalnum() or c in ('_', '-'))
+                    var_result = light_item["rendered_images"]
                     for view_idx in range(v_target):
                         img = var_result[0, view_idx].detach().cpu().float()  # [3, h, w]
                         img = rearrange(img, "c h w -> h w c")
                         img = (img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
                         Image.fromarray(img).save(
-                            os.path.join(sample_dir, f"view_{view_idx:03d}_var_{var_idx:04d}.png")
+                            os.path.join(image_dir, f"light_{light_key}_target_{view_idx:03d}.png")
                         )
-                
-                # Save videos: one video per target view
-                # Each video shows the same view under different lighting variations
-                # For each target view, collect frames from all variations
-                for view_idx in range(v_target):
-                    # Collect this view from all variations: [num_variations, 3, h, w]
-                    view_frames = []
-                    for var_result in all_variation_results:
-                        # var_result: [1, v_target, 3, h, w]
-                        view_frame = var_result[0, view_idx]  # [3, h, w]
-                        view_frames.append(view_frame)
-                    
-                    # Stack frames: [num_variations, 3, h, w]
-                    view_frames = torch.stack(view_frames, dim=0)
-                    
-                    # Convert to numpy: [num_variations, h, w, 3]
-                    view_frames = rearrange(view_frames, "n c h w -> n h w c")
-                    view_frames = (view_frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-                    
-                    # Save video for this view
-                    video_path = os.path.join(sample_dir, f"view_{view_idx:03d}_variations.mp4")
-                    create_video_from_frames(view_frames, video_path, framerate=15)
-                
-                print(f"Saved {v_target * num_variations} images and {v_target} videos (one per view) to {sample_dir}")
+
+                    # Save corresponding input envmaps (LDR/HDR) alongside images.
+                    # File names also include lighting prefix so grouping is explicit.
+                    env_ldr = light_item["env_ldr"][0]  # [v_input, 3, h, w]
+                    env_hdr = light_item["env_hdr"][0]  # [v_input, 3, h, w]
+                    v_input = env_ldr.shape[0]
+                    for input_idx in range(v_input):
+                        env_ldr_img = rearrange(env_ldr[input_idx].detach().cpu().float(), "c h w -> h w c")
+                        env_hdr_img = rearrange(env_hdr[input_idx].detach().cpu().float(), "c h w -> h w c")
+                        env_ldr_img = (env_ldr_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                        env_hdr_img = (env_hdr_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+
+                        Image.fromarray(env_ldr_img).save(
+                            os.path.join(envmap_dir, f"light_{light_key}_input_{input_idx:03d}_ldr.png")
+                        )
+                        Image.fromarray(env_hdr_img).save(
+                            os.path.join(envmap_dir, f"light_{light_key}_input_{input_idx:03d}_hdr.png")
+                        )
+
+                # Save grouped videos: one small video per lighting prefix.
+                # Each video iterates over target views for that lighting condition.
+                for light_item in all_lighting_results:
+                    light_key = "".join(c for c in light_item["lighting_prefix"] if c.isalnum() or c in ('_', '-'))
+                    frames = light_item["rendered_images"][0]  # [v_target, 3, h, w]
+                    frames = rearrange(frames, "n c h w -> n h w c")
+                    frames = (frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                    video_path = os.path.join(sample_dir, f"group_{light_key}.mp4")
+                    # Keep the same frame count but play 3x slower via lower FPS.
+                    create_video_from_frames(frames, video_path, framerate=5)
+
+                print(
+                    f"Saved {len(all_lighting_results) * v_target} images, "
+                    f"{len(all_lighting_results)} grouped videos, and envmaps to {sample_dir}"
+                )
         
         torch.cuda.empty_cache()
 

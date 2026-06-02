@@ -35,7 +35,7 @@ export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 ############################
 export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm/test/full_list.txt}"
 export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/video_making_train_load_all_recon_only}"
-export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/dpt_decoder_512_1e5}"
+export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/video_making_train_load_all_recon_only}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
 export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_video_making_train_load_all_recon_only}"
 export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
@@ -118,5 +118,5 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.dpt_transfer.stage2_unfreeze = all \
     training.dpt_transfer.backbone_lr_scale = 1.0 \
     training.checkpoint_every = 1000 \
-    training.vis_every = 1000
+    training.vis_every = 1
 "
