@@ -17,7 +17,7 @@ torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id 18635 --rdzv_backend c10d --rdzv_endpoint localhost:29502 \
     train.py --config configs/LVSM_scene_encoder_decoder.yaml \
     training.batch_size_per_gpu = 8 \
-    training.dataset_path = /projects/vig/Datasets/obj-with-light/lvsm_format/train/full_list.txt \
+    training.dataset_path = "/projects/vig/Datasets/obj-with-light/lvsm_format/train/full_list.txt,/projects/vig/Datasets/obj-with-light/lvsm_format/test/full_list.txt" \
     training.checkpoint_dir = ckpt/realworld_exps_obj-with-light \
     training.wandb_exp_name = realworld_exps_obj-with-light \
     training.warmup = 3000 \
