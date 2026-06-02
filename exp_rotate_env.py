@@ -13,7 +13,6 @@ import numpy as np
 from PIL import Image
 import re
 import json
-from easydict import EasyDict as edict
 
 # Load config and read(override) arguments from CLI
 config = init_config()
@@ -84,23 +83,35 @@ def parse_scene_name(scene_name):
     return None
 
 
-def collect_unique_lighting_scenes(scene_name, full_list_path):
+def collect_all_lighting_scenes(scene_name, full_list_path):
     """
-    Collect one representative scene per lighting prefix for the same object.
-    Also returns the dedup input prefix.
+    Collect ALL scenes that share the same input prefix as `scene_name`.
+
+    Scenes that share an input prefix (e.g. ``..._env_0_25`` and ``..._env_0_26``)
+    correspond to the same reconstructed input but different rotated lighting envs.
+    These are the relit frames we iterate over, so we keep every member of
+    full_list.txt (no representative deduplication).
+
+    Returns:
+        tuple: (input_prefix, lighting_prefix, variation_scenes)
+          - input_prefix: dedup key for the shared input / output folder
+          - lighting_prefix: key used in output file names (e.g. ``env_0``)
+          - variation_scenes: all scene names sharing the input prefix, sorted
+            by rotation/variation order.
     """
     parsed_scene = parse_scene_name(scene_name)
     if parsed_scene is None:
-        return None, []
+        return None, None, []
+
+    input_prefix = parsed_scene["input_prefix"]
+    lighting_prefix = parsed_scene["lighting_prefix"]
 
     if not os.path.exists(full_list_path):
         if ddp_info.is_main_process:
             print(f"Warning: full_list.txt not found at {full_list_path}")
-        return parsed_scene["input_prefix"], []
+        return input_prefix, lighting_prefix, [scene_name]
 
-    object_id = parsed_scene["object_id"]
-    by_lighting = {}
-
+    entries = []
     with open(full_list_path, "r") as f:
         for line in f:
             json_path = line.strip()
@@ -112,26 +123,18 @@ def collect_unique_lighting_scenes(scene_name, full_list_path):
             parsed_candidate = parse_scene_name(candidate_scene_name)
             if parsed_candidate is None:
                 continue
-            if parsed_candidate["object_id"] != object_id:
+            # Same shared input -> this is one of the rotated lighting variations.
+            if parsed_candidate["input_prefix"] != input_prefix:
                 continue
 
-            lighting_prefix = parsed_candidate["lighting_prefix"]
-            prev = by_lighting.get(lighting_prefix)
-            # Keep a stable canonical representative (smallest sort_key then name).
-            if prev is None or (parsed_candidate["sort_key"], candidate_scene_name) < (prev["sort_key"], prev["scene_name"]):
-                by_lighting[lighting_prefix] = {
-                    "scene_name": candidate_scene_name,
-                    "sort_key": parsed_candidate["sort_key"],
-                }
+            entries.append((parsed_candidate["sort_key"], candidate_scene_name))
 
-    unique_lighting_scenes = sorted(
-        [
-            {"lighting_prefix": k, "scene_name": v["scene_name"], "sort_key": v["sort_key"]}
-            for k, v in by_lighting.items()
-        ],
-        key=lambda x: (x["sort_key"], x["scene_name"]),
-    )
-    return parsed_scene["input_prefix"], unique_lighting_scenes
+    entries.sort(key=lambda x: (x[0], x[1]))
+    variation_scenes = [name for _, name in entries]
+    if not variation_scenes:
+        variation_scenes = [scene_name]
+
+    return input_prefix, lighting_prefix, variation_scenes
 
 
 def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
@@ -230,48 +233,6 @@ def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
     }
     
     return data_batch
-
-
-def load_full_target_template(scene_name, base_dir, dataset_class, process_data_module, device, image_h_w):
-    """
-    Build target rays from ALL frames of a scene (not sampled subset).
-
-    Returns:
-        (target_template, all_target_indices) where:
-          - target_template has ray_o/ray_d/image_h_w for renderer
-          - all_target_indices is [0, 1, ..., num_frames-1]
-    """
-    metadata_dir = os.path.join(base_dir, "metadata")
-    scene_json_path = os.path.join(metadata_dir, f"{scene_name}.json")
-    if not os.path.exists(scene_json_path):
-        return None, None
-
-    with open(scene_json_path, "r") as f:
-        scene_data = json.load(f)
-    frames = scene_data.get("frames", [])
-    if len(frames) == 0:
-        return None, None
-
-    all_target_indices = list(range(len(frames)))
-    image_paths = [frames[idx]["image_path"] for idx in all_target_indices]
-    frames_chosen = [frames[idx] for idx in all_target_indices]
-
-    # Reuse dataset preprocessing to keep intrinsics/c2w consistent with training pipeline.
-    _, fxfycxcy, c2w = dataset_class.preprocess_frames(frames_chosen, image_paths)
-    c2w = c2w.unsqueeze(0).to(device)            # [1, v_all, 4, 4]
-    fxfycxcy = fxfycxcy.unsqueeze(0).to(device)  # [1, v_all, 4]
-
-    target_h, target_w = image_h_w
-    ray_o, ray_d = process_data_module.compute_rays(
-        c2w, fxfycxcy, h=target_h, w=target_w, device=device
-    )
-
-    target_template = edict({
-        "ray_o": ray_o,
-        "ray_d": ray_d,
-        "image_h_w": (target_h, target_w),
-    })
-    return target_template, all_target_indices
 
 
 # Load data
@@ -387,9 +348,9 @@ with torch.no_grad(), torch.autocast(
         # Find full_list.txt path
         full_list_path = os.path.join(base_dir, 'full_list.txt')
         
-        # Group scenes by input-prefix and keep one representative per lighting prefix.
-        # This avoids repeatedly using duplicated scenes like *_env_0_25, *_env_0_26, ...
-        input_prefix, lighting_scene_entries = collect_unique_lighting_scenes(scene_name, full_list_path)
+        # Dedup the INPUT: scenes sharing an input prefix (e.g. *_env_0_25, *_env_0_26)
+        # use the same reconstructed input once, but we still relight over ALL of them.
+        input_prefix, lighting_prefix, variation_scenes = collect_all_lighting_scenes(scene_name, full_list_path)
 
         if input_prefix is None:
             print(f"Warning: Could not parse scene name {scene_name}, processing normally")
@@ -405,7 +366,7 @@ with torch.no_grad(), torch.autocast(
             continue
         processed_input_prefixes.add(input_prefix)
 
-        if not lighting_scene_entries:
+        if not variation_scenes:
             print(f"No lighting scenes found for {scene_name}, processing normally")
             result = model(batch)
             if config.inference.get("render_video", False):
@@ -414,7 +375,10 @@ with torch.no_grad(), torch.autocast(
             continue
 
         if ddp_info.is_main_process:
-            print(f"Using input prefix '{input_prefix}' with {len(lighting_scene_entries)} unique lighting conditions")
+            print(
+                f"Using input prefix '{input_prefix}' (lighting '{lighting_prefix}') "
+                f"with {len(variation_scenes)} relit rotations"
+            )
         
         # Process original scene first to get input data and reconstruct scene
         input, target = model.module.process_data(
@@ -427,25 +391,13 @@ with torch.no_grad(), torch.autocast(
         # Reconstruct scene once (using input images) - this is shared across all variations
         latent_tokens, n_patches, d = model.module.reconstructor(input)
         
-        # Build full-target template from all available frames in scene json.
-        # This enables outputs like target_000 ... target_035 per lighting condition.
-        target_template, all_target_indices = load_full_target_template(
-            scene_name=scene_name,
-            base_dir=base_dir,
-            dataset_class=dataset,
-            process_data_module=model.module.process_data,
-            device=ddp_info.device,
-            image_h_w=input.image_h_w,
-        )
-        if target_template is None:
-            if ddp_info.is_main_process:
-                print(f"Warning: Failed to build full target template for {scene_name}, fallback to sampled targets")
-            target_template = edict({
-                "ray_o": target.ray_o,
-                "ray_d": target.ray_d,
-                "image_h_w": target.image_h_w,
-            })
-            all_target_indices = list(range(target.ray_o.shape[1]))
+        # Get target information (will be reused for all variations)
+        from easydict import EasyDict as edict
+        target_template = edict({
+            'ray_o': target.ray_o,
+            'ray_d': target.ray_d,
+            'image_h_w': target.image_h_w,
+        })
         
         # Get input view indices from the original batch
         # We need to know which frame indices were used for input views
@@ -472,125 +424,108 @@ with torch.no_grad(), torch.autocast(
         if input_indices is None:
             input_indices = list(range(v_input))
         
-        # Store results grouped by lighting prefix
-        all_lighting_results = []
-        
-        # Process one representative scene per lighting prefix.
-        for light_idx, light_entry in enumerate(lighting_scene_entries):
-            var_scene_name = light_entry["scene_name"]
-            lighting_prefix = light_entry["lighting_prefix"]
+        # Prepare output dirs once (one folder per shared input).
+        light_key = "".join(c for c in lighting_prefix if c.isalnum() or c in ('_', '-'))
+        if ddp_info.is_main_process:
+            safe_group_name = "".join(c for c in input_prefix if c.isalnum() or c in ('_', '-'))[:100]
+            sample_dir = os.path.join(config.inference_out_dir, safe_group_name)
+            image_dir = os.path.join(sample_dir, "images")
+            envmap_dir = os.path.join(sample_dir, "envmaps")
+            os.makedirs(sample_dir, exist_ok=True)
+            os.makedirs(image_dir, exist_ok=True)
+            os.makedirs(envmap_dir, exist_ok=True)
+
+        # Iterate over ALL relit rotations sharing this input; render and save
+        # incrementally to keep GPU memory bounded. Each target view gets its own
+        # rotating sequence/video so all target views are preserved.
+        video_frames_by_view = {}  # view_idx -> list of CPU uint8 [h, w, 3]
+        target_counter = 0
+        for rot_idx, var_scene_name in enumerate(variation_scenes):
             if ddp_info.is_main_process:
                 print(
-                    f"Processing lighting {light_idx + 1}/{len(lighting_scene_entries)}: "
-                    f"{lighting_prefix} ({var_scene_name})"
+                    f"Processing relit rotation {rot_idx + 1}/{len(variation_scenes)}: {var_scene_name}"
                 )
-            
+
             # Load environment variation data
             var_data = load_env_variation_data(var_scene_name, base_dir, input_indices, dataset)
-            
+
             if var_data is None:
                 if ddp_info.is_main_process:
                     print(f"Warning: Could not load data for variation {var_scene_name}, skipping")
                 continue
-            
+
             # Move to device
             var_data = {k: v.to(ddp_info.device) if type(v) == torch.Tensor else v for k, v in var_data.items()}
-            
+
             # Get env maps from variation data
             var_env_ldr = var_data["env_ldr"]  # [1, v_input, 3, h, w]
             var_env_hdr = var_data["env_hdr"]  # [1, v_input, 3, h, w]
-            
+
             # Compute env_dir for the variation (using input c2w)
             var_env_dir = model.module.process_data.compute_env_dir(
-                input.c2w, 
-                envmap_h=256, 
-                envmap_w=512, 
+                input.c2w,
+                envmap_h=256,
+                envmap_w=512,
                 device=ddp_info.device
             )  # [1, v_input, 3, env_h, env_w]
-            
+
             # Create input with variation env maps (copy input and update env maps)
             var_input = edict(input)
             var_input.env_ldr = var_env_ldr
             var_input.env_hdr = var_env_hdr
             var_input.env_dir = var_env_dir
-            
+
             # Edit scene with variation env maps
             edited_latent_tokens = model.module.edit_scene_with_env(latent_tokens, var_input)
-            
+
             # Render with same target rays
             rendered_images = model.module.renderer(edited_latent_tokens, target_template, n_patches, d)
-            
-            # Store result
-            all_lighting_results.append({
-                "lighting_prefix": lighting_prefix,
-                "scene_name": var_scene_name,
-                "rendered_images": rendered_images,   # [1, v_target, 3, h, w]
-                "env_ldr": var_env_ldr,               # [1, v_input, 3, h, w]
-                "env_hdr": var_env_hdr,               # [1, v_input, 3, h, w]
-            })
-        
-        # Save individual images and videos
-        if all_lighting_results:
+
             if ddp_info.is_main_process:
-                safe_group_name = "".join(c for c in input_prefix if c.isalnum() or c in ('_', '-'))[:100]
-                sample_dir = os.path.join(config.inference_out_dir, safe_group_name)
-                image_dir = os.path.join(sample_dir, "images")
-                envmap_dir = os.path.join(sample_dir, "envmaps")
-                os.makedirs(sample_dir, exist_ok=True)
-                os.makedirs(image_dir, exist_ok=True)
-                os.makedirs(envmap_dir, exist_ok=True)
-                
-                v_target = all_lighting_results[0]["rendered_images"].shape[1]
-                
-                # Save each rendered image individually with lighting prefix in file name.
-                for light_item in all_lighting_results:
-                    light_key = "".join(c for c in light_item["lighting_prefix"] if c.isalnum() or c in ('_', '-'))
-                    var_result = light_item["rendered_images"]
-                    for view_idx in range(v_target):
-                        img = var_result[0, view_idx].detach().cpu().float()  # [3, h, w]
-                        img = rearrange(img, "c h w -> h w c")
-                        img = (img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-                        target_frame_id = int(all_target_indices[view_idx]) if view_idx < len(all_target_indices) else int(view_idx)
-                        Image.fromarray(img).save(
-                            os.path.join(image_dir, f"light_{light_key}_target_{target_frame_id:03d}.png")
+                v_target = rendered_images.shape[1]
+
+                # Save one relit image per target view for this rotation.
+                for view_idx in range(v_target):
+                    img = rendered_images[0, view_idx].detach().cpu().float()  # [3, h, w]
+                    img = rearrange(img, "c h w -> h w c")
+                    img = (img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                    Image.fromarray(img).save(
+                        os.path.join(
+                            image_dir,
+                            f"light_{light_key}_view_{view_idx:03d}_target_{target_counter:03d}.png",
                         )
+                    )
+                    video_frames_by_view.setdefault(view_idx, []).append(img)
 
-                    # Save corresponding input envmaps (LDR/HDR) alongside images.
-                    # File names also include lighting prefix so grouping is explicit.
-                    env_ldr = light_item["env_ldr"][0]  # [v_input, 3, h, w]
-                    env_hdr = light_item["env_hdr"][0]  # [v_input, 3, h, w]
-                    v_input = env_ldr.shape[0]
-                    for input_idx in range(v_input):
-                        env_ldr_img = rearrange(env_ldr[input_idx].detach().cpu().float(), "c h w -> h w c")
-                        env_hdr_img = rearrange(env_hdr[input_idx].detach().cpu().float(), "c h w -> h w c")
-                        env_ldr_img = (env_ldr_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-                        env_hdr_img = (env_hdr_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-
-                        Image.fromarray(env_ldr_img).save(
-                            os.path.join(envmap_dir, f"light_{light_key}_input_{input_idx:03d}_ldr.png")
-                        )
-                        Image.fromarray(env_hdr_img).save(
-                            os.path.join(envmap_dir, f"light_{light_key}_input_{input_idx:03d}_hdr.png")
-                        )
-
-                # Save grouped videos: one small video per lighting prefix.
-                # Each video iterates over target views for that lighting condition.
-                for light_item in all_lighting_results:
-                    light_key = "".join(c for c in light_item["lighting_prefix"] if c.isalnum() or c in ('_', '-'))
-                    frames = light_item["rendered_images"][0]  # [v_target, 3, h, w]
-                    frames = rearrange(frames, "n c h w -> n h w c")
-                    frames = (frames.detach().cpu().float().numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-                    # Keep original frame set (e.g., all 36 views), and extend duration
-                    # by repeating each frame 3 times at the same fps.
-                    frames = np.repeat(frames, repeats=3, axis=0)
-                    video_path = os.path.join(sample_dir, f"group_{light_key}.mp4")
-                    create_video_from_frames(frames, video_path, framerate=24)
-
-                print(
-                    f"Saved {len(all_lighting_results) * v_target} images, "
-                    f"{len(all_lighting_results)} grouped videos, and envmaps to {sample_dir}"
+                # Save the corresponding input envmap (view 0) once per rotation.
+                env_ldr_img = rearrange(var_env_ldr[0, 0].detach().cpu().float(), "c h w -> h w c")
+                env_hdr_img = rearrange(var_env_hdr[0, 0].detach().cpu().float(), "c h w -> h w c")
+                env_ldr_img = (env_ldr_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                env_hdr_img = (env_hdr_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                Image.fromarray(env_ldr_img).save(
+                    os.path.join(envmap_dir, f"light_{light_key}_target_{target_counter:03d}_ldr.png")
                 )
-        
+                Image.fromarray(env_hdr_img).save(
+                    os.path.join(envmap_dir, f"light_{light_key}_target_{target_counter:03d}_hdr.png")
+                )
+
+                target_counter += 1
+
+        # Save one grouped video per target view for this lighting prefix.
+        if ddp_info.is_main_process and video_frames_by_view:
+            for view_idx in sorted(video_frames_by_view.keys()):
+                frames = np.stack(video_frames_by_view[view_idx], axis=0)  # [n_rot, h, w, 3]
+                # Keep all rotation frames, extend duration by repeating each frame 3x at fps 24.
+                frames = np.repeat(frames, repeats=3, axis=0)
+                video_path = os.path.join(sample_dir, f"group_{light_key}_view_{view_idx:03d}.mp4")
+                create_video_from_frames(frames, video_path, framerate=24)
+
+            num_views = len(video_frames_by_view)
+            print(
+                f"Saved {target_counter * num_views} relit images, {target_counter} envmaps, "
+                f"and {num_views} grouped videos (one per target view) to {sample_dir}"
+            )
+
         torch.cuda.empty_cache()
 
 
