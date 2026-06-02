@@ -1,18 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=video_infer_env_rotate
+#SBATCH --job-name=video_train_load_all
 #SBATCH --partition=ct
 #SBATCH --account=ct
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:1
-#SBATCH --time=24:00:00
+#SBATCH --gres=gpu:4
+#SBATCH --time=72:00:00
 #SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
 #SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
-
-# Env-rotation inference on the Sony cluster.
-# Runs exp_rotate_env.py over the preprocessed rotating-env dataset, using random
-# contiguous-chunk sampling (evenly placed context inside the chunk) instead of a
-# fixed view-index json. Context frame ids come from the batch (input.index).
 
 set -euo pipefail
 
@@ -37,41 +31,35 @@ export HF_HOME=/scratch2/$USER/.cache/huggingface
 export HF_ACCELERATE_CONFIG_DIR=/scratch2/$USER/.cache/accelerate
 
 ############################
-# Inference controls
+# Training controls
 ############################
-export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/polyhaven_lvsm_rotating_env/test/full_list.txt}"
-export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt_dpt/dpt_decoder_512_1e5}"
+export DATASET_PATH="${DATASET_PATH:-/music-shared-disk/group/ct/yiwen/data/objaverse/lvsm_with_envmaps/test/full_list_failure.txt}"
+export CHECKPOINT_DIR="${CHECKPOINT_DIR:-$PROJ/ckpt/infer_rotate_objaverse_failure}"
+export RESUME_CKPT="${RESUME_CKPT:-$PROJ/ckpt_dpt/dpt_decoder_512_1e5}"
 export LVSM_CKPT_DIR="${LVSM_CKPT_DIR:-$PROJ/ckpt/LVSM_object_encoder_decoder_512}"
-export OUTPUT_DIR="${OUTPUT_DIR:-$PROJ/experiments/evaluation/video_making_env_rotate}"
-
-# Random contiguous-chunk sampling: chunk_len = num_input_views + num_target_views.
-export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-4}"
-export NUM_TARGET_VIEWS="${NUM_TARGET_VIEWS:-8}"
-export RANDOM_CHUNK_SAMPLING="${RANDOM_CHUNK_SAMPLING:-true}"
-export RANDOM_CHUNK_SEED="${RANDOM_CHUNK_SEED:-}"
-export RENDER_VIDEO="${RENDER_VIDEO:-false}"
-export COMPUTE_METRICS="${COMPUTE_METRICS:-true}"
-
-NUM_VIEWS=$(( NUM_INPUT_VIEWS + NUM_TARGET_VIEWS ))
+export WANDB_EXP_NAME="${WANDB_EXP_NAME:-LVSM_video_making_train_load_all}"
+export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
+export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
+export LOAD_ALL_FRAMES="${LOAD_ALL_FRAMES:-true}"
+export NUM_INPUT_VIEWS="${NUM_INPUT_VIEWS:-10}"
+export LOAD_ALL_MAX_TARGET_VIEWS="${LOAD_ALL_MAX_TARGET_VIEWS:-32}"
+export EXCLUDE_WHITE_ENV0_FROM_RELIT="${EXCLUDE_WHITE_ENV0_FROM_RELIT:-true}"
 
 ############################
 # Logging
 ############################
 echo "=============================================="
-echo "SBATCH: exp_rotate_env (polyhaven rotating-env)"
+echo "SBATCH: train_editor load-all (polyhaven_lvsm)"
 echo "=============================================="
 echo "Host: $(hostname)"
 echo "JobID: ${SLURM_JOB_ID:-N/A}"
 echo "DATASET_PATH: $DATASET_PATH"
 echo "CHECKPOINT_DIR: $CHECKPOINT_DIR"
-echo "OUTPUT_DIR: $OUTPUT_DIR"
+echo "RESUME_CKPT: $RESUME_CKPT"
+echo "LOAD_ALL_FRAMES: $LOAD_ALL_FRAMES"
 echo "NUM_INPUT_VIEWS: $NUM_INPUT_VIEWS"
-echo "NUM_TARGET_VIEWS: $NUM_TARGET_VIEWS"
-echo "NUM_VIEWS (chunk_len): $NUM_VIEWS"
-echo "RANDOM_CHUNK_SAMPLING: $RANDOM_CHUNK_SAMPLING"
-echo "RANDOM_CHUNK_SEED: ${RANDOM_CHUNK_SEED:-<unset>}"
-echo "RENDER_VIDEO: $RENDER_VIDEO"
-echo "COMPUTE_METRICS: $COMPUTE_METRICS"
+echo "LOAD_ALL_MAX_TARGET_VIEWS: $LOAD_ALL_MAX_TARGET_VIEWS"
+echo "EXCLUDE_WHITE_ENV0_FROM_RELIT: $EXCLUDE_WHITE_ENV0_FROM_RELIT"
 echo "----------------------------------------------"
 echo ""
 
@@ -80,15 +68,8 @@ if [ ! -f "$DATASET_PATH" ]; then
   exit 1
 fi
 
-# Optional random_chunk_seed: only pass the override if the user set it.
-SEED_ARG=""
-if [ -n "${RANDOM_CHUNK_SEED}" ]; then
-  SEED_ARG="inference.random_chunk_seed = ${RANDOM_CHUNK_SEED}"
-fi
-export SEED_ARG
-
 ############################
-# Run inference
+# Run training
 ############################
 singularity exec --nv $BIND $SIF bash -lc "
   set -euo pipefail
@@ -107,20 +88,23 @@ singularity exec --nv $BIND $SIF bash -lc "
   torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
-    --rdzv_endpoint localhost:29547 \
-    exp_rotate_env.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml \
+    --rdzv_endpoint localhost:29541 \
+    train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml \
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CHECKPOINT_DIR\" \
+    training.resume_ckpt = \"$RESUME_CKPT\" \
     training.LVSM_checkpoint_dir = \"$LVSM_CKPT_DIR\" \
+    training.wandb_exp_name = \"$WANDB_EXP_NAME\" \
     training.batch_size_per_gpu = 1 \
-    training.target_has_input = false \
-    training.num_views = ${NUM_VIEWS} \
     training.num_input_views = ${NUM_INPUT_VIEWS} \
-    training.num_target_views = ${NUM_TARGET_VIEWS} \
-    inference.if_inference = true \
-    inference.compute_metrics = ${COMPUTE_METRICS} \
-    inference.render_video = ${RENDER_VIDEO} \
-    inference.random_chunk_sampling = ${RANDOM_CHUNK_SAMPLING} \
-    \${SEED_ARG} \
-    inference_out_dir = \"$OUTPUT_DIR\"
+    training.load_all_frames = ${LOAD_ALL_FRAMES} \
+    training.load_all_max_target_views = ${LOAD_ALL_MAX_TARGET_VIEWS} \
+    training.exclude_white_env0_from_relit_sampling = ${EXCLUDE_WHITE_ENV0_FROM_RELIT} \
+    training.lr = ${LEARNING_RATE} \
+    training.warmup = ${WARMUP_STEPS} \
+    training.dpt_transfer.enabled = true \
+    training.dpt_transfer.train_stage = stage2 \
+    training.dpt_transfer.stage2_unfreeze = all \
+    training.vis_every = 1 \
+    training.dpt_transfer.backbone_lr_scale = 1.0
 "
