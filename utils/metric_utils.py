@@ -430,15 +430,19 @@ def visualize_intermediate_results(out_dir, result):
     )
 
 
-def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None, scene_name=None):
-    """Save interpolated visualization frames produced by model.render_video.
+def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None, scene_name=None, prefix="interpolate_vis"):
+    """Save extra visualization frames produced by model.render_video.
+
+    Works for any trajectory type (e.g. interpolation between views or an orbit
+    around the object); the `prefix` controls the output file naming.
 
     Args:
         out_dir (str): directory to write the visualization into.
         video_rendering (torch.Tensor): [b, num_frames, 3, h, w] rendered frames (any device).
-        input_endpoints (torch.Tensor | None): [n_ends, 3, h, w] the input views the
-            interpolation was sampled between, prepended to the strip for reference.
+        input_endpoints (torch.Tensor | None): [n_views, 3, h, w] the input views used
+            to build the trajectory, prepended to the strip for reference.
         scene_name (str | None): used to build the output filename.
+        prefix (str): filename prefix, e.g. "orbit_vis" or "interpolate_vis".
     """
     if video_rendering is None or (not isinstance(video_rendering, torch.Tensor)) or video_rendering.ndim != 5:
         return None
@@ -461,19 +465,19 @@ def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None,
     strip = torch.cat(strip_parts, dim=0)  # [n, 3, h, w]
     strip_img = rearrange(strip, "v c h w -> h (v w) c")
     strip_img = (strip_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-    out_path = os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}.jpg")
+    out_path = os.path.join(out_dir, f"{prefix}_{safe_scene_name}.jpg")
     Image.fromarray(strip_img).save(out_path)
 
-    # Also export an mp4 so the interpolated trajectory can be inspected as motion.
+    # Also export an mp4 so the trajectory can be inspected as motion.
     try:
         video_np = (frames.permute(0, 2, 3, 1).numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
         data_utils.create_video_from_frames(
             video_np,
-            os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}.mp4"),
+            os.path.join(out_dir, f"{prefix}_{safe_scene_name}.mp4"),
             framerate=10,
         )
     except Exception as e:
-        print(f"[interpolate vis] failed to write mp4: {e}")
+        print(f"[{prefix}] failed to write mp4: {e}")
 
     return out_path
 

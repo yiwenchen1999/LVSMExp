@@ -263,9 +263,10 @@ while cur_train_step <= total_train_steps:
             os.makedirs(vis_path, exist_ok=True)
             visualize_intermediate_results(vis_path, ret_dict)
 
-            # Extra visualization-only pass: pick 2 input views and render a set of
-            # camera poses interpolated evenly between them. This does NOT affect loss,
-            # optimizer steps or checkpoints (pure no_grad inference + save).
+            # Extra visualization-only pass: render an orbit trajectory that circles
+            # around the input-camera-distribution center, staying in-distribution.
+            # This does NOT affect loss, optimizer steps or checkpoints
+            # (pure no_grad inference + save).
             if config.training.get("vis_interpolate", True):
                 try:
                     base_model = model.module if isinstance(model, DDP) else model
@@ -273,13 +274,13 @@ while cur_train_step <= total_train_steps:
                     vis_input = ret_dict.input
                     v_input = vis_input.image.size(1)
                     if v_input >= 2:
-                        num_frames = int(config.training.get("vis_interpolate_frames", 8))
-                        select_mode = config.training.get("vis_interpolate_select", "random_two")
+                        num_frames = int(config.training.get("vis_interpolate_frames", 16))
+                        traj_type = config.training.get("vis_interpolate_traj_type", "orbit_centered")
+                        select_mode = config.training.get("vis_interpolate_select", "all")
                         if select_mode == "random_two":
-                            i0, i1 = random.sample(range(v_input), 2)
-                        else:
-                            i0, i1 = 0, v_input - 1
-                        sel = [i0, i1]
+                            sel = sorted(random.sample(range(v_input), 2))
+                        else:  # "all": use every input view for reconstruction + orbit stats
+                            sel = list(range(v_input))
 
                         vis_data_batch = edict(
                             input=edict(
@@ -299,7 +300,7 @@ while cur_train_step <= total_train_steps:
                             ):
                                 vis_out = base_model.render_video(
                                     vis_data_batch,
-                                    traj_type="interpolate",
+                                    traj_type=traj_type,
                                     num_frames=num_frames,
                                     loop_video=False,
                                     order_poses=False,
@@ -315,9 +316,10 @@ while cur_train_step <= total_train_steps:
                             vis_out.video_rendering,
                             input_endpoints=vis_input.image[0, sel],
                             scene_name=scene_name,
+                            prefix="orbit_vis" if traj_type == "orbit_centered" else "interpolate_vis",
                         )
                 except Exception as e:
-                    print(f"[interpolate vis] skipped due to error: {e}")
+                    print(f"[orbit vis] skipped due to error: {e}")
 
             torch.cuda.empty_cache()
             model.train()

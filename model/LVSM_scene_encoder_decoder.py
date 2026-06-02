@@ -487,7 +487,7 @@ class Images2LatentScene(nn.Module):
             [self.config.model.transformer.n_latent_vectors, v_input * n_patches], dim=1
         ) # [b, n_latent_vectors, d]
 
-        if traj_type == "interpolate":
+        if traj_type in ("interpolate", "orbit_centered"):
             c2ws = input.c2w # [b, v, 4, 4]
             fxfycxcy = input.fxfycxcy #  [b, v, 4]
             device = input.c2w.device
@@ -499,17 +499,22 @@ class Images2LatentScene(nn.Module):
             intrinsics[:, :,  0, 2] = fxfycxcy[:, :, 2]
             intrinsics[:, :,  1, 2] = fxfycxcy[:, :, 3]
 
-            # Loop video if requested
-            if loop_video:
+            # Loop video if requested (only meaningful for the interpolate trajectory).
+            if loop_video and traj_type == "interpolate":
                 c2ws = torch.cat([c2ws, c2ws[:, [0], :]], dim=1)
                 intrinsics = torch.cat([intrinsics, intrinsics[:, [0], :]], dim=1)
 
-            # Interpolate camera poses
+            # Build per-batch camera trajectory
             all_c2ws, all_intrinsics = [], []
             for b in range(input.image.size(0)):
-                cur_c2ws, cur_intrinsics = camera_utils.get_interpolated_poses_many(
-                    c2ws[b, :, :3, :4], intrinsics[b], num_frames, order_poses=order_poses
-                )
+                if traj_type == "orbit_centered":
+                    cur_c2ws, cur_intrinsics = camera_utils.get_orbit_poses_around_center(
+                        c2ws[b, :, :3, :4], intrinsics[b], num_frames
+                    )
+                else:
+                    cur_c2ws, cur_intrinsics = camera_utils.get_interpolated_poses_many(
+                        c2ws[b, :, :3, :4], intrinsics[b], num_frames, order_poses=order_poses
+                    )
                 all_c2ws.append(cur_c2ws.to(device))
                 all_intrinsics.append(cur_intrinsics.to(device))
 
