@@ -431,9 +431,22 @@ with torch.no_grad(), torch.autocast(
             sample_dir = os.path.join(config.inference_out_dir, safe_group_name)
             image_dir = os.path.join(sample_dir, "images")
             envmap_dir = os.path.join(sample_dir, "envmaps")
+            before_lit_dir = os.path.join(sample_dir, "before_lit")
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(image_dir, exist_ok=True)
             os.makedirs(envmap_dir, exist_ok=True)
+            os.makedirs(before_lit_dir, exist_ok=True)
+
+            # Save the GT target views (before relighting) alongside predictions.
+            if hasattr(target, "image") and target.image is not None:
+                gt_target = target.image  # [1, v_target, 3, h, w]
+                for view_idx in range(gt_target.shape[1]):
+                    gt_img = gt_target[0, view_idx].detach().cpu().float()  # [3, h, w]
+                    gt_img = rearrange(gt_img, "c h w -> h w c")
+                    gt_img = (gt_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                    Image.fromarray(gt_img).save(
+                        os.path.join(before_lit_dir, f"light_{light_key}_view_{view_idx:03d}.png")
+                    )
 
         # Iterate over ALL relit rotations sharing this input; render and save
         # incrementally to keep GPU memory bounded. Each target view gets its own
