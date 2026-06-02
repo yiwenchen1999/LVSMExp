@@ -432,10 +432,12 @@ with torch.no_grad(), torch.autocast(
             image_dir = os.path.join(sample_dir, "images")
             envmap_dir = os.path.join(sample_dir, "envmaps")
             before_lit_dir = os.path.join(sample_dir, "before_lit")
+            relit_gt_dir = os.path.join(sample_dir, "relit_gt")
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(image_dir, exist_ok=True)
             os.makedirs(envmap_dir, exist_ok=True)
             os.makedirs(before_lit_dir, exist_ok=True)
+            os.makedirs(relit_gt_dir, exist_ok=True)
 
             # Save the GT target views (before relighting) alongside predictions.
             if hasattr(target, "image") and target.image is not None:
@@ -446,6 +448,17 @@ with torch.no_grad(), torch.autocast(
                     gt_img = (gt_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
                     Image.fromarray(gt_img).save(
                         os.path.join(before_lit_dir, f"light_{light_key}_view_{view_idx:03d}.png")
+                    )
+
+            # Save the relit GT target views (target.relit_images) if available.
+            if hasattr(target, "relit_images") and target.relit_images is not None:
+                relit_gt = target.relit_images  # [1, v_target, 3, h, w]
+                for view_idx in range(relit_gt.shape[1]):
+                    relit_img = relit_gt[0, view_idx].detach().cpu().float()  # [3, h, w]
+                    relit_img = rearrange(relit_img, "c h w -> h w c")
+                    relit_img = (relit_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                    Image.fromarray(relit_img).save(
+                        os.path.join(relit_gt_dir, f"light_{light_key}_view_{view_idx:03d}.png")
                     )
 
         # Iterate over ALL relit rotations sharing this input; render and save
