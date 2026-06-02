@@ -13,6 +13,7 @@ import numpy as np
 from PIL import Image
 import re
 import json
+from easydict import EasyDict as edict
 
 # Load config and read(override) arguments from CLI
 config = init_config()
@@ -231,6 +232,48 @@ def load_env_variation_data(scene_name, base_dir, image_indices, dataset_class):
     return data_batch
 
 
+def load_full_target_template(scene_name, base_dir, dataset_class, process_data_module, device, image_h_w):
+    """
+    Build target rays from ALL frames of a scene (not sampled subset).
+
+    Returns:
+        (target_template, all_target_indices) where:
+          - target_template has ray_o/ray_d/image_h_w for renderer
+          - all_target_indices is [0, 1, ..., num_frames-1]
+    """
+    metadata_dir = os.path.join(base_dir, "metadata")
+    scene_json_path = os.path.join(metadata_dir, f"{scene_name}.json")
+    if not os.path.exists(scene_json_path):
+        return None, None
+
+    with open(scene_json_path, "r") as f:
+        scene_data = json.load(f)
+    frames = scene_data.get("frames", [])
+    if len(frames) == 0:
+        return None, None
+
+    all_target_indices = list(range(len(frames)))
+    image_paths = [frames[idx]["image_path"] for idx in all_target_indices]
+    frames_chosen = [frames[idx] for idx in all_target_indices]
+
+    # Reuse dataset preprocessing to keep intrinsics/c2w consistent with training pipeline.
+    _, fxfycxcy, c2w = dataset_class.preprocess_frames(frames_chosen, image_paths)
+    c2w = c2w.unsqueeze(0).to(device)            # [1, v_all, 4, 4]
+    fxfycxcy = fxfycxcy.unsqueeze(0).to(device)  # [1, v_all, 4]
+
+    target_h, target_w = image_h_w
+    ray_o, ray_d = process_data_module.compute_rays(
+        c2w, fxfycxcy, h=target_h, w=target_w, device=device
+    )
+
+    target_template = edict({
+        "ray_o": ray_o,
+        "ray_d": ray_d,
+        "image_h_w": (target_h, target_w),
+    })
+    return target_template, all_target_indices
+
+
 # Load data
 dataset_name = config.training.get("dataset_name", "data.dataset.Dataset")
 module, class_name = dataset_name.rsplit(".", 1)
@@ -384,13 +427,25 @@ with torch.no_grad(), torch.autocast(
         # Reconstruct scene once (using input images) - this is shared across all variations
         latent_tokens, n_patches, d = model.module.reconstructor(input)
         
-        # Get target information (will be reused for all variations)
-        from easydict import EasyDict as edict
-        target_template = edict({
-            'ray_o': target.ray_o,
-            'ray_d': target.ray_d,
-            'image_h_w': target.image_h_w,
-        })
+        # Build full-target template from all available frames in scene json.
+        # This enables outputs like target_000 ... target_035 per lighting condition.
+        target_template, all_target_indices = load_full_target_template(
+            scene_name=scene_name,
+            base_dir=base_dir,
+            dataset_class=dataset,
+            process_data_module=model.module.process_data,
+            device=ddp_info.device,
+            image_h_w=input.image_h_w,
+        )
+        if target_template is None:
+            if ddp_info.is_main_process:
+                print(f"Warning: Failed to build full target template for {scene_name}, fallback to sampled targets")
+            target_template = edict({
+                "ray_o": target.ray_o,
+                "ray_d": target.ray_d,
+                "image_h_w": target.image_h_w,
+            })
+            all_target_indices = list(range(target.ray_o.shape[1]))
         
         # Get input view indices from the original batch
         # We need to know which frame indices were used for input views
@@ -495,8 +550,9 @@ with torch.no_grad(), torch.autocast(
                         img = var_result[0, view_idx].detach().cpu().float()  # [3, h, w]
                         img = rearrange(img, "c h w -> h w c")
                         img = (img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+                        target_frame_id = int(all_target_indices[view_idx]) if view_idx < len(all_target_indices) else int(view_idx)
                         Image.fromarray(img).save(
-                            os.path.join(image_dir, f"light_{light_key}_target_{view_idx:03d}.png")
+                            os.path.join(image_dir, f"light_{light_key}_target_{target_frame_id:03d}.png")
                         )
 
                     # Save corresponding input envmaps (LDR/HDR) alongside images.
