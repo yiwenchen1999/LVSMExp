@@ -5,8 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=168:00:00
-#SBATCH --output=/group2/ct/yiwen/logs/%x.%N.%j.out
-#SBATCH --error=/group2/ct/yiwen/logs/%x.%N.%j.err
+#SBATCH --output=/group2/ct/yiwen/logs/infer_stanford_512_sony.out
+#SBATCH --error=/group2/ct/yiwen/logs/infer_stanford_512_sony.err
 
 # Train Stanford ORB recon-only at 512x512 from 256x256 checkpoint.
 # (Sony cluster, Singularity.)
@@ -118,7 +118,7 @@ singularity exec --nv $BIND $SIF bash -lc "
   export HF_ACCELERATE_CONFIG_DIR=\"$HF_ACCELERATE_CONFIG_DIR\"
   cd \"$PROJ\"
 
-  torchrun --nproc_per_node 2 --nnodes 1 \
+  torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
     --rdzv_endpoint localhost:$MASTER_PORT \
