@@ -430,6 +430,54 @@ def visualize_intermediate_results(out_dir, result):
     )
 
 
+def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None, scene_name=None):
+    """Save interpolated visualization frames produced by model.render_video.
+
+    Args:
+        out_dir (str): directory to write the visualization into.
+        video_rendering (torch.Tensor): [b, num_frames, 3, h, w] rendered frames (any device).
+        input_endpoints (torch.Tensor | None): [n_ends, 3, h, w] the input views the
+            interpolation was sampled between, prepended to the strip for reference.
+        scene_name (str | None): used to build the output filename.
+    """
+    if video_rendering is None or (not isinstance(video_rendering, torch.Tensor)) or video_rendering.ndim != 5:
+        return None
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    safe_scene_name = _safe_scene_name(scene_name) if scene_name is not None else "unknown"
+
+    # Only visualize the first batch element.
+    frames = video_rendering[0].detach().cpu().float()  # [num_frames, 3, h, w]
+    h, w = frames.shape[-2], frames.shape[-1]
+
+    strip_parts = []
+    if input_endpoints is not None and isinstance(input_endpoints, torch.Tensor) and input_endpoints.ndim == 4:
+        endpoints = input_endpoints.detach().cpu().float()
+        if endpoints.shape[-2:] == (h, w):
+            strip_parts.append(endpoints)
+    strip_parts.append(frames)
+
+    strip = torch.cat(strip_parts, dim=0)  # [n, 3, h, w]
+    strip_img = rearrange(strip, "v c h w -> h (v w) c")
+    strip_img = (strip_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+    out_path = os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}.jpg")
+    Image.fromarray(strip_img).save(out_path)
+
+    # Also export an mp4 so the interpolated trajectory can be inspected as motion.
+    try:
+        video_np = (frames.permute(0, 2, 3, 1).numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+        data_utils.create_video_from_frames(
+            video_np,
+            os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}.mp4"),
+            framerate=10,
+        )
+    except Exception as e:
+        print(f"[interpolate vis] failed to write mp4: {e}")
+
+    return out_path
+
+
 def _save_images(result, batch_idx, out_dir):
     """Save visualization images."""
     # Save input image
@@ -513,66 +561,6 @@ def _save_video(frames, out_dir):
         f"{out_dir}/rendered_video.mp4", 
         framerate=15
     )
-
-
-def save_interpolated_vis_frames(
-    out_dir: str,
-    vis_result: edict,
-    pair_positions_by_batch,
-    num_frames: int,
-):
-    """
-    Save additional vis-only interpolation renders generated from two input views.
-
-    Args:
-        out_dir: train vis folder (e.g., iter_00001000)
-        vis_result: result from model.render_video(...) containing video_rendering
-        pair_positions_by_batch: list[(pos_a, pos_b)] in input-view local positions
-        num_frames: configured interpolation frame count
-    """
-    if not hasattr(vis_result, "video_rendering") or vis_result.video_rendering is None:
-        return
-    if not hasattr(vis_result, "input") or vis_result.input is None:
-        return
-
-    frames_all = vis_result.video_rendering  # [b, n, 3, h, w]
-    input_data = vis_result.input
-    batch_size = frames_all.shape[0]
-
-    for bidx in range(batch_size):
-        scene_name = input_data.scene_name[bidx] if hasattr(input_data, "scene_name") else f"scene_{bidx}"
-        safe_scene_name = _safe_scene_name(scene_name)
-        cur_frames = frames_all[bidx].detach().cpu().to(torch.float32)  # [n, 3, h, w]
-
-        pos_a, pos_b = pair_positions_by_batch[bidx]
-        idx_a, idx_b = pos_a, pos_b
-        if hasattr(input_data, "index") and input_data.index is not None:
-            try:
-                view_indices = input_data.index[bidx, :, 0].detach().cpu().tolist()
-                idx_a = int(view_indices[pos_a])
-                idx_b = int(view_indices[pos_b])
-            except Exception:
-                idx_a, idx_b = pos_a, pos_b
-
-        # Save a stitched strip for quick inspection.
-        strip = rearrange(cur_frames, "n c h w -> h (n w) c")
-        strip = (strip.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-        strip_name = (
-            f"interpolate_{safe_scene_name}_"
-            f"pair_{idx_a:05d}-{idx_b:05d}_n{num_frames:03d}.jpg"
-        )
-        Image.fromarray(strip).save(os.path.join(out_dir, strip_name))
-
-        # Save per-frame images too (easy to compose custom videos later).
-        for fi in range(cur_frames.shape[0]):
-            frame = cur_frames[fi]
-            frame_np = (frame.permute(1, 2, 0).numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-            Image.fromarray(frame_np).save(
-                os.path.join(
-                    out_dir,
-                    f"interpolate_{safe_scene_name}_pair_{idx_a:05d}-{idx_b:05d}_{fi:03d}.png",
-                )
-            )
 
 
 @torch.no_grad()
