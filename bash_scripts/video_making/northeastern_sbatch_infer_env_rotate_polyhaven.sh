@@ -13,8 +13,9 @@ set -euo pipefail
 PROJ="/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp"
 DATASET_FULL_LIST="/projects/vig/Datasets/objaverse/hf-objaverse-v1/polyhaven_env_rotate/test/full_list.txt"
 CHECKPOINT_DIR="/projects/vig/yiwenc/ResearchProjects/lightingDiffusion/3dgs/LVSMExp/ckpt_dpt/dpt_decoder_512_1e5"
+LVSM_CKPT_DIR="$PROJ/ckpt/LVSM_object_encoder_decoder_512"
 EVAL_INDEX="$PROJ/data/evaluation_index_polyhaven_env_rotate_4in4out.json"
-OUT_DIR="$PROJ/experiments/evaluation/polyhaven_env_rotate_4in4out"
+OUT_DIR="$PROJ/experiments/evaluation/polyhaven_env_rotate"
 
 NUM_INPUT_VIEWS=4
 NUM_TARGET_VIEWS=4
@@ -47,9 +48,10 @@ fi
 
 torchrun --nproc_per_node 1 --nnodes 1 \
 --rdzv_id "${SLURM_JOB_ID:-18635}" --rdzv_backend c10d --rdzv_endpoint localhost:29506 \
-exp_rotate_env.py --config "configs/LVSM_scene_encoder_decoder_wEditor.yaml" \
+exp_rotate_env.py --config "configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer.yaml" \
 training.dataset_path = "$DATASET_FULL_LIST" \
 training.checkpoint_dir = "$CHECKPOINT_DIR" \
+training.LVSM_checkpoint_dir = "$LVSM_CKPT_DIR" \
 training.batch_size_per_gpu = 1 \
 training.target_has_input = false \
 training.num_views = "$NUM_VIEWS" \
