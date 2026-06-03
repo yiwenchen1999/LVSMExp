@@ -335,6 +335,11 @@ while cur_train_step <= total_train_steps:
                         pos_w = float(config.training.get("vis_interpolate_pose_dist_pos_w", 1.0))
                         rot_w = float(config.training.get("vis_interpolate_pose_dist_rot_w", 0.5))
                         select_mode = config.training.get("vis_interpolate_select", "local_six_pose")
+                        # When enabled, `num_frames` counts the views rendered strictly
+                        # BETWEEN two context keyframes: we render num_frames+2 poses then
+                        # drop the two endpoints (which coincide with the context poses).
+                        drop_endpoints = bool(config.training.get("vis_interpolate_drop_endpoints", False))
+                        render_frames = num_frames + 2 if drop_endpoints else num_frames
 
                         c2w_b0 = vis_input.c2w[0]  # [v, 4, 4]
                         if select_mode == "random_two":
@@ -374,11 +379,16 @@ while cur_train_step <= total_train_steps:
                                         vis_out = base_model.render_video(
                                             vis_data_batch,
                                             traj_type="interpolate",
-                                            num_frames=num_frames,
+                                            num_frames=render_frames,
                                             loop_video=False,
                                             order_poses=False,
                                         )
-                                segment_frames.append(vis_out.video_rendering)  # [b, num_frames, 3, h, w]
+                                seg_render = vis_out.video_rendering  # [b, render_frames, 3, h, w]
+                                # Drop the endpoint frames (context-pose renders) so only
+                                # the views strictly between the two context frames remain.
+                                if drop_endpoints and seg_render.shape[1] >= 3:
+                                    seg_render = seg_render[:, 1:-1]
+                                segment_frames.append(seg_render)
                             except Exception as seg_e:
                                 print(f"[interpolate vis] segment ({a},{b}) skipped: {seg_e}")
 

@@ -58,11 +58,13 @@ export SAVE_EVERY="${SAVE_EVERY:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
 export MASTER_PORT="${MASTER_PORT:-29533}"
 export VIS_INTERPOLATE="${VIS_INTERPOLATE:-true}"
-export VIS_INTERPOLATE_FRAMES="${VIS_INTERPOLATE_FRAMES:-8}"
+# Render 16 views strictly BETWEEN each pair of context keyframes (endpoints dropped).
+export VIS_INTERPOLATE_FRAMES="${VIS_INTERPOLATE_FRAMES:-16}"
 export VIS_INTERPOLATE_SELECT="${VIS_INTERPOLATE_SELECT:-local_six_pose}"
-export VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES="${VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES:-6}"
+export VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES="${VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES:-10}"
 export VIS_INTERPOLATE_POSE_DIST_POS_W="${VIS_INTERPOLATE_POSE_DIST_POS_W:-1.0}"
 export VIS_INTERPOLATE_POSE_DIST_ROT_W="${VIS_INTERPOLATE_POSE_DIST_ROT_W:-0.5}"
+export VIS_INTERPOLATE_DROP_ENDPOINTS="${VIS_INTERPOLATE_DROP_ENDPOINTS:-true}"
 
 ############################
 # Logging
@@ -147,7 +149,8 @@ singularity exec --nv $BIND $SIF bash -lc "
     training.vis_interpolate_select = ${VIS_INTERPOLATE_SELECT} \
     training.vis_interpolate_num_input_keyframes = ${VIS_INTERPOLATE_NUM_INPUT_KEYFRAMES} \
     training.vis_interpolate_pose_dist_pos_w = ${VIS_INTERPOLATE_POSE_DIST_POS_W} \
-    training.vis_interpolate_pose_dist_rot_w = ${VIS_INTERPOLATE_POSE_DIST_ROT_W}
+    training.vis_interpolate_pose_dist_rot_w = ${VIS_INTERPOLATE_POSE_DIST_ROT_W} \
+    training.vis_interpolate_drop_endpoints = ${VIS_INTERPOLATE_DROP_ENDPOINTS}
 "
 
 echo ""
