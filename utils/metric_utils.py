@@ -454,22 +454,41 @@ def save_interpolated_vis_frames(out_dir, video_rendering, input_endpoints=None,
     frames = video_rendering[0].detach().cpu().float()  # [total_frames, 3, h, w]
     h, w = frames.shape[-2], frames.shape[-1]
 
-    # Save the interpolated trajectory frames as a single horizontal strip.
-    strip_img = rearrange(frames, "v c h w -> h (v w) c")
-    strip_img = (strip_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+    # Lay the frames out in a bounded grid (reading left-to-right, top-to-bottom).
+    # A single horizontal strip can exceed JPEG's ~65500 px per-side limit once there
+    # are many frames at high resolution (e.g. 144 frames x 512 px = 73728 px), which
+    # makes Image.save() raise and silently drops the whole visualization.
     out_path = os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}.jpg")
-    Image.fromarray(strip_img).save(out_path)
+    _save_frame_grid(frames, out_path, max_cols=12)
 
-    # Save the ordered input keyframes used to build the path as a reference strip.
+    # Save the ordered input keyframes used to build the path as a reference grid.
     if input_endpoints is not None and isinstance(input_endpoints, torch.Tensor) and input_endpoints.ndim == 4:
         endpoints = input_endpoints.detach().cpu().float()
         if endpoints.shape[-2:] == (h, w) and endpoints.shape[0] > 0:
-            kf_img = rearrange(endpoints, "v c h w -> h (v w) c")
-            kf_img = (kf_img.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
-            Image.fromarray(kf_img).save(
-                os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}_keyframes.jpg")
+            _save_frame_grid(
+                endpoints,
+                os.path.join(out_dir, f"interpolate_vis_{safe_scene_name}_keyframes.jpg"),
+                max_cols=12,
             )
 
+    return out_path
+
+
+def _save_frame_grid(frames, out_path, max_cols=12):
+    """Save a [n, 3, h, w] frame tensor as a single grid JPEG.
+
+    Frames are arranged row-major with at most `max_cols` columns so neither image
+    dimension blows past JPEG's per-side pixel limit. The last row is zero-padded.
+    """
+    n, c, h, w = frames.shape
+    cols = min(max_cols, n)
+    rows = (n + cols - 1) // cols
+    pad = rows * cols - n
+    if pad > 0:
+        frames = torch.cat([frames, torch.zeros((pad, c, h, w), dtype=frames.dtype)], dim=0)
+    grid = rearrange(frames, "(r col) c h w -> (r h) (col w) c", r=rows, col=cols)
+    grid = (grid.numpy() * 255.0).clip(0.0, 255.0).astype(np.uint8)
+    Image.fromarray(grid).save(out_path)
     return out_path
 
 

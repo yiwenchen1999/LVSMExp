@@ -4,6 +4,7 @@ import importlib
 import os
 import time
 import random
+import traceback
 import wandb
 import torch
 from easydict import EasyDict as edict
@@ -407,6 +408,7 @@ while cur_train_step <= total_train_steps:
                             )
                 except Exception as e:
                     print(f"[interpolate vis] skipped due to error: {e}")
+                    traceback.print_exc()
 
             torch.cuda.empty_cache()
             model.train()
