@@ -45,7 +45,7 @@ export STAGE2_UNFREEZE="${STAGE2_UNFREEZE:-all}"          # all | decoder_only
 export LEARNING_RATE="${LEARNING_RATE:-5e-5}"
 export WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 export DATALOADER_SEED="${DATALOADER_SEED:-779}"
-export BATCH_SIZE_PER_GPU="${BATCH_SIZE_PER_GPU:-4}"
+export BATCH_SIZE_PER_GPU="${BATCH_SIZE_PER_GPU:-1}"
 export MASTER_PORT="${MASTER_PORT:-29531}"
 
 # For scene style shift, always co-tune reconstruction/renderer backbones.
