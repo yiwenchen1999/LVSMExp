@@ -127,7 +127,7 @@ singularity exec --nv $BIND $SIF bash -lc "
   torchrun --nproc_per_node 1 --nnodes 1 \
     --rdzv_id \$(date +%s) \
     --rdzv_backend c10d \
-    --rdzv_endpoint localhost:29531 \
+    --rdzv_endpoint localhost:29231 \
     train_editor.py --config configs/LVSM_scene_encoder_decoder_wEditor_general_dense_512_res_singleMap_dpt_transfer_recon_only.yaml \
     training.dataset_path = \"$DATASET_PATH\" \
     training.checkpoint_dir = \"$CHECKPOINT_DIR\" \
